@@ -1,0 +1,277 @@
+أمر إلى agent 3 (نفّذ بدقة، دون كسر أي سلوك قائم)
+السياق
+
+الواجهة: React + TypeScript + Vite + Tailwind + react-router + i18next (AR/EN) + Zustand (موجودة useAuthStore, useUIStore).
+
+الشيفرة الأمامية في: frontend/src.
+
+أسلوب التصميم الحالي: ألوان (charcoal/gold/sand/ivory)، حواف rounded-luxury، قابلية استخدام على الجوال أولًا، RTL عند lang=ar.
+
+الشريط العلوي: Navbar في src/components/... (فيه BrandLogo، اللغة، البحث…).
+
+المطلوب (ميزات جديدة)
+
+زر سلة المشتريات + صفحة للسلة /cart
+
+أيقونة في الهيدر ببادج (عدد العناصر).
+
+صفحة تعرض: قائمة المنتجات (صورة/اسم/سعر/كمية), إزالة عنصر, تحديث كمية, ملخص: إجمالي فرعي + الشحن + الخصم (إن وُجد) + الإجمالي الكلي، زر “متابعة للدفع” → /checkout.
+
+زر المفضلة + صفحة للمفضلة /wishlist
+
+أيقونة قلب في الهيدر ببادج (عدد العناصر).
+
+صفحة تعرض نفس بطاقات المنتجات بشكل مُصغّر مع زر “إضافة للسلة” و“إزالة من المفضلة”.
+
+صفحة إتمام الدفع /checkout
+
+أقسام:
+
+ملخص الطلب (المنتجات + الكميات + الإجمالي الفرعي).
+
+الشحن: اختيار طريقة الشحن (افتراضي/مُسرّع) مع التكلفة.
+
+كوبون خصم: إدخال/تفعيل، اظهار التخفيض، حالات الخطأ.
+
+بيانات التوصيل: الاسم، الهاتف، المدينة، العنوان التفصيلي (تحقق أساسي).
+
+خيارات الدفع: (بطاقة/ApplePay/مدى/دفع عند الاستلام*) مع واجهة جاهزة للدمج؛ إن لم تتوفر بوابة ادفع نفّذ تدفقًا تجريبيًا (mock) ويظهر تنبيه نجاح.
+
+الإجمالي الكلي = إجمالي السلة − الخصم + الشحن.
+
+زر “تأكيد الطلب” ينجح إن مرّ التحقق (عرض رقم طلب وهمي ثم توجيه إلى صفحة نجاح /order/success?orderId=…).
+
+*إن كان الدفع عند الاستلام غير مسموح، اجعل الخيار معطّل مع Tooltip.
+
+قيود وتوافق
+
+لا تعدّل سلوك غير ذي صلة.
+
+RTL: التزم باتجاه dir من i18n.
+
+إمكانية الوصول: aria-labels، أزرار قابلة للوحة المفاتيح، فوكس واضح.
+
+الجوال: الأيقونات بأبعاد 24px على الأقل؛ الأزرار min-h 44px.
+
+التخزين: خزّن السلة والمفضلة في Zustand + LocalStorage (حتى بدون تسجيل دخول). عند تسجيل الدخول، حدّث الـ badges من الحالة.
+
+الدوال الخلفية: إن توفرت API استخدمها؛ وإن لم تتوفر، وفّر طبقة mock بدون كسر الواجهة.
+
+بنية الملفات (أضف التالية)
+src/store/cartStore.ts
+src/store/wishlistStore.ts
+src/components/cart/CartIconButton.tsx
+src/components/wishlist/WishlistIconButton.tsx
+src/pages/CartPage.tsx
+src/pages/WishlistPage.tsx
+src/pages/CheckoutPage.tsx
+src/pages/OrderSuccessPage.tsx
+src/utils/currency.ts
+
+الحالة (Zustand) — أنشئ المتاجر التالية
+src/store/cartStore.ts
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+export type CartItem = {
+  id: string; // product id
+  name: string;
+  price: number;
+  image?: string | null;
+  brand?: string | null;
+  qty: number;
+  maxQty?: number; // للاستخدام لاحقاً
+};
+
+type ShippingMethod = "standard" | "express";
+
+type CartState = {
+  items: CartItem[];
+  coupon?: { code: string; amount: number } | null;
+  shipping: ShippingMethod;
+  add: (p: Omit<CartItem, "qty">, qty?: number) => void;
+  remove: (id: string) => void;
+  setQty: (id: string, qty: number) => void;
+  clear: () => void;
+  setCoupon: (c: CartState["coupon"]) => void;
+  setShipping: (m: ShippingMethod) => void;
+  totals: () => { sub: number; discount: number; shipping: number; total: number };
+  count: () => number;
+};
+
+export const useCartStore = create<CartState>()(persist((set, get) => ({
+  items: [],
+  coupon: null,
+  shipping: "standard",
+  add: (p, qty = 1) => {
+    const items = [...get().items];
+    const idx = items.findIndex(i => i.id === p.id);
+    if (idx >= 0) items[idx].qty += qty;
+    else items.push({ ...p, qty });
+    set({ items });
+  },
+  remove: (id) => set({ items: get().items.filter(i => i.id !== id) }),
+  setQty: (id, qty) => set({ items: get().items.map(i => i.id === id ? { ...i, qty: Math.max(1, qty) } : i) }),
+  clear: () => set({ items: [], coupon: null }),
+  setCoupon: (c) => set({ coupon: c }),
+  setShipping: (m) => set({ shipping: m }),
+  totals: () => {
+    const sub = get().items.reduce((s, i) => s + i.price * i.qty, 0);
+    const discount = get().coupon?.amount ?? 0;
+    const ship = get().shipping === "express" ? 35 : 0; // قابل للتعديل
+    const total = Math.max(0, sub - discount) + ship;
+    return { sub, discount, shipping: ship, total };
+  },
+  count: () => get().items.reduce((c, i) => c + i.qty, 0),
+}), { name: "cart" }));
+
+src/store/wishlistStore.ts
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+export type WishItem = { id: string; name: string; price: number; image?: string | null; brand?: string | null };
+
+type WishlistState = {
+  items: WishItem[];
+  add: (p: WishItem) => void;
+  remove: (id: string) => void;
+  has: (id: string) => boolean;
+  count: () => number;
+};
+
+export const useWishlistStore = create<WishlistState>()(persist((set, get) => ({
+  items: [],
+  add: (p) => {
+    if (get().items.some(i => i.id === p.id)) return;
+    set({ items: [...get().items, p] });
+  },
+  remove: (id) => set({ items: get().items.filter(i => i.id !== id) }),
+  has: (id) => get().items.some(i => i.id === id),
+  count: () => get().items.length,
+}), { name: "wishlist" }));
+
+أيقونات الهيدر
+
+في Navbar:
+
+أضف <CartIconButton /> و <WishlistIconButton /> بمحاذاة أزرار اللغة/البحث.
+
+كلاهما يظهران badge بعدد العناصر.
+
+ملفان الأيقونات:
+
+src/components/cart/CartIconButton.tsx
+import { Link } from "react-router-dom";
+import { useCartStore } from "../../store/cartStore";
+
+export default function CartIconButton() {
+  const count = useCartStore(s => s.count());
+  return (
+    <Link to="/cart" className="relative p-2.5 rounded-lg hover:bg-charcoal-light transition min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="السلة">
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9H7.5L6 6zM7 6V4a3 3 0 016 0v2"/></svg>
+      {count > 0 && <span className="absolute -top-1 -end-1 bg-gold text-charcoal text-[11px] px-1.5 rounded-full">{count}</span>}
+    </Link>
+  );
+}
+
+src/components/wishlist/WishlistIconButton.tsx
+import { Link } from "react-router-dom";
+import { useWishlistStore } from "../../store/wishlistStore";
+
+export default function WishlistIconButton() {
+  const count = useWishlistStore(s => s.count());
+  return (
+    <Link to="/wishlist" className="relative p-2.5 rounded-lg hover:bg-charcoal-light transition min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="المفضلة">
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M20.8 4.6a5 5 0 0 0-7.1 0L12 6.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 22l8.8-10.3a5 5 0 0 0 0-7.1z"/></svg>
+      {count > 0 && <span className="absolute -top-1 -end-1 bg-gold text-charcoal text-[11px] px-1.5 rounded-full">{count}</span>}
+    </Link>
+  );
+}
+
+
+أدرج هاتين الأيقونتين في Navbar ضمن قسم أيقونات الهيدر (الموبايل/الديسكتوب)، بدون كسر محاذاة الشعار.
+
+الصفحات
+src/pages/CartPage.tsx
+
+جدول عناصر السلة: صورة، اسم، سعر منفرد، مُعدّل كمية (+/−)، إزالة.
+
+ملخّص جانبي (أو أسفل في الجوال): نداء totals()، زر “متابعة للدفع” → /checkout.
+
+src/pages/WishlistPage.tsx
+
+شبكة بطاقات مُصغّرة: زر “إضافة للسلة” (ينقل العنصر للسلة)، زر إزالة.
+
+src/pages/CheckoutPage.tsx
+
+أقسام: Delivery, Shipping, Coupon, Payment, Order Summary.
+
+التحقق من الحقول الأساسية قبل “تأكيد الطلب”.
+
+عند النجاح: توجيه إلى /order/success?orderId=… + تفريغ السلة (مع إبقاء المفضلة).
+
+src/pages/OrderSuccessPage.tsx
+
+شكرًا + رقم الطلب + رابط “العودة للمتجر”.
+
+التوجيه (Routes)
+
+أضف في الراوتر:
+
+<Route path="/cart" element={<CartPage />} />
+<Route path="/wishlist" element={<WishlistPage />} />
+<Route path="/checkout" element={<CheckoutPage />} />
+<Route path="/order/success" element={<OrderSuccessPage />} />
+
+العملة والرمز
+
+استخدم رمز الريال (الشعار الخاص) بجانب السعر إن وُجد كمكوّن SARIcon, وإلا استخدم الرمز الموحّد ﷼.
+
+أنشئ src/utils/currency.ts:
+
+export const sar = (n: number, locale: "ar-SA" | "en-US" = "ar-SA") =>
+  n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+
+مثال عرض:
+
+<span className="text-gold font-extrabold text-lg">{sar(price)} ﷼</span>
+
+
+أو مع SARIcon.
+
+API (إن وُجدت)
+
+تطبيق الكوبون: POST /coupons/validate { code, items:[{id, qty}], subTotal } → { valid:boolean, amount:number, message?:string }
+
+يمكن تبديل الشحن لاحقًا بواجهة حقيقية. إن لم تتوفر، أبقِها ثابتة كما في cartStore.
+
+i18n
+
+أضف مفاتيح جديدة (AR/EN) مثل:
+
+common.cart, common.wishlist, cart.title, cart.empty, cart.toCheckout,
+checkout.title, checkout.delivery, checkout.shipping, checkout.coupon,
+checkout.payment, checkout.placeOrder, checkout.successTitle, ...
+
+القبول (Acceptance)
+
+شارة العدد تتحدّث فوريًا عند الإضافة/الإزالة.
+
+تغيّر الكمية يعيد حساب الإجمالي دون تحديث الصفحة.
+
+الكوبون يطبّق ويُظهر الخصم وحالات الخطأ.
+
+الدفع (mock) يُنهي العملية وينقل لصفحة النجاح.
+
+كامل التجربة تعمل RTL وMobile-first.
+
+لا تظهر أي أخطاء في الـ console.
+
+التسليم
+
+كومِتات واضحة: feat(cart): …, feat(wishlist): …, feat(checkout): …
+
+لقطة شاشة/ GIF لعمل الصفحات الثلاث.
+
+تحديث مستند README القصير: كيفية اختبار المزايا.

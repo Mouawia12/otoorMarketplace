@@ -1,0 +1,56 @@
+Proceed to Milestone 4 — Buyer Dashboard.
+
+Implement the following routes and components:
+
+### Routes
+- /account
+- /account/orders
+- /account/bids
+- /account/favorites
+- /account/support
+
+### UI & Components
+1. **Account Overview (/account)**
+   - Show profile summary (name, email, join date)
+   - Button: Edit Profile (opens modal or separate page)
+   - Display total orders, active bids, and favorite products count.
+
+2. **Orders (/account/orders)**
+   - Table listing: Order ID, Product, Date, Amount, Status, and Actions (View, Download Invoice placeholder)
+   - Status colors: pending=gold, shipped=blue, completed=green, canceled=red
+   - Allow filtering by status.
+
+3. **Bids (/account/bids)**
+   - Table of user bids with: Auction, Current Status, Your Max Bid, Result
+   - Indicate "Winning" or "Outbid"
+   - Option to view auction details (/auction/:id)
+
+4. **Favorites (/account/favorites)**
+   - Grid of favorited items using existing ProductCard component
+   - Buttons: Remove from favorites / View Details
+
+5. **Support (/account/support)**
+   - Ticket list (subject, date, status)
+   - Button: “Open New Ticket” → form (subject, message, upload optional)
+   - Status colors: open=gold, in progress=blue, closed=gray
+   - Support messages can be mocked now (API ready later)
+
+### Data & API
+- Use mock services:
+  - GET /api/orders/mine
+  - GET /api/bids/mine
+  - GET /api/favorites
+  - GET/POST /api/support/tickets
+- Keep using mock data for now; structure the Axios stubs to be easily switchable.
+
+### UX & Theme
+- Keep Charcoal/Gold/Ivory theme and Arabic/English support.
+- Reuse table and card components for consistency.
+- Responsive layout with sidebar navigation for Buyer Dashboard (on mobile → collapsible drawer).
+
+### Acceptance Criteria
+- All routes render properly and switch between AR/EN flawlessly.
+- Tables and grids display mock data.
+- Support ticket creation works (mock POST).
+- Design matches brand aesthetics and RTL layout.
+- Create checkpoint and print changed paths after completion.

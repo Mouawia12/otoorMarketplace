@@ -1,0 +1,84 @@
+Context: You generated a simple landing page. We need to align the frontend with the full spec (bilingual marketplace + auctions + role dashboards). Do NOT redo the backend scaffold; continue by implementing the UI/features below. After each milestone, create a checkpoint and print changed paths.
+
+### Milestone 1 — Global UI polish & i18n/RTL
+- Enforce the brand theme:
+  - Colors: Charcoal #1A1A1A, Gold #C8A24A (hover #B28E3E), Ivory #F7F5F2, Sand #EAE4D9, Taupe #B8A68C, Success #2E7D6F, Alert #E26D5A.
+  - Typography: Inter (EN) + Cairo (AR); H1=32/700, H2=24/600, Body=16/400.
+  - Components: rounded 12px, soft shadows, spacing 8/16/24/32.
+- Header: sticky, logo left (BrandLogo placeholder), right: Search, Language toggle (EN/AR), Auth buttons.
+- Footer: dark (Charcoal), gold logo text, links (About/Help/Policies/Contact).
+- i18n: move ALL visible strings into `src/i18n/en.json` and `src/i18n/ar.json`. On Arabic, set `<html dir="rtl" lang="ar">`. No mixed-language literals.
+
+**Acceptance:** language switch flips all labels and direction; header/footer styled with the palette.
+
+### Milestone 2 — Public catalog pages
+- Routes: `/new`, `/used`, `/auctions`.
+- Build a reusable `ProductCard` (image, title, brand, price, badges: NEW/USED/AUCTION; buttons: Buy Now, Bid Now).
+- Add a filter bar component with: Brand (multi), Category, Condition (new/used), Price range, Sort (Newest/Price/Popularity).
+- Grid responsive 2–4 columns. Pagination component.
+- Connect to API stubs: `GET /api/products?type=new|used&brand=&category=&condition=&sort=&page=&page_size=`. If backend not ready, mock with a local service that later switches to Axios.
+
+**Acceptance:** visiting `/new` or `/used` shows a paginated grid, filters actually filter (even if mocked). Styling matches theme.
+
+### Milestone 3 — Product detail & Auction page
+- `/p/:id`: gallery (thumbnails), details (brand, size_ml, concentration, condition), price or “Auction” badge, buttons: **Buy Now**, **Request Authenticity**, **Add to Favorites**. Show related products section.
+- `/auction/:id`: current_price, min_increment, countdown timer component, numeric bid input with +/–, **Place Bid** button, Bid Log table (username masked, amount, time). On end, show “Winner” ribbon and CTA to proceed to order.
+- Wire to endpoints: `GET /api/products/:id`, `GET /api/auctions/:id`, `POST /api/auctions/:id/bid`. For live updates use WebSocket if available, else poll `/api/auctions/:id` every 3–5s.
+
+**Acceptance:** countdown stops at end; bid button validates amount ≥ current+min_increment; UI updates after placing a bid (mock acceptable if backend not ready).
+
+### Milestone 4 — Buyer dashboard
+- Routes: `/account`, `/account/orders`, `/account/bids`, `/account/favorites`, `/account/support`.
+- Implement tables:
+  - Orders: id, product, amount, status, created_at; download invoice placeholder.
+  - Bids: auction, current status, your_max_bid, result.
+  - Favorites: list ProductCard items.
+  - Support: open ticket form + list.
+- API stubs: `GET /api/orders/mine`, `GET /api/auth-requests/mine`, `GET/POST /api/support/tickets`.
+
+**Acceptance:** pages render with mocked data, switch to Axios when backend is ready.
+
+### Milestone 5 — Seller panel
+- Routes: `/seller/dashboard`, `/seller/products`, `/seller/auctions`, `/seller/orders`, `/seller/earnings`, `/seller/support`.
+- `/seller/products`: use a reusable DataTable with search; columns(id,title,brand,type,condition,price,status,created_at). Inline edit for price/status. Actions: Delete, Duplicate. Buttons: **Add Product** modal (with image upload up to 5), **Import CSV** (title,brand,type,price,condition).
+- Wire to: `GET /api/seller/products`, `POST /api/products`, `PUT /api/products/:id`, `DELETE /api/products/:id`, `POST /api/uploads`.
+
+**Acceptance:** create product → appears Pending; inline edits persist; CSV import creates multiple items.
+
+### Milestone 6 — Admin shell & moderation
+- Routes under `/admin/*`:
+  - Dashboard: KPI cards (commissions today, new orders, active auctions, pending products, open tickets) + Moderation Queue (pending products, scheduled auctions, users awaiting verification).
+  - Products: list + filters + **Approve/Reject/Hide** with reason + **Bulk** actions.
+  - Auctions: running/scheduled/ended with **Extend/End** and Bid Log.
+  - Orders: change status (pending/seller_confirmed/shipped/completed/canceled/dispute) + CSV export.
+  - Users: activate/suspend, set roles, mark verified_seller.
+  - Auth Requests: assign validator, set status (processing/done), result text/attachments.
+  - Ads: CRUD banners for positions (hero/sidebar/strip).
+  - Support: tickets inbox with canned replies.
+  - Reports: sales/commissions & auction performance charts; CSV export.
+  - Settings: commission rates (new 10%, used/auction 5%), authenticity fee, notifications, language/theme, RBAC.
+  - Audit: list sensitive actions with filters.
+- Provide API client stubs (AdminAPI) mapping to `/api/admin/*`. Keep UI functional with mocks if backend not ready.
+
+**Acceptance:** visible routes and tables exist; approval modal captures reason; bulk actions update UI.
+
+### Milestone 7 — Global components & polish
+- Toast notifications (success/error/warn, AR/EN).
+- Dark mode toggle (colors adjust as defined; gold constant).
+- Performance: lazy-load heavy pages, image lazy loading.
+- Accessibility: alt text, aria-labels for bilingual logo, contrast checks.
+
+**Acceptance:** Lighthouse ≥ 90 on performance & accessibility for `/`, `/new`, `/p/:id`.
+
+### Milestone 8 — Brand assets wiring
+- Add a placeholder `BrandLogo` component with variants (monogram, wordmark-en, wordmark-ar, bilingual). Use it in header/footer.
+- Create `manifest.webmanifest`, favicon set, and reference them in `index.html`.
+
+**Acceptance:** icons appear in browser tabs and PWA audits pass.
+
+### Notes
+- Keep strings in i18n files only; no hard-coded UI text.
+- Keep direction-safe CSS (logical props: padding-inline, border-inline).
+- After each milestone: make a checkpoint and print a short summary + changed paths only.
+
+Start with Milestone 1 now.

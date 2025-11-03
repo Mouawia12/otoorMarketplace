@@ -1,0 +1,44 @@
+Mobile UI refinement (Header + Product Cards) with Noon-like compact style. Keep outputs minimal and PRINT CHANGED PATHS ONLY.
+
+Scope A) Mobile Header (<= 480px)
+- Make a compact sticky header: height 56px, Charcoal bg, subtle shadow.
+- Center brand logo; place hamburger on inline-start (LTR=left, RTL=right), language + search icons on inline-end.
+- Convert search into full-screen overlay on mobile (opens via icon; closes with X).
+- Ensure proper RTL/LTR: use logical props (padding-inline, inset-inline-start, etc.).
+- Increase tap targets to >=44px; fix z-index so header stays above drawers/overlays.
+- Prevent double headers: Navbar rendered once in Layout only.
+
+Scope B) Product Cards (catalog: /new, /used, /auctions)
+- Add a "compact" ProductCard variant for mobile.
+- Grid: 2 columns on mobile (≥360px), 3 on md, 4 on lg.
+- Card sizing: image aspect-ratio 4:5 (or 1:1 fallback), image height ~160–180px on mobile.
+- Reduce paddings/gaps; clamp title to 2 lines; keep brand as small label; price bold & prominent.
+- Buttons condensed to icons on mobile (heart, cart/bid) with tooltips on desktop.
+- Badges (NEW/USED/AUCTION) smaller (12–13px), corner-rounded.
+
+Scope C) Auction thumbnails & broken images
+- Add image fallback (onError) to show a placeholder perfume bottle SVG.
+- Add Skeleton placeholders while images load.
+- Ensure auction cards use same compact variant; keep countdown visible under image.
+
+Scope D) Footer (mobile)
+- Stack columns; reduce padding; ensure <Link to="..."> client-side navigation only.
+
+Scope E) Performance & polish
+- Lazy-load catalog images; use loading="lazy".
+- Avoid horizontal scroll on mobile except for intended tables.
+- Keep palette/typography as is.
+
+Acceptance
+- On 360–414px widths: header aligned (centered logo), hamburger + search work, no overlap.
+- Catalog shows compact cards (2 per row) with crisp images, no layout shift.
+- Auction page shows images reliably (fallback if broken) and compact layout.
+- RTL/LTR switches instantly and keeps alignment.
+- Create ONE checkpoint and print CHANGED PATHS ONLY.
+
+Files to touch (suggested):
+- frontend/src/components/layout/Navbar.tsx
+- frontend/src/components/products/ProductCard.tsx (+ ProductCard.compact.tsx if needed)
+- frontend/src/pages/*Catalog*.tsx
+- frontend/src/components/common/Image.tsx (create reusable with fallback)
+- frontend/src/index.css or global styles

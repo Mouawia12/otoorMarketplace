@@ -1,0 +1,229 @@
+Agent 3 Brief — Build a Professional Blog Module (Multilingual, No Comments) with Admin Management & Full SEO
+Goal
+
+Implement a multilingual (AR/EN) blog for a React + Vite + Tailwind + i18n + react-router stack. The blog must be:
+
+SEO-ready (meta, schema, canonical, hreflang, sitemap, RSS).
+
+Admin-managed (create/edit/delete, draft/publish, preview).
+
+Integrated in Navigation (footer + navbar/mobile drawer).
+
+Without any comments feature (no UI, no API, no fields).
+
+Dependencies
+npm i gray-matter marked dompurify react-helmet-async slugify
+
+
+Wrap the app with <HelmetProvider> (e.g., in main.tsx).
+
+Sanitize post HTML with DOMPurify before rendering.
+
+Content Structure
+
+Create Markdown files with front-matter (one file per language):
+
+/src/content/blog/
+  2025-01-10-intro-to-niche-perfumes.ar.md
+  2025-01-10-intro-to-niche-perfumes.en.md
+
+
+Front-matter:
+
+---
+slug: intro-to-niche-perfumes
+title: ...
+description: ...
+cover: /images/blog/cover.jpg
+author: Brand Name
+category: guides
+tags: ["tag1","tag2"]
+date: 2025-01-10
+lang: ar
+status: published # or draft
+---
+
+Blog Service — src/services/blogService.ts
+
+Load via import.meta.glob(".../*.md", { as: "raw", eager: true }).
+
+Parse front-matter with gray-matter.
+
+Convert Markdown → HTML with marked, then sanitize via DOMPurify.
+
+Expose:
+
+getAllPosts() (sorted DESC by date; exclude draft for public)
+
+getPostsByLang(lang)
+
+getPostBySlug(slug, lang)
+
+getRelated(slug, lang, n)
+
+estimateReadingTime(text) (words & minutes)
+
+extractToc(html) (H2/H3 anchors for a Table of Contents)
+
+Do not implement any comments-related functions.
+
+Public Pages
+1) Blog Index — /blog (src/pages/blog/BlogIndex.tsx)
+
+Grid of cards (cover, title, description, date).
+
+Pagination: 12 posts/page.
+
+Optional filters: category, tag, plus text search.
+
+<Helmet>: title, description, canonical.
+
+2) Blog Post — /blog/:slug (src/pages/blog/BlogPost.tsx)
+
+Show:
+
+Title, date, reading time.
+
+Cover image (lazy), sanitized HTML in prose (respect RTL for AR).
+
+TOC from H2/H3 (clickable anchors).
+
+Related posts (by language + relevance).
+
+Breadcrumbs (UI + JSON-LD).
+
+Share buttons (copy link / WhatsApp / Twitter).
+
+No comments UI.
+
+SEO:
+
+<Helmet> + OG/Twitter + canonical.
+
+JSON-LD Article.
+
+hreflang to alternate language version (if available).
+
+3) Category / Tag / Author Pages
+
+src/pages/blog/CategoryPage.tsx → /blog/category/:cat
+
+src/pages/blog/TagPage.tsx → /blog/tag/:tag
+
+src/pages/blog/AuthorPage.tsx → /blog/author/:name (simple bio)
+
+Each includes <Helmet>, breadcrumb UI, and suitable schema (BreadcrumbList / CollectionPage).
+
+4) Routing
+
+Add:
+
+<Route path="/blog" element={<BlogIndex />} />
+<Route path="/blog/:slug" element={<BlogPost />} />
+<Route path="/blog/category/:cat" element={<CategoryPage />} />
+<Route path="/blog/tag/:tag" element={<TagPage />} />
+<Route path="/blog/author/:name" element={<AuthorPage />} />
+
+Navigation Integration
+
+Footer: add “Blog” link under the About section → /blog.
+
+Navbar & mobile drawer: add “Blog” link.
+
+i18n keys (AR/EN):
+
+"nav": { "blog": "Blog" },
+"blog": {
+  "title": "Blog",
+  "desc": "Latest articles and tips",
+  "related": "You may also like",
+  "notFound": "Article not found",
+  "back": "Back to Blog",
+  "toc": "Table of Contents",
+  "minRead": "min read"
+}
+
+Admin Panel — Blog Management
+Listing
+
+Sidebar item: Blog (roles: admin, super_admin).
+
+Table columns: title, language, status (draft/published), date, author.
+
+Actions: Create, Edit, Delete, Preview.
+
+Filters: status/language/category + search.
+
+Create/Edit
+
+Fields: title, slug (slugify, unique per lang), description, cover, author, category, tags[], lang, date, status, Markdown content with Preview.
+
+Buttons: Save Draft, Publish, Preview (opens /blog/:slug?preview=1).
+
+No comments fields.
+
+Storage
+
+Choose one (prefer API/DB):
+
+API/DB (preferred)
+
+REST: /api/admin/blog (CRUD), /api/blog (public read).
+
+Store Markdown + front-matter.
+
+Protected file writer
+
+Admin writes to /src/content/blog/* through a secure backend endpoint.
+
+SEO & Performance
+
+Full meta on all pages (title/description/OG/Twitter/canonical).
+
+JSON-LD: Article (post), BreadcrumbList (all), CollectionPage (lists).
+
+hreflang between AR/EN versions of the same slug.
+
+Sitemap & RSS (build step):
+
+Generate /public/sitemap.xml, /public/sitemap-blog.xml, /public/rss.xml from getAllPosts().
+
+Images: loading="lazy", prefer WebP/AVIF, provide srcset/sizes.
+
+Internal linking: pillar pages + topic clusters.
+
+Performance: preconnect to image host, caching, optional LQIP/blur placeholders.
+
+Analytics
+
+GA4 events: scroll depth, share click, TOC click, copy link, time on page.
+
+Track outbound links.
+
+(Optional) enable Hotjar/FullStory (no UI work).
+
+Explicit Constraints
+
+No comments anywhere (UI/API/schema).
+
+Drafts are never publicly visible.
+
+Enforce RTL for Arabic inside prose.
+
+Acceptance Criteria
+
+ /blog with 12/page pagination, filters/search, proper meta.
+
+ /blog/:slug with TOC, reading time, related posts, breadcrumbs, <Helmet> + OG + JSON-LD + hreflang.
+
+ Footer/Navbar/mobile include a working Blog link.
+
+ Category/Tag/Author pages exist with meta and breadcrumb schema.
+
+ Admin: list + create/edit/delete + draft/publish + preview + role guard.
+
+ Build step outputs sitemap.xml, sitemap-blog.xml, rss.xml.
+
+ Sanitized HTML (DOMPurify), RTL/LTR respected.
+
+ Images lazy-load and are responsive.

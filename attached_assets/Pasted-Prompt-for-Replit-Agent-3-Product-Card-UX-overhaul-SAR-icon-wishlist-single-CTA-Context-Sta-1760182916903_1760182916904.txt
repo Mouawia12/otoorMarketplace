@@ -1,0 +1,225 @@
+Prompt for Replit Agent 3 — Product Card UX overhaul (SAR icon + wishlist + single CTA)
+Context
+
+Stack: React + TypeScript + Vite + TailwindCSS + React Router + Zustand + i18next.
+
+Frontend root: frontend/src.
+
+Existing stores: useCartStore, useWishlistStore.
+
+Design: charcoal/gold/sand/ivory, rounded corners, mobile-first, RTL when lang='ar'.
+
+Goal
+
+Update all product cards to a professional UX:
+
+Use the provided Saudi Riyal SVG icon next to prices (no text “ريال/SAR”).
+
+Show a wishlist heart button at the top-left of the card (filled when in wishlist).
+
+Make image and product name clickable to the product detail page (no “view details” button).
+
+Keep a single CTA button only: “Add to Cart”.
+
+Apply everywhere product cards are used (new/used/auctions/search/category, etc.).
+
+Fully responsive + RTL-safe.
+
+Files to add/ensure
+
+SAR icon (already provided by user)
+Save to: src/assets/icons/sar-symbol.svg
+
+Currency utils
+Create: src/utils/currency.ts
+
+export const formatSAR = (n: number, locale: "ar-SA" | "en-US" = "ar-SA") =>
+  n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+
+SAR icon component
+Create: src/components/common/SARIcon.tsx
+
+import sarSymbol from "../../assets/icons/sar-symbol.svg";
+
+export default function SARIcon({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <img
+      src={sarSymbol}
+      width={size}
+      height={size}
+      alt="SAR"
+      loading="lazy"
+      className={`inline-block align-middle ${className}`}
+    />
+  );
+}
+
+Replace product card with the new UX
+
+Replace (or create if not present) src/components/products/ProductCard.tsx with:
+
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { useCartStore } from "../../store/cartStore";
+import { useWishlistStore } from "../../store/wishlistStore";
+import SARIcon from "../common/SARIcon";
+import { formatSAR } from "../../utils/currency";
+
+// Adjust to project Product type if needed
+export type Product = {
+  id: string;
+  name: string;
+  slug?: string;
+  brand?: { name: string } | string | null;
+  price: number;
+  image?: string | null;
+};
+
+function getBrandName(brand: Product["brand"]) {
+  if (!brand) return "";
+  return typeof brand === "string" ? brand : brand.name || "";
+}
+
+function productLink(p: Product) {
+  return p.slug ? `/products/${p.slug}` : `/products/${p.id}`; // adjust if your route differs
+}
+
+export default function ProductCard({ product }: { product: Product }) {
+  const { i18n } = useTranslation();
+  const dir = i18n.language === "ar" ? "rtl" : "ltr";
+
+  const addToCart = useCartStore((s) => s.add);
+  const hasInWishlist = useWishlistStore((s) => s.has(product.id));
+  const addToWishlist = useWishlistStore((s) => s.add);
+  const removeFromWishlist = useWishlistStore((s) => s.remove);
+
+  const toggleWishlist = () => {
+    if (hasInWishlist) removeFromWishlist(product.id);
+    else
+      addToWishlist({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image || undefined,
+        brand: getBrandName(product.brand) || undefined,
+      });
+  };
+
+  return (
+    <article
+      dir={dir}
+      className="group bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow overflow-hidden flex flex-col"
+    >
+      {/* Clickable image */}
+      <div className="relative">
+        <Link to={productLink(product)} className="block aspect-[4/5] w-full bg-sand/60 overflow-hidden">
+          {product.image ? (
+            <img
+              src={product.image}
+              alt={product.name}
+              loading="lazy"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <div className="w-full h-full" />
+          )}
+        </Link>
+
+        {/* Wishlist heart - top-left (logical) */}
+        <button
+          onClick={toggleWishlist}
+          aria-label={hasInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          className="absolute top-2 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center bg-white/85 hover:bg-white shadow-md"
+          style={{ insetInlineStart: "8px" }}
+        >
+          <svg
+            className="w-5 h-5"
+            viewBox="0 0 24 24"
+            fill={hasInWishlist ? "currentColor" : "none"}
+            stroke="currentColor"
+          >
+            <path
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M20.8 4.6a5 5 0 0 0-7.1 0L12 6.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 22l8.8-10.3a5 5 0 0 0 0-7.1z"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 flex-1 flex flex-col">
+        {getBrandName(product.brand) ? (
+          <div className="text-xs text-taupe/90 mb-1">{getBrandName(product.brand)}</div>
+        ) : null}
+
+        {/* Clickable name */}
+        <Link
+          to={productLink(product)}
+          className="block text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2"
+        >
+          {product.name}
+        </Link>
+
+        {/* Price with SAR SVG */}
+        <div className="mt-2 text-gold font-extrabold text-lg inline-flex items-center gap-1">
+          {formatSAR(product.price)} <SARIcon />
+        </div>
+
+        {/* Single CTA: Add to cart */}
+        <button
+          onClick={() =>
+            addToCart(
+              {
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                image: product.image || undefined,
+                brand: getBrandName(product.brand) || undefined,
+              },
+              1
+            )
+          }
+          className="mt-3 h-11 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition flex items-center justify-center gap-2 min-h-[44px]"
+          aria-label="Add to cart"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9H7.5L6 6zM7 6V4a3 3 0 016 0v2" />
+          </svg>
+          <span>أضف للسلة</span>
+        </button>
+      </div>
+    </article>
+  );
+}
+
+Apply globally
+
+Ensure all product listings import and render this ProductCard (home sections, “New”, “Used”, “Auctions”, search results, category pages, etc.). Replace any legacy card component with this one.
+
+Replace any raw price text (e.g., “ريال”, “SAR”) across the app with:
+
+import { formatSAR } from "@/utils/currency";
+import SARIcon from "@/components/common/SARIcon";
+
+<span className="inline-flex items-center gap-1 text-gold font-extrabold">
+  {formatSAR(price)} <SARIcon />
+</span>
+
+Acceptance Criteria
+
+SAR SVG icon (not text) is shown next to all prices.
+
+Wishlist heart appears top-left of each card, toggles filled/outlined state, and persists via Zustand/localStorage.
+
+Image and product name are clickable and navigate to product detail.
+
+Only one CTA on the card: Add to Cart; it adds the product via useCartStore.add.
+
+Cards are responsive and RTL-safe (heart position uses inset-inline-start).
+
+No console errors; design matches existing palette and spacing.
+
+Proceed to implement exactly as described.

@@ -1,0 +1,152 @@
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+
+interface AccountStats {
+  totalOrders: number;
+  activeBids: number;
+  favoritesCount: number;
+}
+
+interface UserProfile {
+  name: string;
+  email: string;
+  joinDate: string;
+}
+
+export default function AccountOverviewPage() {
+  const { t, i18n } = useTranslation();
+  const [stats, setStats] = useState<AccountStats>({ totalOrders: 0, activeBids: 0, favoritesCount: 0 });
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    const mockProfile: UserProfile = {
+      name: 'Ahmed Mohamed',
+      email: 'ahmed@example.com',
+      joinDate: '2024-01-15',
+    };
+
+    const mockStats: AccountStats = {
+      totalOrders: 12,
+      activeBids: 3,
+      favoritesCount: 8,
+    };
+
+    setProfile(mockProfile);
+    setStats(mockStats);
+  }, []);
+
+  if (!profile) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t('common.loading')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Profile Card */}
+      <div className="bg-white rounded-luxury p-6 shadow-luxury">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h1 className="text-h2 text-charcoal mb-2">{t('account.overview')}</h1>
+            <p className="text-taupe">{t('account.welcomeBack')}, {profile.name}</p>
+          </div>
+          <button
+            onClick={() => setShowEditModal(true)}
+            className="bg-gold text-charcoal px-6 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
+          >
+            {t('account.editProfile')}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-gray-200">
+          <div>
+            <p className="text-taupe text-sm mb-1">{t('account.fullName')}</p>
+            <p className="text-charcoal font-semibold">{profile.name}</p>
+          </div>
+          <div>
+            <p className="text-taupe text-sm mb-1">{t('account.email')}</p>
+            <p className="text-charcoal font-semibold">{profile.email}</p>
+          </div>
+          <div>
+            <p className="text-taupe text-sm mb-1">{t('account.memberSince')}</p>
+            <p className="text-charcoal font-semibold">
+              {new Date(profile.joinDate).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Link
+          to="/account/orders"
+          className="bg-white rounded-luxury p-6 shadow-luxury hover:shadow-luxury-hover transition"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gold bg-opacity-20 rounded-luxury flex items-center justify-center">
+              <span className="text-2xl">📦</span>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-charcoal">{stats.totalOrders}</p>
+              <p className="text-taupe">{t('account.totalOrders')}</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          to="/account/bids"
+          className="bg-white rounded-luxury p-6 shadow-luxury hover:shadow-luxury-hover transition"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gold bg-opacity-20 rounded-luxury flex items-center justify-center">
+              <span className="text-2xl">🔨</span>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-charcoal">{stats.activeBids}</p>
+              <p className="text-taupe">{t('account.activeBids')}</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          to="/account/favorites"
+          className="bg-white rounded-luxury p-6 shadow-luxury hover:shadow-luxury-hover transition"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gold bg-opacity-20 rounded-luxury flex items-center justify-center">
+              <span className="text-2xl">❤️</span>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-charcoal">{stats.favoritesCount}</p>
+              <p className="text-taupe">{t('account.favorites')}</p>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* Edit Profile Modal (Placeholder) */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-luxury p-6 max-w-md w-full">
+            <h3 className="text-h3 text-charcoal mb-4">{t('account.editProfile')}</h3>
+            <p className="text-taupe mb-6">{t('account.editProfileComingSoon')}</p>
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="w-full bg-charcoal text-ivory px-6 py-3 rounded-luxury font-semibold hover:bg-charcoal-light transition"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,610 @@
+Replit Agent 3 — Full Build Prompt (Aalam Al-Otoor Marketplace)
+
+Objective: Build a production-ready MVP (with selected “Should-have” enhancements) for Aalam Al-Otoor: a bilingual (Arabic/English) marketplace for new, used, and auctioned perfumes. Roles: admin, moderator, support, seller, buyer.
+Focus on clean architecture, security, and easy extensibility.
+
+0) Tech Stack & Conventions
+
+Backend: Python FastAPI, SQLAlchemy, Alembic (migrations), Pydantic v2, PostgreSQL (SQLite OK for local), bcrypt, JWT auth (+ optional refresh), CORS, basic rate limiting.
+
+Auctions live updates: WebSocket (preferred) or short-interval polling fallback.
+
+Frontend: React (Vite + TS), React Router, Zustand (or Redux), react-i18next (AR/EN), RTL support, Axios, react-hook-form + zod, @tanstack/react-table.
+
+UI Theme: Brand palette (luxury):
+
+Charcoal #1A1A1A (text/headers), Gold #C8A24A (primary), Gold hover #B28E3E, Ivory #F7F5F2 (bg), Taupe #B8A68C, Sand #EAE4D9, Success #2E7D6F, Alert #E26D5A.
+
+Fonts: Inter (EN), Cairo (AR). Rounded corners 10–14px, soft shadows, generous whitespace.
+
+Infra/Dev: Docker + docker-compose, .env with example, Nginx (reverse proxy) for prod, testing (pytest + React Testing Library), ESLint/Prettier.
+
+Repo structure:
+
+/backend/app (models, schemas, routers, services, core(config, db, security), main.py)
+/backend/alembic/*  /backend/tests/*
+/frontend/src (pages, components, admin, seller, buyer, api, store, i18n, styles)
+docker-compose.yml  .env.example  README.md
+
+1) Database Models (SQLAlchemy)
+
+users(id, name, email, phone, password_hash, roles [array or m2m], status[active/suspended], created_at)
+
+products(id, seller_id, title, brand, category, size_ml, concentration, condition[new/used], description, type[listing/auction], price, status[pending/published/sold/hidden/ended], allow_auth_check[bool], created_at, status_reason)
+
+product_images(id, product_id, url, sort_order)
+
+auctions(id, product_id, start_price, min_increment, start_at, end_at, current_price, status[scheduled/running/ended], end_extended_count)
+
+bids(id, auction_id, user_id, amount, created_at)
+
+orders(id, buyer_id, product_id, amount, payment_method[cod/bank], status[pending/seller_confirmed/shipped/completed/canceled/dispute], shipping_address_json, notes, internal_notes, created_at, dispute_flag)
+
+auth_requests(id, product_id, requester_id, fee_amount, assigned_to, status[open/processing/done], result_text, created_at)
+
+ads(id, title, position[hero/sidebar/strip], image_url, target_url, status[active/inactive], start_at, end_at)
+
+tickets(id, user_id, subject, message, status[open/pending/closed], order_id nullable, created_at)
+
+notifications(id, user_id, title, body, is_read, created_at)
+
+audit_logs(id, admin_id, entity, entity_id, action, meta_json, created_at)
+
+Indexes: on (status, created_at, brand); foreign keys; sensible cascades.
+
+Migrations: Alembic revision for initial schema + seed script.
+
+2) Auth, Security & RBAC
+
+JWT access tokens (short-lived) + optional refresh; bcrypt passwords.
+
+Roles: super_admin, admin, moderator, support, seller, buyer. Users may have multiple roles.
+
+Route guards:
+
+/api/admin/* → admin/super_admin (+moderator/support per endpoint).
+
+/api/seller/* → seller.
+
+/api/* public/buyer as appropriate.
+
+Rate limit: basic per-IP on auth, bidding, checkout.
+
+2FA (Should-have) for admin: optional TOTP toggle in settings (mocked endpoint okay).
+
+Audit logs for all sensitive admin actions (approve/reject/hide/extend/end/change-status).
+
+Uploads security: accept images only, limit size, sanitize names, generate thumbnails.
+
+3) Backend API (FastAPI)
+
+Auth
+
+POST /api/auth/register (name, email, phone, password)
+
+POST /api/auth/login → JWT
+
+GET /api/auth/me → user + roles
+
+Public Products
+
+GET /api/products?type=new|used&search=&brand=&category=&sort=&page=&page_size=
+
+GET /api/products/:id
+
+GET /api/ads?position=hero|sidebar|strip
+
+Seller
+
+GET /api/seller/products
+
+POST /api/products (creates pending product; accepts images: string[])
+
+PUT /api/products/:id
+
+DELETE /api/products/:id
+
+GET /api/seller/orders
+
+PATCH /api/seller/orders/:id/status (confirm/shipped/completed/canceled)
+
+POST /api/uploads (multipart) → { url }
+
+Auctions
+
+GET /api/auctions?status=running|scheduled|ended
+
+GET /api/auctions/:id
+
+POST /api/auctions/:id/bid (auth required): guard by time window + min_increment
+
+WebSocket /ws/auctions/:id (broadcast current_price, latest bid, remaining time)
+
+Polling fallback endpoint /api/auctions/:id/pulse
+
+Orders & Checkout
+
+Buyer: POST /api/orders (product_id, shipping_address_json, payment_method=cod|bank, notes)
+
+Buyer: GET /api/orders/mine
+
+Admin: GET /api/admin/orders?status=...
+
+Admin: PATCH /api/admin/orders/:id/status (+internal_notes, dispute_flag)
+
+Authenticity
+
+Buyer: POST /api/auth-requests (product_id)
+
+Buyer: GET /api/auth-requests/mine
+
+Admin: GET /api/admin/auth-requests
+
+Admin: PATCH /api/admin/auth-requests/:id/assign (assigned_to)
+
+Admin: PATCH /api/admin/auth-requests/:id/status (processing/done, result_text)
+
+Admin Products & Moderation
+
+GET /api/admin/products?status=pending|published|hidden
+
+PATCH /api/admin/products/:id/approve
+
+PATCH /api/admin/products/:id/reject (reason)
+
+PATCH /api/admin/products/:id/hide (reason)
+
+Bulk endpoints optional: accept { ids: number[], reason? }
+
+Users (Admin)
+
+GET /api/admin/users
+
+PATCH /api/admin/users/:id/status (active/suspended)
+
+PATCH /api/admin/users/:id/roles (add/remove role)
+
+PATCH /api/admin/users/:id/verified_seller (true/false)
+
+Ads
+
+Admin: GET/POST/PATCH /api/admin/ads
+
+Support/Tickets
+
+Buyer: GET /api/support/tickets, POST /api/support/tickets
+
+Admin/Support: GET /api/admin/support/tickets, PATCH /api/admin/support/tickets/:id (assign/status/note)
+
+Notifications
+
+GET /api/notifications, PATCH /api/notifications/:id/read
+
+Audit
+
+GET /api/admin/audit-logs?entity=&admin_id=&date_from=&date_to=
+
+Health
+
+GET /healthz returns { ok: true }
+
+4) Frontend — Routes & Pages
+Public
+
+/ Home: tabs (New / Used / Auctions), banners, “Authenticity” strip.
+
+/new, /used, /auctions: grid, filters (brand/category/condition/price/sort), pagination.
+
+/p/:id: product page (gallery, details, price or auction state; actions: Buy Now, Join Auction, Request Authenticity).
+
+/auction/:id: auction page (current price, bid box, countdown, bid log live).
+
+/search, /help (policies: returns, privacy, terms; AR/EN).
+
+Auth
+
+/auth login/register (react-hook-form + zod; translated errors).
+
+Buyer
+
+/account: profile (name/email/phone/address), language toggle persistence.
+
+/account/orders: list + status + invoice PDF (optional).
+
+/account/bids: joined auctions + timers + results.
+
+/account/favorites: wishlist.
+
+/account/support: open ticket + list + status.
+
+Seller
+
+/seller/dashboard: sales KPIs, notifications.
+
+/seller/products: table with search, inline edit (price/status), delete, CSV import, Duplicate, add modal with image uploads (max 5).
+
+/seller/auctions: own auctions (running/scheduled/ended), details, notifications.
+
+/seller/orders: incoming orders; change status; optional tracking number.
+
+/seller/earnings: balance & payout requests (manual).
+
+/seller/support: FAQ + open ticket.
+
+Admin
+
+/admin/dashboard: KPIs (clickable), Moderation Queue, Open orders & disputes, Auctions panel (countdown + quick actions), Authenticity requests, Ads summary.
+
+/admin/products: list + filters + approve/reject/hide (with reason) + bulk actions.
+
+/admin/auctions: running/scheduled/ended, extend/end, bid logs.
+
+/admin/orders: change states, mark disputes, CSV export.
+
+/admin/users: activate/suspend, set roles, mark verified sellers.
+
+/admin/auth-requests: assign validators, status (processing/done), attach result.
+
+/admin/ads: CRUD banners (hero/sidebar/strip), metrics (impressions/clicks basic).
+
+/admin/support: tickets inbox (priority/state), assign, templates, close with canned replies.
+
+/admin/reports: sales/commissions, auction performance, top brands/sellers, CSV export.
+
+/admin/settings: commission rates (new 10%, used/auction 5% default with edit), authenticity fee, notifications, language/theme, RBAC matrix.
+
+/admin/audit: audit logs with filters (entity/admin/date).
+
+UI Essentials
+
+Global toasts (success/error/warn; AR/EN).
+
+Countdown component (accurate; stops at end; prevents late bids).
+
+Saved Views for admin lists (remember filters).
+
+Theme with brand palette; optional dark mode toggle.
+
+5) Auctions — Business Rules
+
+Bids allowed only between start_at and end_at.
+
+Bid amount ≥ current_price + min_increment.
+
+Update current_price and create bid atomically (TX).
+
+On end: determine highest valid bid; auto-create Order for winner (status=pending).
+
+Anti-spam: rate limit bids per user; identity must be active/verified.
+
+Optional anti-sniping (Phase 2): auto-extend N minutes if bid arrives in last minute.
+
+6) Authenticity Service
+
+Buyer can open auth request for a product; fee recorded.
+
+Admin assigns validator; status: open → processing → done; store result_text and optional attachments.
+
+Show “Verified” badge on product page when applicable (link to result).
+
+7) Analytics, Logs & Compliance
+
+Integrate Google Analytics with events:
+
+view_product, add_listing, place_bid, checkout_start, order_confirmed
+
+Error tracking: Sentry (or pluggable hook) for FE + BE.
+
+Server logs in JSON (path, status, duration, user id if present).
+
+Policies pages in AR/EN (returns, privacy, terms). Trust Center page with verified seller badge explanation.
+
+Hide seller email/phone from buyers until order is created.
+
+8) Performance & Delivery
+
+Pagination on all lists; DB indexes on hot fields.
+
+Image hosting ready for external storage (S3 or equivalent), Cache-Control headers.
+
+Nginx reverse proxy config for prod (/api to FastAPI, static for React build).
+
+Docker: services for api, db, front. Healthchecks.
+
+Seed script: creates:
+
+admin@demo.com (roles: super_admin, admin), seller@demo.com (seller), buyer@demo.com (buyer) with default password Passw0rd!
+
+20–50 products (new/used), 3 running auctions, a few orders/tickets.
+
+README.md with setup steps, env vars, Docker usage, migrations, and login creds.
+
+9) i18n & RTL Requirements
+
+src/i18n/ar.json and src/i18n/en.json with all UI strings.
+
+Language toggle persists (localStorage).
+
+Apply RTL automatically when Arabic is active (<html dir="rtl" lang="ar">).
+
+Form errors and toast messages translated.
+
+10) Testing & Quality
+
+Backend: pytest for auth, products, auctions, orders, RBAC (happy + error paths).
+
+Frontend: RTL tests for critical flows (login, add product, bid, checkout).
+
+TypeScript strict mode; ESLint/Prettier config.
+
+11) Acceptance Criteria (summary)
+
+Users can register/login (JWT), roles enforced on all protected routes.
+
+Sellers can create/edit/delete products (pending → admin approve → published), upload images.
+
+Buyers can Buy Now (COD/Bank) and see their orders; sellers can change order status.
+
+Auctions work end-to-end: bid rules, live updates, winner → order.
+
+Admin can moderate products, manage auctions/orders/users/auth-requests/ads/support, export CSV, view reports, and see audit logs.
+
+AR/EN fully implemented; RTL correct.
+
+Docker compose runs entire stack locally; seed data works; README complete.
+
+12) Environment & Commands
+
+.env.example
+
+DATABASE_URL=postgresql+psycopg2://user:pass@db:5432/perfumes
+JWT_SECRET=change_me
+JWT_EXPIRES=86400
+ENV=dev
+S3_BUCKET=
+S3_KEY=
+S3_SECRET=
+S3_REGION=
+
+
+Backend
+
+Dev: uvicorn app.main:app --reload
+
+Migrations: alembic revision --autogenerate -m "init" && alembic upgrade head
+
+Tests: pytest -q
+
+Frontend
+
+Dev: npm run dev
+
+Build: npm run build → dist/
+
+Docker
+
+docker-compose up --build
+
+Services: api, db, front, (nginx optional)
+
+Healthcheck endpoints and logs available.
+
+13) Extras (Should-have already included)
+
+Saved Views in admin lists (store filter state).
+
+CSV import for seller products; Duplicate product action.
+
+Wishlist (favorites) for buyers.
+
+Return/Exchange request creates a linked support ticket.
+
+2FA toggle for admin accounts (mockable at first).
+
+WebSocket for auctions (fallback to polling).
+Deliverables:
+Commit a fully working codebase with the structure above, bilingual UI with RTL, secured endpoints, seed data, Docker setup, and a clear README. Ensure MVP flows run end-to-end and all Acceptance Criteria are met.
+🎨 UI Components & Visual Design Brief (Add this section to the Replit prompt)
+Goal:
+Deliver a premium, minimal, and responsive UI for Aalam Al-Otoor — inspired by luxury perfume brands (Tom Ford, Dior, Arabian Oud).
+The interface should feel elegant, modern, and trustworthy, with clear hierarchy, balanced spacing, and subtle motion.
+________________________________________
+🧱 1. Layout System
+•	Use a 12-column grid with standard spacing steps (8, 16, 24, 32 px).
+•	Maintain max content width 1440px, center-aligned, full-width background sections allowed.
+•	Default container padding: px-6 sm:px-8 lg:px-12, vertical rhythm 16–24px.
+•	Use consistent section titles (text-2xl font-bold tracking-tight mb-4) and subtitles (text-base opacity-70).
+________________________________________
+🖌️ 2. Typography
+•	Fonts:
+o	English: Inter, 400–700
+o	Arabic: Cairo, 400–700
+•	Heading hierarchy:
+o	H1 (page title): 32px / 700
+o	H2 (section title): 24px / 600
+o	Body text: 16px / 400
+o	Small labels: 13px / 500, uppercase or subtle letter-spacing.
+•	Text automatically switches direction (LTR/RTL) based on current language.
+________________________________________
+🌈 3. Color Palette (already defined)
+•	Primary Gold: #C8A24A
+•	Gold Hover: #B28E3E
+•	Text Charcoal: #1A1A1A
+•	Background Ivory: #F7F5F2
+•	Surface Sand: #EAE4D9
+•	Accent Taupe: #B8A68C
+•	Success: #2E7D6F
+•	Alert: #E26D5A
+Use Gold for key CTAs (primary buttons, highlights).
+Use Sand and Taupe for cards and background layers.
+Charcoal is the main text color; Ivory is the page background.
+________________________________________
+🧭 4. Navigation & Header
+•	Sticky top navigation bar, translucent white background initially → solid on scroll.
+•	Logo “Aalam Al-Otoor” on the left, gold accent underline.
+•	Right side:
+o	Search bar (rounded, subtle shadow).
+o	Language toggle (AR / EN).
+o	Cart / Profile / Theme switch icons.
+•	Hover: underline or gold highlight.
+•	Mobile: collapsible drawer menu.
+________________________________________
+🛍️ 5. Product Cards & Lists
+•	Card: rounded corners 12px, soft shadow, white background.
+•	On hover: elevate with subtle shadow and gold border.
+•	Content:
+o	Top: Image (square or 3:4, cover, rounded corners).
+o	Below: Title (truncate), brand (small), price (bold gold text).
+o	Button group: “Buy Now” (gold) / “Bid Now” (outline).
+•	Grid: responsive 2–4 columns; equal height rows.
+________________________________________
+⏱️ 6. Auction UI
+•	Countdown timer styled in gold digits on dark background bar.
+•	Bid box: numeric input with plus/minus and “Place Bid” button.
+•	Bid log: table with username, amount, time, alternating background rows.
+•	When auction ends → show “Winner” badge and button to confirm order.
+________________________________________
+📊 7. Dashboard & Admin
+•	Use card-based grid layout for KPIs (Total Sales, Active Auctions, Pending Products, etc.).
+•	Charts: simple bar/line using Recharts or Chart.js.
+•	Tables: tanstack/react-table with striped rows, hover highlight.
+•	Filters: small gold-outlined selects and date pickers.
+•	Page titles: icon + label (ex: “🛒 Orders Management”).
+________________________________________
+💬 8. Forms & Modals
+•	Inputs: rounded (10–12px), light Sand border, focus glow gold.
+•	Buttons:
+o	Primary → Gold background, Charcoal text.
+o	Secondary → White background, Gold border, hover fill gold.
+o	Danger → Alert red with white text.
+•	Modal overlays: semi-transparent black (rgba(0,0,0,0.35)), card centered with shadow-xl and smooth fade-in.
+•	Toasts: top-right, rounded, soft color based on status.
+________________________________________
+📱 9. Responsive & Mobile Behavior
+•	Use responsive grid breakpoints: sm <640, md <768, lg <1024, xl <1280.
+•	Collapse sidebars into drawers on mobile.
+•	Replace hover with touch-friendly feedback (shadow + scale).
+•	Ensure text remains readable (min 14px).
+•	Sticky bottom action bar on product pages (Buy/Bid).
+________________________________________
+🌙 10. Theme & Transitions
+•	Implement Dark Mode toggle:
+o	Background: #121212, Cards: #1E1E1E, Text: #EEE, Gold remains consistent.
+o	Transition: 0.3s ease-in-out fade for colors.
+•	Global transitions for hover and modal open/close (Framer Motion optional).
+________________________________________
+📑 11. Footer
+•	Dark background (#1A1A1A), gold logo text.
+•	Columns: About / Help / Policies / Contact / Language.
+•	Bottom strip: copyright + social icons (Instagram, X, TikTok).
+________________________________________
+💎 12. General UX Guidance
+•	Prioritize clarity and calm luxury feel — white space > clutter.
+•	Use micro-interactions (hover, fade, subtle motion) for feedback.
+•	Avoid overly bright colors; keep tone sophisticated.
+•	Ensure AR and EN labels fit naturally without truncation.
+•	Optimize for Lighthouse 90+ in accessibility and performance.
+________________________________________
+Deliverable:
+A visually polished, bilingual, responsive UI matching the above system — integrated into the full-stack project defined earlier (React + FastAPI).
+Ensure consistent styling, reusable components, and full RTL support.
+Brand Identity & Logo Brief (Add to the Replit prompt)
+Brand name: Aalam Al-Otoor (English) — عالم العطور (Arabic)
+Positioning: Luxury, modern, trustworthy marketplace for perfumes (new, used, auctions) in the GCC.
+Visual tone: Elegant, minimal, premium; subtle Middle-Eastern flourish (not ornamental overload).
+1) Logo Concept
+•	Create a dual-language wordmark and a compact monogram:
+1.	English wordmark: “Aalam Al-Otoor” — uppercase “AALAM” small caps acceptable; tracking slightly tight; weight semibold.
+2.	Arabic wordmark: “عالم العطور” — set in Cairo (or Noto Kufi Arabic) with careful kerning for ل+ـعطور.
+3.	Monogram: geometric “AO” intertwined, with a subtle calligraphic curve hinting at the Arabic letter ع. The monogram should be recognisable at 24px.
+•	Corners slightly rounded; avoid overly decorative swashes.
+•	Balance horizontal and stacked versions:
+o	Horizontal: monogram at left + wordmark to the right.
+o	Stacked: monogram centered, wordmark below.
+2) Color & Variants
+Use the approved palette:
+•	Charcoal #1A1A1A (text)
+•	Gold #C8A24A (primary) — Hover #B28E3E
+•	Ivory #F7F5F2 (bg), Sand #EAE4D9, Taupe #B8A68C
+•	Success #2E7D6F, Alert #E26D5A
+Provide these logo variants:
+•	Primary: Gold monogram + Charcoal wordmark on Ivory/Sand.
+•	Dark background: Gold monogram + Ivory/White wordmark on Charcoal.
+•	Monochrome: All-black and all-white versions.
+•	Flat & “foil-like”: flat Gold (#C8A24A) and CSS-friendly gradient linear-gradient(180deg, #C8A24A 0%, #B28E3E 100%).
+3) Typography Lockups
+•	English: Inter (600 for wordmark)
+•	Arabic: Cairo (600 for wordmark)
+•	Keep baseline alignment between English/Arabic lockups; ensure Arabic RTL spacing is correct.
+•	Export both EN and AR wordmarks, and a bilingual lockup (EN over AR) for hero usage.
+4) Clear Space & Minimum Size
+•	Clear space = height of the monogram “O” on all sides.
+•	Minimum width:
+o	Monogram: 24px
+o	Wordmark: 120px
+o	Bilingual lockup: 160px
+5) Misuse Rules (document in a README)
+•	Do not stretch, skew, or add drop shadows to the logo.
+•	Do not place gold logo on high-noise photos without a contrast layer.
+•	Do not change the gold hex values.
+6) Deliverable Files & Structure
+Create this structure and export assets from the logo source (SVG as master):
+/frontend/src/assets/brand/
+  logo-ao-monogram.svg
+  logo-ao-monogram-gold.svg
+  logo-ao-monogram-white.svg
+  logo-ao-wordmark-en.svg
+  logo-ao-wordmark-ar.svg
+  logo-ao-lockup-bilingual.svg
+
+  logo-ao-monogram.png            # 1024, 512, 256, 128, 64
+  logo-ao-wordmark-en.png         # 1024, 512, 256
+  logo-ao-wordmark-ar.png         # 1024, 512, 256
+  logo-ao-lockup-bilingual.png    # 1200x630 (Open Graph), 1080x1080 (social)
+
+  favicon/
+    favicon.ico        # 16, 32, 48
+    favicon-32.png
+    favicon-180.png    # Apple touch icon
+    favicon-192.png    # Android
+    favicon-512.png    # PWA
+
+  manifest.webmanifest
+  brand-readme.md      # usage, clearspace, misuse, color specs
+Notes:
+•	SVG is the source of truth. Generate crisp PNGs at the listed sizes.
+•	Favicon ICO should include 16/32/48px layers.
+•	manifest.webmanifest should reference name, short_name, icons (192/512), theme_color = #C8A24A, background_color = #F7F5F2, display = standalone.
+7) Social & Share Assets
+•	Open Graph (OG): 1200x630 — centered gold monogram over Charcoal, thin gold frame, small bilingual wordmark below.
+•	Square social: 1080x1080 — gold monogram large, subtle Sand background pattern (very low opacity).
+•	Export as PNG and keep a simple editable template (SVG) for future campaigns.
+8) CSS/Component Usage
+•	Provide a small React component BrandLogo.tsx that supports props:
+o	variant: "monogram" | "wordmark-en" | "wordmark-ar" | "lockup-bilingual"
+o	theme: "light" | "dark" → chooses correct asset and aria-label localized
+o	size: numeric px (defaults: 24 for monogram, 160 for wordmark)
+•	Provide CSS utility for gold foil look via gradient text:
+•	.gold-foil {
+•	  background: linear-gradient(180deg, #C8A24A 0%, #B28E3E 100%);
+•	  -webkit-background-clip: text;
+•	  background-clip: text;
+•	  color: transparent;
+•	}
+9) Auto-Wiring in the App
+•	Replace temporary header text logo with <BrandLogo variant="lockup-bilingual" theme="light" size={160} /> on desktop, and monogram on mobile.
+•	Use monogram as the PWA icon and favicon.
+•	Reference manifest.webmanifest in /frontend/index.html and preload Inter & Cairo fonts.
+10) QA Checklist (acceptance)
+•	SVGs are pixel-perfect (no stray points; paths combined).
+•	PNG exports look crisp at all sizes.
+•	Favicon shows correctly in browser tabs and mobile home screen.
+•	Manifest passes Lighthouse PWA checks (icons, theme/background colors).
+•	Logo renders correctly in both LTR and RTL contexts (no misalignment).
+•	README includes color palette, clearspace, misuse, and examples of correct/incorrect usage.
+________________________________________
+Instruction to the Agent:
+After generating the logos and assets, wire the monogram + wordmarks into the header/footer and update the PWA manifest and favicon links automatically.
+
+Please start building this project structure now, create initial backend and frontend folders as specified.
+
