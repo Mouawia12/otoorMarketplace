@@ -146,7 +146,7 @@ export default function Orders() {
           {orders.map(order => {
             const product = order.product;
             const productName = product ? (language === 'ar' ? product.name_ar : product.name_en) : t('products.unknownProduct');
-            const imageUrl = product?.image_urls?.[0] || '/placeholder-perfume.jpg';
+            const imageUrl = product?.image_urls?.[0] || '/images/placeholder-perfume.svg';
 
             return (
               <div key={order.id} className="bg-white rounded-luxury shadow-luxury overflow-hidden">

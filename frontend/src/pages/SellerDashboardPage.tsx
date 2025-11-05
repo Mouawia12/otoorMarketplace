@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
+import api from '../lib/api';
 
 interface DashboardStats {
   totalSales: number;
@@ -21,19 +22,15 @@ export default function SellerDashboardPage() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const mockStats: DashboardStats = {
-        totalSales: 147,
-        activeProducts: 23,
-        activeAuctions: 5,
-        pendingOrders: 8,
-        totalEarnings: 45230.50,
-        monthlyEarnings: 12450.00,
-      };
-
-      setStats(mockStats);
-      setLoading(false);
+      try {
+        setLoading(true);
+        const response = await api.get('/seller/dashboard');
+        setStats(response.data);
+      } catch (error) {
+        console.error('Failed to load seller stats', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchStats();

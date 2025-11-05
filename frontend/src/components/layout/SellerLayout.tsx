@@ -1,11 +1,29 @@
-import { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../../store/authStore';
 
 export default function SellerLayout() {
   const { t } = useTranslation();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isAuthenticated, user } = useAuthStore();
+
+  const hasSellerAccess = useMemo(() => {
+    const roles = user?.roles ?? [];
+    return roles.some((role) => {
+      const upper = role.toUpperCase();
+      return upper === 'SELLER' || upper === 'ADMIN' || upper === 'SUPER_ADMIN';
+    });
+  }, [user]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!hasSellerAccess) {
+    return <Navigate to="/account" replace />;
+  }
 
   const menuItems = [
     { path: '/seller/dashboard', label: t('seller.dashboard'), icon: '📊' },

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
+import { fetchAuctions } from '../services/auctionService';
 
 interface Bid {
   id: number;
@@ -22,57 +24,35 @@ export default function BidsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchBids = async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const mockBids: Bid[] = [
-        {
-          id: 1,
-          auctionId: 1,
-          auctionName: 'Chanel No 5',
-          auctionNameAr: 'شانيل رقم 5',
-          yourMaxBid: 147.00,
-          currentPrice: 142.00,
-          status: 'winning',
-          endTime: '2024-10-10T18:00:00Z',
-        },
-        {
-          id: 2,
-          auctionId: 2,
-          auctionName: 'Dior Sauvage Limited Edition',
-          auctionNameAr: 'ديور سوفاج إصدار محدود',
-          yourMaxBid: 180.00,
-          currentPrice: 195.00,
-          status: 'outbid',
-          endTime: '2024-10-11T20:00:00Z',
-        },
-        {
-          id: 3,
-          auctionId: 3,
-          auctionName: 'Tom Ford Oud Wood',
-          auctionNameAr: 'توم فورد أود وود',
-          yourMaxBid: 320.00,
-          currentPrice: 310.00,
-          status: 'ended_won',
-          endTime: '2024-09-30T16:00:00Z',
-        },
-        {
-          id: 4,
-          auctionId: 4,
-          auctionName: 'Creed Aventus Vintage',
-          auctionNameAr: 'كريد أفينتوس فينتاج',
-          yourMaxBid: 400.00,
-          currentPrice: 425.00,
-          status: 'ended_lost',
-          endTime: '2024-09-28T14:00:00Z',
-        },
-      ];
-
-      setBids(mockBids);
-      setLoading(false);
+    const loadAuctions = async () => {
+      try {
+        setLoading(true);
+        const auctions = await fetchAuctions();
+        const mapped: Bid[] = auctions.map((auction) => ({
+          id: auction.id,
+          auctionId: auction.id,
+          auctionName: auction.product?.name_en ?? `Auction #${auction.id}`,
+          auctionNameAr: auction.product?.name_ar ?? `مزاد #${auction.id}`,
+          yourMaxBid: auction.current_price,
+          currentPrice: auction.current_price,
+          status:
+            auction.status === 'active'
+              ? 'winning'
+              : auction.status === 'completed'
+                ? 'ended_won'
+                : 'ended_lost',
+          endTime: auction.end_time,
+        }));
+        setBids(mapped);
+      } catch (error) {
+        console.error('Failed to load auctions', error);
+        setBids([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchBids();
+    loadAuctions();
   }, []);
 
   const getStatusBadge = (status: Bid['status']) => {

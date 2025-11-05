@@ -5,7 +5,22 @@ import { useTranslation } from "react-i18next";
 
 type Condition = "all" | "new" | "used";
 
-export default function ProductFilters({ className = "" }: { className?: string }) {
+type FilterState = {
+  sort?: string;
+  brand?: string;
+  category?: string;
+  condition?: string;
+  min_price?: number;
+  max_price?: number;
+};
+
+type ProductFiltersProps = {
+  className?: string;
+  filters?: FilterState;
+  onFilterChange?: (filters: FilterState) => void;
+};
+
+export default function ProductFilters({ className = "", filters, onFilterChange }: ProductFiltersProps) {
   const { i18n } = useTranslation();
   const dir = i18n.language === "ar" ? "rtl" : "ltr";
   const navigate = useNavigate();
@@ -14,15 +29,29 @@ export default function ProductFilters({ className = "" }: { className?: string 
   const [open, setOpen] = useState(false);
 
   // قيم الفلاتر
-  const [sort, setSort] = useState("newest");
-  const [brand, setBrand] = useState("");
-  const [category, setCategory] = useState("");
-  const [condition, setCondition] = useState<Condition>("all");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
+  const [sort, setSort] = useState(filters?.sort ?? "newest");
+  const [brand, setBrand] = useState(filters?.brand ?? "");
+  const [category, setCategory] = useState(filters?.category ?? "");
+  const [condition, setCondition] = useState<Condition>((filters?.condition as Condition) ?? "all");
+  const [minPrice, setMinPrice] = useState(filters?.min_price?.toString() ?? "");
+  const [maxPrice, setMaxPrice] = useState(filters?.max_price?.toString() ?? "");
 
   // تهيئة القيم من الـ URL
   useEffect(() => {
+    if (filters) {
+      setSort(filters.sort ?? "newest");
+      setBrand(filters.brand ?? "");
+      setCategory(filters.category ?? "");
+      setCondition((filters.condition as Condition) ?? "all");
+      setMinPrice(
+        typeof filters.min_price === "number" ? String(filters.min_price) : ""
+      );
+      setMaxPrice(
+        typeof filters.max_price === "number" ? String(filters.max_price) : ""
+      );
+      return;
+    }
+
     const qs = new URLSearchParams(location.search);
     setSort(qs.get("sort") || "newest");
     setBrand(qs.get("brand") || "");
@@ -30,7 +59,7 @@ export default function ProductFilters({ className = "" }: { className?: string 
     setCondition((qs.get("condition") as Condition) || "all");
     setMinPrice(qs.get("min") || "");
     setMaxPrice(qs.get("max") || "");
-  }, [location.search]);
+  }, [filters, location.search]);
 
   // إغلاق عند الضغط خارج/ESC
   const btnRef = useRef<HTMLButtonElement | null>(null);
@@ -77,19 +106,34 @@ export default function ProductFilters({ className = "" }: { className?: string 
     setCondition("all");
     setMinPrice("");
     setMaxPrice("");
+
+    onFilterChange?.({ sort: "newest" });
   }
 
   function apply() {
-    const params = new URLSearchParams();
-    if (sort) params.set("sort", sort);
-    if (brand) params.set("brand", brand);
-    if (category) params.set("category", category);
-    if (condition !== "all") params.set("condition", condition);
-    if (minPrice) params.set("min", minPrice);
-    if (maxPrice) params.set("max", maxPrice);
+    const nextFilters: FilterState = {
+      sort,
+      brand,
+      category,
+      condition: condition === "all" ? undefined : condition,
+      min_price: minPrice ? Number(minPrice) : undefined,
+      max_price: maxPrice ? Number(maxPrice) : undefined,
+    };
 
-    // حدّث الـ URL بدون إعادة تحميل
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+    if (onFilterChange) {
+      onFilterChange(nextFilters);
+    } else {
+      const params = new URLSearchParams();
+      if (nextFilters.sort) params.set("sort", nextFilters.sort);
+      if (nextFilters.brand) params.set("brand", nextFilters.brand);
+      if (nextFilters.category) params.set("category", nextFilters.category);
+      if (nextFilters.condition) params.set("condition", nextFilters.condition);
+      if (nextFilters.min_price !== undefined) params.set("min", String(nextFilters.min_price));
+      if (nextFilters.max_price !== undefined) params.set("max", String(nextFilters.max_price));
+
+      navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+    }
+
     setOpen(false);
   }
 

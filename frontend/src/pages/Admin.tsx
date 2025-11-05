@@ -42,9 +42,7 @@ export default function Admin() {
         const statsRes = await api.get('/admin/dashboard');
         setStats(statsRes.data);
       } else if (activeTab === 'products') {
-        const productsRes = await api.get('/products', { 
-          params: { status: 'pending' } 
-        });
+        const productsRes = await api.get('/admin/products/pending');
         setPendingProducts(productsRes.data);
       } else if (activeTab === 'users') {
         const usersRes = await api.get('/admin/users');
@@ -64,9 +62,8 @@ export default function Admin() {
 
   const moderateProduct = async (productId: number, action: 'approve' | 'reject') => {
     try {
-      await api.patch(`/products/${productId}/moderate`, { 
-        action,
-        status: action === 'approve' ? 'approved' : 'rejected'
+      await api.patch(`/admin/products/${productId}/moderate`, { 
+        action
       });
       fetchDashboardData();
     } catch (error: any) {

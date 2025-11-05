@@ -26,8 +26,17 @@ export default function Login() {
   const onSubmit = async (data: LoginForm) => {
     try {
       setError('');
-      await login(data.email, data.password);
-      navigate('/');
+      const user = await login(data.email, data.password);
+
+      const upperRoles = (user.roles ?? []).map((role) => role.toUpperCase());
+      let target = '/account';
+      if (upperRoles.includes('SUPER_ADMIN') || upperRoles.includes('ADMIN')) {
+        target = '/admin/dashboard';
+      } else if (upperRoles.includes('SELLER')) {
+        target = '/seller/dashboard';
+      }
+
+      navigate(target, { replace: true });
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (Array.isArray(detail)) {

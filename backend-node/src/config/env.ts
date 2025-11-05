@@ -7,10 +7,9 @@ const envSchema = z.object({
     .default("development"),
   PORT: z.coerce.number().default(8080),
   DATABASE_URL: z
-    .string({
-      description: "MySQL connection string",
-    })
-    .min(1, "DATABASE_URL is required"),
+    .string()
+    .min(1, "DATABASE_URL is required")
+    .describe("MySQL connection string"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET should be at least 32 chars"),
   JWT_EXPIRES_IN: z.string().default("86400"),
   ALLOWED_ORIGINS: z.string().default("*"),

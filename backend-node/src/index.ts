@@ -1,10 +1,13 @@
 import express from "express";
-import cors, { CorsOptions } from "cors";
+import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import type { CorsOptions } from "cors";
 
 import { config } from "./config/env";
 import { prisma } from "./prisma/client";
+import apiRouter from "./routes";
+import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 
@@ -22,6 +25,8 @@ if (config.nodeEnv === "development") {
   app.use(morgan("dev"));
 }
 
+app.use("/api", apiRouter);
+
 app.get("/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -38,6 +43,8 @@ app.get("/health", async (_req, res) => {
     });
   }
 });
+
+app.use(errorHandler);
 
 const server = app.listen(config.port, () => {
   console.log(`🚀 API server running on http://localhost:${config.port}`);

@@ -127,11 +127,11 @@ export default function ProductDetailPage() {
         <div className="space-y-4">
           <div className="bg-ivory rounded-luxury overflow-hidden aspect-square">
             <img
-              src={images[selectedImage] || 'https://via.placeholder.com/600x600?text=Perfume'}
+              src={images[selectedImage] || '/images/placeholder-perfume.svg'}
               alt={name}
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = 'https://via.placeholder.com/600x600?text=Perfume';
+                e.currentTarget.src = '/images/placeholder-perfume.svg';
               }}
             />
           </div>
@@ -147,11 +147,11 @@ export default function ProductDetailPage() {
                   }`}
                 >
                   <img
-                    src={img}
+                    src={img || '/images/placeholder-perfume.svg'}
                     alt={`${name} ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.src = 'https://via.placeholder.com/150x150?text=Perfume';
+                      e.currentTarget.src = '/images/placeholder-perfume.svg';
                     }}
                   />
                 </button>

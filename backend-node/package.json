@@ -10,6 +10,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
+    "db:diff": "npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script",
+    "db:migrate:sql": "npm run db:diff",
+    "seed": "ts-node-dev --transpile-only src/scripts/seed.ts",
     "lint": "eslint . --ext ts --max-warnings 0"
   },
   "keywords": [],
@@ -24,18 +27,19 @@
     "express": "^5.1.0",
     "helmet": "^7.2.0",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
     "mysql2": "^3.15.3",
     "prisma": "^6.18.0",
-    "zod": "^4.1.12",
-    "morgan": "^1.10.0"
+    "transliteration": "^2.3.5",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^24.10.0",
     "@types/morgan": "^1.9.7",
+    "@types/node": "^24.10.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }

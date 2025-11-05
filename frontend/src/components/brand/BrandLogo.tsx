@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useUIStore } from "../../store/uiStore";
 
 type BrandLogoProps = {

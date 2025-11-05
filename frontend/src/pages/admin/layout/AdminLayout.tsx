@@ -1,13 +1,29 @@
-import { useState } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-// إذا كان مسار ملف الـ store مختلفًا عندك غيّره هنا
-// import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function AdminLayout() {
   const { t } = useTranslation();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isAuthenticated, user } = useAuthStore();
+
+  const hasAdminAccess = useMemo(() => {
+    const roles = user?.roles ?? [];
+    return roles.some((role) => {
+      const upper = role.toUpperCase();
+      return upper === 'ADMIN' || upper === 'SUPER_ADMIN';
+    });
+  }, [user]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!hasAdminAccess) {
+    return <Navigate to="/account" replace />;
+  }
 
   // ملاحظة: استخدم startsWith بدل مساواة كاملة ليشمل المسارات الفرعية
   const isActive = (path: string) =>

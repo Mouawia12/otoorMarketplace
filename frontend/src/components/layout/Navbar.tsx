@@ -57,7 +57,7 @@ export default function Navbar() {
           {/* Center: logo */}
           <div className="flex justify-center">
             <Link to="/" aria-label="Home" className="block">
-              <BrandLogo variant="lockup-bilingual" size={45} />
+              <BrandLogo size={45} />
             </Link>
           </div>
 
@@ -83,7 +83,7 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
           <div className="flex justify-between items-center h-16 md:h-20">
             <Link to="/" className="flex-shrink-0">
-              <BrandLogo variant="lockup-bilingual" size={60} />
+              <BrandLogo size={60} />
             </Link>
 
             <div className="flex items-center gap-4 lg:gap-6 flex-1 justify-end">

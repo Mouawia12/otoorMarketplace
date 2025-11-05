@@ -37,13 +37,15 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
   }, [mode, id]);
 
   const on = (k: keyof Form, v:any)=> setForm(s=>({...s,[k]:v}));
-  const html = useMemo(()=> marked.parse(form.content||""), [form.content]);
+  const html = useMemo(
+    () => marked.parse(form.content || "") as string,
+    [form.content]
+  );
   const autoSlug = ()=> form.title && on("slug", slugify(form.title,{lower:true,strict:true}));
 
   const save = async ()=>{
     setSaving(true);
     try{
-      const payload = { ...form, tags: form.tags.split(",").map(x=>x.trim()).filter(Boolean) };
       // TODO: POST /api/admin/blog  أو  PUT /api/admin/blog/:id
       navigate("/admin/blog");
     }catch(e){ console.error(e); alert(t("common.error","حدث خطأ")); }

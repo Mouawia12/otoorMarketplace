@@ -46,8 +46,6 @@ export default function BlogPost() {
   const pageDesc = post.description;
   const canonicalUrl = `${window.location.origin}/blog/${post.slug}`;
   const imageUrl = post.cover.startsWith('http') ? post.cover : `${window.location.origin}${post.cover}`;
-  const alternateLang = language === 'ar' ? 'en' : 'ar';
-  const alternateUrl = `${window.location.origin}/blog/${post.slug}?lang=${alternateLang}`;
 
   const articleSchema = {
     "@context": "https://schema.org",

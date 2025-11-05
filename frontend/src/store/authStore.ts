@@ -12,8 +12,8 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; full_name: string; phone?: string }) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (data: { email: string; password: string; full_name: string; phone?: string }) => Promise<User>;
   logout: () => void;
   fetchUser: () => Promise<void>;
 }
@@ -24,24 +24,20 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: !!localStorage.getItem('auth_token'),
 
   login: async (email: string, password: string) => {
-    const formData = new FormData();
-    formData.append('username', email);
-    formData.append('password', password);
+    const response = await api.post('/auth/login', { email, password });
 
-    const response = await api.post('/auth/login', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-
-    const { access_token } = response.data;
+    const { access_token, user } = response.data;
     localStorage.setItem('auth_token', access_token);
-    set({ token: access_token, isAuthenticated: true });
-
-    const userResponse = await api.get('/auth/me');
-    set({ user: userResponse.data });
+    set({ token: access_token, isAuthenticated: true, user });
+    return user;
   },
 
   register: async (data) => {
-    await api.post('/auth/register', data);
+    const response = await api.post('/auth/register', data);
+    const { access_token, user } = response.data;
+    localStorage.setItem('auth_token', access_token);
+    set({ token: access_token, user, isAuthenticated: true });
+    return user;
   },
 
   logout: () => {

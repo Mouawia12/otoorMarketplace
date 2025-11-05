@@ -41,12 +41,23 @@ export default function ProductDetail() {
     }
 
     try {
+      if (!product) return;
       await api.post('/orders', {
-        product_id: product?.id,
-        quantity,
-        unit_price: product?.base_price,
         payment_method: 'COD',
-        shipping_address: 'To be provided'
+        items: [
+          {
+            productId: product.id,
+            quantity,
+            unitPrice: product.base_price,
+          },
+        ],
+        shipping: {
+          name: 'Pending',
+          phone: '0000000000',
+          city: 'Riyadh',
+          region: 'Riyadh',
+          address: 'To be confirmed',
+        },
       });
       navigate('/orders');
     } catch (error: any) {

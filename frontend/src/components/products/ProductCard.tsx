@@ -4,6 +4,8 @@ import { Product } from '../../types';
 import { useUIStore } from '../../store/uiStore';
 import { useCartStore } from '../../store/cartStore';
 import { useWishlistStore } from '../../store/wishlistStore';
+import { useAuthStore } from '../../store/authStore';
+import api from '../../lib/api';
 import SARIcon from '../common/SARIcon';
 import { formatSAR } from '../../utils/currency';
 import CountdownTimer from '../auctions/CountdownTimer';
@@ -28,24 +30,35 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const hasInWishlist = useWishlistStore((s) => s.has(product.id.toString()));
   const addToWishlist = useWishlistStore((s) => s.add);
   const removeFromWishlist = useWishlistStore((s) => s.remove);
+  const { isAuthenticated } = useAuthStore();
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
-  const imageUrl = product.image_urls?.[0] || 'https://via.placeholder.com/300x400?text=Perfume';
+  const imageUrl = product.image_urls?.[0] || '/images/placeholder-perfume.svg';
   const displayPrice = type === 'auction' && currentBid ? currentBid : product.base_price;
   
   const defaultAuctionEnd = auctionEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const toggleWishlist = () => {
-    if (hasInWishlist) {
-      removeFromWishlist(product.id.toString());
-    } else {
-      addToWishlist({
-        id: product.id.toString(),
-        name,
-        price: displayPrice,
-        image: imageUrl,
-        brand: product.brand,
-      });
+  const toggleWishlist = async () => {
+    try {
+      if (hasInWishlist) {
+        if (isAuthenticated) {
+          await api.delete(`/wishlist/${product.id}`);
+        }
+        removeFromWishlist(product.id.toString());
+      } else {
+        if (isAuthenticated) {
+          await api.post('/wishlist', { productId: product.id });
+        }
+        addToWishlist({
+          id: product.id.toString(),
+          name,
+          price: displayPrice,
+          image: imageUrl,
+          brand: product.brand,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to toggle wishlist', error);
     }
   };
 

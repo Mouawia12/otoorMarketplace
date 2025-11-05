@@ -5,11 +5,245 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int        @id @default(autoincrement())
+  email          String     @unique
+  passwordHash   String     @map("password_hash")
+  fullName       String     @map("full_name")
+  phone          String?    @unique
+  status         UserStatus @default(ACTIVE)
+  avatarUrl      String?    @map("avatar_url")
+  verifiedSeller Boolean    @default(false) @map("verified_seller")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  roles        UserRole[]
+  products     Product[]      @relation("SellerProducts")
+  auctions     Auction[]      @relation("SellerAuctions")
+  bids         Bid[]          @relation("UserBids")
+  orders       Order[]        @relation("BuyerOrders")
+  WishlistItem WishlistItem[]
+  Address      Address[]
+}
+
+model Role {
+  id        Int        @id @default(autoincrement())
+  name      RoleName   @unique
+  users     UserRole[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+}
+
+model UserRole {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  roleId    Int      @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model Product {
+  id            Int              @id @default(autoincrement())
+  sellerId      Int              @map("seller_id")
+  nameAr        String           @map("name_ar")
+  nameEn        String           @map("name_en")
+  slug          String           @unique
+  descriptionAr String           @map("description_ar")
+  descriptionEn String           @map("description_en")
+  productType   String           @map("product_type")
+  brand         String
+  category      String
+  basePrice     Decimal          @map("base_price") @db.Decimal(10, 2)
+  sizeMl        Int              @map("size_ml")
+  concentration String
+  condition     ProductCondition
+  stockQuantity Int              @map("stock_quantity")
+  status        ProductStatus    @default(DRAFT)
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  seller       User           @relation("SellerProducts", fields: [sellerId], references: [id], onDelete: Cascade)
+  images       ProductImage[]
+  auctions     Auction[]
+  orderItems   OrderItem[]
+  WishlistItem WishlistItem[]
+
+  @@index([sellerId])
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  url       String
+  altText   String?  @map("alt_text")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model Auction {
+  id               Int           @id @default(autoincrement())
+  productId        Int           @unique @map("product_id")
+  sellerId         Int           @map("seller_id")
+  startingPrice    Decimal       @map("starting_price") @db.Decimal(10, 2)
+  currentPrice     Decimal       @map("current_price") @db.Decimal(10, 2)
+  minimumIncrement Decimal       @map("minimum_increment") @db.Decimal(10, 2)
+  startTime        DateTime      @map("start_time")
+  endTime          DateTime      @map("end_time")
+  status           AuctionStatus @default(SCHEDULED)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  seller  User    @relation("SellerAuctions", fields: [sellerId], references: [id], onDelete: Cascade)
+  bids    Bid[]
+}
+
+model Bid {
+  id        Int      @id @default(autoincrement())
+  auctionId Int      @map("auction_id")
+  bidderId  Int      @map("bidder_id")
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidder  User    @relation("UserBids", fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId])
+  @@index([bidderId])
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  buyerId         Int         @map("buyer_id")
+  status          OrderStatus @default(PENDING)
+  paymentMethod   String      @map("payment_method")
+  shippingName    String      @map("shipping_name")
+  shippingPhone   String      @map("shipping_phone")
+  shippingCity    String      @map("shipping_city")
+  shippingRegion  String      @map("shipping_region")
+  shippingAddress String      @map("shipping_address")
+  subtotalAmount  Decimal     @map("subtotal_amount") @db.Decimal(10, 2)
+  discountAmount  Decimal     @map("discount_amount") @db.Decimal(10, 2)
+  shippingFee     Decimal     @map("shipping_fee") @db.Decimal(10, 2)
+  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  buyer User        @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  items OrderItem[]
+
+  @@index([buyerId])
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int      @map("order_id")
+  productId  Int      @map("product_id")
+  quantity   Int
+  unitPrice  Decimal  @map("unit_price") @db.Decimal(10, 2)
+  totalPrice Decimal  @map("total_price") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model WishlistItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  productId Int      @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("wishlist_items")
+}
+
+model Address {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  label     String
+  recipient String
+  phone     String
+  city      String
+  region    String
+  street    String
+  building  String?
+  notes     String?
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum RoleName {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  SUPPORT
+  SELLER
+  BUYER
+}
+
+enum ProductCondition {
+  NEW
+  USED
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum AuctionStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
 }

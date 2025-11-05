@@ -15,7 +15,7 @@ export default function AuctionDetailPage() {
   const { language } = useUIStore();
   const { isAuthenticated } = useAuthStore();
   
-  const [auction, setAuction] = useState<(Auction & { product: Product }) | null>(null);
+  const [auction, setAuction] = useState<Auction | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
   const [bidAmount, setBidAmount] = useState(0);
@@ -127,7 +127,21 @@ export default function AuctionDetailPage() {
     );
   }
 
-  const product = auction.product;
+  if (!auction.product) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t('common.notFound')}</p>
+        <button
+          onClick={() => navigate('/auctions')}
+          className="mt-4 bg-gold text-charcoal px-6 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
+        >
+          {t('common.back')}
+        </button>
+      </div>
+    );
+  }
+
+  const product: Product = auction.product;
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
   const images = product.image_urls || [];
@@ -153,11 +167,11 @@ export default function AuctionDetailPage() {
         <div className="space-y-4">
           <div className="bg-ivory rounded-luxury overflow-hidden aspect-square">
             <img
-              src={images[selectedImage] || 'https://via.placeholder.com/600x600?text=Perfume'}
+              src={images[selectedImage] || '/images/placeholder-perfume.svg'}
               alt={name}
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = 'https://via.placeholder.com/600x600?text=Perfume';
+                e.currentTarget.src = '/images/placeholder-perfume.svg';
               }}
             />
           </div>
@@ -173,11 +187,11 @@ export default function AuctionDetailPage() {
                   }`}
                 >
                   <img
-                    src={img}
+                    src={img || '/images/placeholder-perfume.svg'}
                     alt={`${name} ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.src = 'https://via.placeholder.com/150x150?text=Perfume';
+                      e.currentTarget.src = '/images/placeholder-perfume.svg';
                     }}
                   />
                 </button>

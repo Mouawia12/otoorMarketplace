@@ -15,7 +15,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {/* الشعار + السطر التعريفي */}
           <div className="flex flex-col items-center sm:items-start">
-            <BrandLogo variant="default" size={52} className="mb-3" />
+            <BrandLogo size={52} className="mb-3" />
             <p className="text-[13px] sm:text-sm text-taupe text-center sm:text-start leading-6">
               {t('footer.tagline')}
             </p>

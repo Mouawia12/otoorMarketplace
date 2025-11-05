@@ -8,6 +8,7 @@ import { useState } from 'react';
 
 // نُبقي فقط البريد وكلمة المرور
 const registerSchema = z.object({
+  full_name: z.string().min(3),
   email: z.string().email(),
   password: z.string().min(6),
 });
@@ -32,7 +33,11 @@ export default function Register() {
     try {
       setError('');
       // نرسل فقط الحقول المطلوبة
-      await registerUser({ email: data.email, password: data.password });
+      await registerUser({
+        full_name: data.full_name,
+        email: data.email,
+        password: data.password,
+      });
       navigate('/login');
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
@@ -60,6 +65,21 @@ export default function Register() {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* الاسم الكامل */}
+          <div>
+            <label className="block text-charcoal font-medium mb-2">
+              {t('auth.fullName', 'الاسم الكامل')}
+            </label>
+            <input
+              {...register('full_name')}
+              type="text"
+              autoComplete="name"
+              className="w-full px-4 py-2 border border-gray-300 rounded-luxury focus:ring-2 focus:ring-gold focus:border-transparent"
+            />
+            {errors.full_name && (
+              <p className="text-red-500 text-sm mt-1">{errors.full_name.message}</p>
+            )}
+          </div>
           {/* البريد الإلكتروني */}
           <div>
             <label className="block text-charcoal font-medium mb-2">

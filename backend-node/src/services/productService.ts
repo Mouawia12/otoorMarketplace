@@ -1,0 +1,415 @@
+import { Prisma, ProductCondition, ProductStatus } from "@prisma/client";
+import { z } from "zod";
+
+import { prisma } from "../prisma/client";
+import { AppError } from "../utils/errors";
+import { toPlainObject } from "../utils/serializer";
+import { makeSlug } from "../utils/slugify";
+
+const normalizeStatus = (status: string | null | undefined) => {
+  if (!status) return status ?? "";
+  const value = status.toLowerCase();
+  if (value === "pending_review") return "pending";
+  if (value === "published") return "published";
+  if (value === "draft") return "draft";
+  if (value === "rejected") return "rejected";
+  if (value === "archived") return "archived";
+  return value;
+};
+
+export const normalizeProduct = (product: any) => {
+  const plain = toPlainObject(product);
+  const images = Array.isArray(plain.images)
+    ? plain.images.map((image: any) => image.url)
+    : plain.image_urls ?? [];
+
+  return {
+    id: plain.id,
+    seller_id: plain.sellerId,
+    name_ar: plain.nameAr,
+    name_en: plain.nameEn,
+    description_ar: plain.descriptionAr,
+    description_en: plain.descriptionEn,
+    product_type: plain.productType,
+    brand: plain.brand,
+    category: plain.category,
+    base_price: plain.basePrice,
+    size_ml: plain.sizeMl,
+    concentration: plain.concentration,
+    condition: plain.condition?.toLowerCase?.() ?? plain.condition,
+    stock_quantity: plain.stockQuantity,
+    image_urls: images,
+    status: normalizeStatus(plain.status),
+    created_at: plain.createdAt,
+    updated_at: plain.updatedAt,
+    seller: plain.seller
+      ? {
+          id: plain.seller.id,
+          full_name: plain.seller.fullName,
+          verified_seller: plain.seller.verifiedSeller,
+        }
+      : undefined,
+  };
+};
+
+const listProductsSchema = z.object({
+  search: z.string().optional(),
+  brand: z.string().optional(),
+  category: z.string().optional(),
+  condition: z.nativeEnum(ProductCondition).optional(),
+  status: z
+    .union([
+      z.nativeEnum(ProductStatus),
+      z.enum(["pending", "published", "draft", "rejected", "archived"]),
+    ])
+    .optional(),
+  min_price: z.coerce.number().optional(),
+  max_price: z.coerce.number().optional(),
+  sort: z
+    .enum(["price_asc", "price_desc", "newest", "oldest", "stock"])
+    .default("newest")
+    .optional(),
+  page: z.coerce.number().default(1).optional(),
+  page_size: z.coerce.number().default(12).optional(),
+  seller: z.union([z.literal("me"), z.coerce.number()]).optional(),
+});
+
+export const listProducts = async (query: unknown) => {
+  const {
+    search,
+    brand,
+    category,
+    condition,
+    status,
+    min_price,
+  max_price,
+  sort,
+  page = 1,
+  page_size = 12,
+  seller,
+} = listProductsSchema.parse(query);
+
+  const filters: Prisma.ProductWhereInput = {};
+
+  if (status) {
+    if (typeof status === "string") {
+      if (status === "pending") {
+        filters.status = ProductStatus.PENDING_REVIEW;
+      } else {
+        filters.status = status.toUpperCase() as ProductStatus;
+      }
+    } else {
+      filters.status = status;
+    }
+  } else {
+    filters.status = ProductStatus.PUBLISHED;
+  }
+
+  if (seller && seller !== "me") {
+    filters.sellerId = seller;
+  }
+
+  if (condition) {
+    filters.condition = condition;
+  }
+
+  if (brand) {
+    filters.brand = brand;
+  }
+
+  if (category) {
+    filters.category = category;
+  }
+
+  if (search) {
+    filters.OR = [
+      { nameEn: { contains: search } },
+      { nameAr: { contains: search } },
+      { brand: { contains: search } },
+    ];
+  }
+
+  if (min_price !== undefined || max_price !== undefined) {
+    filters.basePrice = {};
+    if (min_price !== undefined) {
+      filters.basePrice.gte = new Prisma.Decimal(min_price);
+    }
+    if (max_price !== undefined) {
+      filters.basePrice.lte = new Prisma.Decimal(max_price);
+    }
+  }
+
+  const orderBy: Prisma.ProductOrderByWithRelationInput[] = [];
+  switch (sort) {
+    case "price_asc":
+      orderBy.push({ basePrice: "asc" });
+      break;
+    case "price_desc":
+      orderBy.push({ basePrice: "desc" });
+      break;
+    case "oldest":
+      orderBy.push({ createdAt: "asc" });
+      break;
+    case "stock":
+      orderBy.push({ stockQuantity: "desc" });
+      break;
+    default:
+      orderBy.push({ createdAt: "desc" });
+  }
+
+  const [total, items] = await prisma.$transaction([
+    prisma.product.count({ where: filters }),
+    prisma.product.findMany({
+      where: filters,
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        seller: {
+          select: {
+            id: true,
+            fullName: true,
+            verifiedSeller: true,
+          },
+        },
+        auctions: true,
+      },
+      orderBy,
+      skip: (page - 1) * page_size,
+      take: page_size,
+    }),
+  ]);
+
+  const products = items.map((product) => normalizeProduct(product));
+
+  return {
+    products,
+    total,
+    page,
+    page_size,
+    total_pages: Math.ceil(total / page_size),
+  };
+};
+
+export const getProductById = async (id: number) => {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+      seller: {
+        select: {
+          id: true,
+          fullName: true,
+          verifiedSeller: true,
+        },
+      },
+      auctions: true,
+    },
+  });
+
+  if (!product) {
+    throw AppError.notFound("Product not found");
+  }
+
+  return normalizeProduct(product);
+};
+
+export const getRelatedProducts = async (productId: number, limit = 4) => {
+  const base = await prisma.product.findUnique({
+    where: { id: productId },
+  });
+
+  if (!base) {
+    return [];
+  }
+
+  const related = await prisma.product.findMany({
+    where: {
+      id: { not: productId },
+      status: ProductStatus.PUBLISHED,
+      OR: [
+        { category: base.category },
+        { brand: base.brand },
+      ],
+    },
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+    },
+    take: limit,
+  });
+
+  return related.map((product) => normalizeProduct(product));
+};
+
+const productInputSchema = z.object({
+  sellerId: z.coerce.number().int().positive(),
+  nameAr: z.string().min(2),
+  nameEn: z.string().min(2),
+  descriptionAr: z.string().min(4),
+  descriptionEn: z.string().min(4),
+  productType: z.string().min(1),
+  brand: z.string().min(1),
+  category: z.string().min(1),
+  basePrice: z.coerce.number().positive(),
+  sizeMl: z.coerce.number().int().positive(),
+  concentration: z.string().min(1),
+  condition: z.nativeEnum(ProductCondition),
+  stockQuantity: z.coerce.number().int().nonnegative(),
+  status: z.nativeEnum(ProductStatus).default(ProductStatus.PENDING_REVIEW),
+  imageUrls: z.array(z.string().url()).default([]),
+});
+
+export const createProduct = async (input: z.infer<typeof productInputSchema>) => {
+  const data = productInputSchema.parse(input);
+  const slugBase = makeSlug(data.nameEn);
+
+  const existingSlug = await prisma.product.findFirst({
+    where: { slug: slugBase },
+    select: { id: true },
+  });
+
+  const slug =
+    existingSlug && existingSlug.id
+      ? `${slugBase}-${Date.now().toString(36)}`
+      : slugBase;
+
+  const product = await prisma.product.create({
+    data: {
+      sellerId: data.sellerId,
+      nameAr: data.nameAr,
+      nameEn: data.nameEn,
+      slug,
+      descriptionAr: data.descriptionAr,
+      descriptionEn: data.descriptionEn,
+      productType: data.productType,
+      brand: data.brand,
+      category: data.category,
+      basePrice: new Prisma.Decimal(data.basePrice),
+      sizeMl: data.sizeMl,
+      concentration: data.concentration,
+      condition: data.condition,
+      stockQuantity: data.stockQuantity,
+      status: data.status,
+      images: {
+        create: data.imageUrls.map((url, index) => ({
+          url,
+          sortOrder: index,
+        })),
+      },
+    },
+    include: {
+      images: true,
+      seller: {
+        select: {
+          id: true,
+          fullName: true,
+          verifiedSeller: true,
+        },
+      },
+    },
+  });
+
+  return normalizeProduct(product);
+};
+
+const updateProductSchema = z.object({
+  nameAr: z.string().min(2).optional(),
+  nameEn: z.string().min(2).optional(),
+  descriptionAr: z.string().min(4).optional(),
+  descriptionEn: z.string().min(4).optional(),
+  productType: z.string().min(1).optional(),
+  brand: z.string().min(1).optional(),
+  category: z.string().min(1).optional(),
+  basePrice: z.coerce.number().positive().optional(),
+  sizeMl: z.coerce.number().int().positive().optional(),
+  concentration: z.string().min(1).optional(),
+  condition: z.nativeEnum(ProductCondition).optional(),
+  stockQuantity: z.coerce.number().int().nonnegative().optional(),
+  status: z
+    .union([
+      z.nativeEnum(ProductStatus),
+      z.enum(["pending", "published", "draft", "rejected", "archived"]),
+    ])
+    .optional(),
+  imageUrls: z.array(z.string().url()).optional(),
+});
+
+export const updateProduct = async (
+  productId: number,
+  sellerId: number,
+  payload: unknown
+) => {
+  const data = updateProductSchema.parse(payload);
+
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+  });
+
+  if (!product || product.sellerId !== sellerId) {
+    throw AppError.notFound("Product not found");
+  }
+
+  const updateData: Prisma.ProductUpdateInput = {};
+
+  if (data.nameAr !== undefined) updateData.nameAr = data.nameAr;
+  if (data.nameEn !== undefined) updateData.nameEn = data.nameEn;
+  if (data.descriptionAr !== undefined) updateData.descriptionAr = data.descriptionAr;
+  if (data.descriptionEn !== undefined) updateData.descriptionEn = data.descriptionEn;
+  if (data.productType !== undefined) updateData.productType = data.productType;
+  if (data.brand !== undefined) updateData.brand = data.brand;
+  if (data.category !== undefined) updateData.category = data.category;
+  if (data.basePrice !== undefined) updateData.basePrice = new Prisma.Decimal(data.basePrice);
+  if (data.sizeMl !== undefined) updateData.sizeMl = data.sizeMl;
+  if (data.concentration !== undefined) updateData.concentration = data.concentration;
+  if (data.condition !== undefined) updateData.condition = data.condition;
+  if (data.stockQuantity !== undefined) updateData.stockQuantity = data.stockQuantity;
+  if (data.status !== undefined) {
+    if (typeof data.status === "string" && data.status === "pending") {
+      updateData.status = ProductStatus.PENDING_REVIEW;
+    } else if (typeof data.status === "string") {
+      updateData.status = data.status.toUpperCase() as ProductStatus;
+    } else {
+      updateData.status = data.status;
+    }
+  }
+
+  const imagesUpdate =
+    data.imageUrls !== undefined
+      ? {
+          deleteMany: {},
+          create: data.imageUrls.map((url, index) => ({
+            url,
+            sortOrder: index,
+          })),
+        }
+      : undefined;
+
+  const updated = await prisma.product.update({
+    where: { id: productId },
+    data: {
+      ...updateData,
+      ...(imagesUpdate ? { images: imagesUpdate } : {}),
+    },
+    include: {
+      images: { orderBy: { sortOrder: "asc" as const } },
+    },
+  });
+
+  return normalizeProduct(updated);
+};
+
+export const moderateProduct = async (
+  productId: number,
+  action: "approve" | "reject"
+) => {
+  const status =
+    action === "approve" ? ProductStatus.PUBLISHED : ProductStatus.REJECTED;
+
+  const product = await prisma.product.update({
+    where: { id: productId },
+    data: { status },
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+
+  return normalizeProduct(product);
+};
