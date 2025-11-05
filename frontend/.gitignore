@@ -10,7 +10,10 @@ dist/
 downloads/
 eggs/
 .eggs/
+# Allow committed source utilities under src/lib while keeping other lib folders ignored
 lib/
+!src/lib/
+!src/lib/**
 lib64/
 parts/
 sdist/
