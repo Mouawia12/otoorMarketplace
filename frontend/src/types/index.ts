@@ -37,6 +37,8 @@ export interface Auction {
   start_time: string;
   end_time: string;
   status: string;
+  created_at: string;
+  updated_at: string;
   product?: Product;
   seller?: { id: number; full_name: string; verified_seller: boolean };
   total_bids?: number;

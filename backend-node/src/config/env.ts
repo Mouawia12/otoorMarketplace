@@ -13,6 +13,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET should be at least 32 chars"),
   JWT_EXPIRES_IN: z.string().default("86400"),
   ALLOWED_ORIGINS: z.string().default("*"),
+  PLATFORM_COMMISSION_RATE: z
+    .string()
+    .default("0.1")
+    .describe("Commission rate taken on every order (e.g. 0.1 for 10%)"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -29,6 +33,7 @@ const {
   JWT_SECRET,
   JWT_EXPIRES_IN,
   ALLOWED_ORIGINS,
+  PLATFORM_COMMISSION_RATE,
 } = parsed.data;
 
 const allowedOrigins =
@@ -45,4 +50,5 @@ export const config = {
   jwtSecret: JWT_SECRET,
   jwtExpiresIn: JWT_EXPIRES_IN,
   allowedOrigins,
+  platformCommissionRate: Number(PLATFORM_COMMISSION_RATE),
 };

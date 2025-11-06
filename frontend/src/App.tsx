@@ -66,12 +66,12 @@ import { useAuthStore } from './store/authStore';
 import { useUIStore } from './store/uiStore';
 
 function App() {
-  const { isAuthenticated, fetchUser } = useAuthStore();
+  const { isAuthenticated, fetchUser, user } = useAuthStore();
   const { language } = useUIStore();
 
   useEffect(() => {
-    if (isAuthenticated) fetchUser();
-  }, [isAuthenticated, fetchUser]);
+    if (isAuthenticated && !user) fetchUser();
+  }, [isAuthenticated, user, fetchUser]);
 
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
