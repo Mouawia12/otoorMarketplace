@@ -144,6 +144,7 @@ model Order {
   discountAmount  Decimal     @map("discount_amount") @db.Decimal(10, 2)
   shippingFee     Decimal     @map("shipping_fee") @db.Decimal(10, 2)
   totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
+  platformFee     Decimal     @map("platform_fee") @db.Decimal(10, 2) @default(0)
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 

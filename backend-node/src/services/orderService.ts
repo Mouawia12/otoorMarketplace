@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { normalizeProduct } from "./productService";
+import { config } from "../config/env";
 
 const orderItemSchema = z.object({
   productId: z.number().int().positive(),
@@ -95,6 +96,10 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         shippingFee: new Prisma.Decimal(data.shippingFee),
         totalAmount: new Prisma.Decimal(
           subtotal - data.discountAmount + data.shippingFee
+        ),
+        platformFee: new Prisma.Decimal(
+          (subtotal - data.discountAmount + data.shippingFee) *
+            config.platformCommissionRate
         ),
         items: {
           create: data.items.map((item) => ({
@@ -203,6 +208,7 @@ const mapOrderToDto = (order: Prisma.OrderGetPayload<{
     shipping_address: order.shippingAddress,
     status: statusToFriendly(order.status),
     created_at: order.createdAt.toISOString(),
+    platform_fee: Number(order.platformFee ?? 0),
     product,
   };
 };
