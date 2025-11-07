@@ -7,9 +7,9 @@ import { normalizeProduct } from "./productService";
 import { config } from "../config/env";
 
 const orderItemSchema = z.object({
-  productId: z.number().int().positive(),
-  quantity: z.number().int().positive(),
-  unitPrice: z.number().positive(),
+  productId: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().int().positive(),
+  unitPrice: z.coerce.number().positive().optional(),
 });
 
 const createOrderSchema = z.object({
@@ -25,8 +25,8 @@ const createOrderSchema = z.object({
     })
     .optional(),
   items: z.array(orderItemSchema).min(1),
-  discountAmount: z.number().nonnegative().default(0),
-  shippingFee: z.number().nonnegative().default(0),
+  discountAmount: z.coerce.number().nonnegative().default(0),
+  shippingFee: z.coerce.number().nonnegative().default(0),
 });
 
 export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
@@ -54,12 +54,18 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
       },
     });
 
-    if (products.length !== data.items.length) {
+    const productMap = new Map(products.map((product) => [product.id, product]));
+
+    if (productMap.size !== data.items.length) {
       throw AppError.badRequest("One or more products are unavailable");
     }
 
     const subtotal = data.items.reduce((total, item) => {
-      return total + item.unitPrice * item.quantity;
+      const product = productMap.get(item.productId);
+      if (!product) {
+        throw AppError.badRequest(`Product ${item.productId} not found`);
+      }
+      return total + product.basePrice.toNumber() * item.quantity;
     }, 0);
 
     if (subtotal <= 0) {
@@ -67,7 +73,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     }
 
     for (const item of data.items) {
-      const product = products.find((p) => p.id === item.productId);
+      const product = productMap.get(item.productId);
       if (!product) {
         throw AppError.badRequest(`Product ${item.productId} not found`);
       }
@@ -80,6 +86,17 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         );
       }
     }
+
+    const normalizedItems = data.items.map((item) => {
+      const product = productMap.get(item.productId)!;
+      const unitPrice = new Prisma.Decimal(product.basePrice.toNumber());
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice,
+        totalPrice: unitPrice.mul(item.quantity),
+      };
+    });
 
     const order = await tx.order.create({
       data: {
@@ -102,12 +119,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
             config.platformCommissionRate
         ),
         items: {
-          create: data.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: new Prisma.Decimal(item.unitPrice),
-            totalPrice: new Prisma.Decimal(item.unitPrice * item.quantity),
-          })),
+          create: normalizedItems,
         },
       },
       include: {
@@ -116,7 +128,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     });
 
     // decrement stock
-    for (const item of data.items) {
+    for (const item of normalizedItems) {
       await tx.product.update({
         where: { id: item.productId },
         data: {

@@ -1,8 +1,16 @@
-import { Prisma, RoleName, ProductCondition, ProductStatus, AuctionStatus } from "@prisma/client";
+import {
+  Prisma,
+  RoleName,
+  ProductCondition,
+  ProductStatus,
+  AuctionStatus,
+  OrderStatus,
+} from "@prisma/client";
 
 import { prisma } from "../prisma/client";
 import { hashPassword } from "../utils/password";
 import { makeSlug } from "../utils/slugify";
+import { config } from "../config/env";
 
 const productSeedData = [
   {
@@ -82,6 +90,34 @@ const roleNames = [
   RoleName.BUYER,
 ];
 
+async function resetDatabase() {
+  console.log("🧹 Clearing existing data...");
+  await prisma.bid.deleteMany();
+  await prisma.auction.deleteMany();
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.wishlistItem.deleteMany();
+  await prisma.productImage.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.address.deleteMany();
+  await prisma.userRole.deleteMany();
+  await prisma.role.deleteMany();
+  await prisma.user.deleteMany();
+}
+
+async function ensureSchema() {
+  const columnCheck = await prisma.$queryRaw<
+    Array<{ column_name: string }>
+  >`SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'Order' AND column_name = 'platform_fee'`;
+
+  if (columnCheck.length === 0) {
+    console.log("🛠️  Adding missing column Order.platform_fee ...");
+    await prisma.$executeRawUnsafe(
+      "ALTER TABLE `Order` ADD COLUMN `platform_fee` DECIMAL(10, 2) NOT NULL DEFAULT 0 AFTER `total_amount`;"
+    );
+  }
+}
+
 async function seedRoles() {
   for (const name of roleNames) {
     await prisma.role.upsert({
@@ -149,39 +185,6 @@ async function seedUsers() {
 async function seedProducts(sellerId: number) {
   for (const product of productSeedData) {
     const slugBase = makeSlug(product.nameEn);
-    const existing = await prisma.product.findUnique({
-      where: { slug: slugBase },
-    });
-
-    if (existing) {
-      await prisma.product.update({
-        where: { id: existing.id },
-        data: {
-          nameAr: product.nameAr,
-          nameEn: product.nameEn,
-          descriptionAr: product.descriptionAr,
-          descriptionEn: product.descriptionEn,
-          productType: product.productType,
-          brand: product.brand,
-          category: product.category,
-          basePrice: new Prisma.Decimal(product.basePrice),
-          sizeMl: product.sizeMl,
-          concentration: product.concentration,
-          condition: product.condition,
-          stockQuantity: product.stockQuantity,
-          status: product.status,
-          images: {
-            deleteMany: {},
-            create: product.imageUrls.map((url, index) => ({
-              url,
-              sortOrder: index,
-            })),
-          },
-        },
-      });
-      continue;
-    }
-
     await prisma.product.create({
       data: {
         sellerId,
@@ -208,6 +211,23 @@ async function seedProducts(sellerId: number) {
       },
     });
   }
+}
+
+async function seedAddresses(buyerId: number) {
+  await prisma.address.create({
+    data: {
+      userId: buyerId,
+      label: "Home",
+      recipient: "Lina Al-Salem",
+      phone: "+966500000000",
+      city: "Riyadh",
+      region: "Riyadh",
+      street: "King Fahd Road",
+      building: "Tower A",
+      notes: "Ring the bell upon arrival",
+      isDefault: true,
+    },
+  });
 }
 
 async function seedAuctions(sellerId: number) {
@@ -241,12 +261,64 @@ async function seedAuctions(sellerId: number) {
   });
 }
 
+async function seedSampleOrder(buyerId: number) {
+  const product = await prisma.product.findFirst({
+    where: { status: ProductStatus.PUBLISHED },
+  });
+
+  if (!product) {
+    return;
+  }
+
+  const unitPrice = new Prisma.Decimal(product.basePrice);
+  const platformFee = unitPrice.mul(config.platformCommissionRate);
+
+  await prisma.order.create({
+    data: {
+      buyerId,
+      status: OrderStatus.PENDING,
+      paymentMethod: "COD",
+      shippingName: "Lina Al-Salem",
+      shippingPhone: "+966500000000",
+      shippingCity: "Riyadh",
+      shippingRegion: "Riyadh",
+      shippingAddress: "King Fahd Road, Tower A",
+      subtotalAmount: unitPrice,
+      discountAmount: new Prisma.Decimal(0),
+      shippingFee: new Prisma.Decimal(0),
+      totalAmount: unitPrice,
+      platformFee,
+      items: {
+        create: [
+          {
+            productId: product.id,
+            quantity: 1,
+            unitPrice,
+            totalPrice: unitPrice,
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.product.update({
+    where: { id: product.id },
+    data: {
+      stockQuantity: product.stockQuantity > 0 ? product.stockQuantity - 1 : product.stockQuantity,
+    },
+  });
+}
+
 async function main() {
   console.log("🌱 Seeding database...");
+  await resetDatabase();
+  await ensureSchema();
   await seedRoles();
-  const { seller } = await seedUsers();
+  const { seller, buyer } = await seedUsers();
   await seedProducts(seller.id);
+  await seedAddresses(buyer.id);
   await seedAuctions(seller.id);
+  await seedSampleOrder(buyer.id);
   console.log("✅ Seeding completed");
 }
 

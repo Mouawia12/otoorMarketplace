@@ -9,6 +9,7 @@ export interface User {
 export interface Product {
   id: number;
   seller_id: number;
+  seller?: { id: number; full_name: string; verified_seller: boolean };
   name_ar: string;
   name_en: string;
   description_ar: string;
@@ -65,4 +66,14 @@ export interface Order {
   status: string;
   created_at: string;
   product?: Product;
+}
+
+export interface ModerationQueueItem {
+  id: string;
+  item_id: number;
+  type: 'product' | 'order' | 'auction';
+  title_en: string;
+  title_ar: string;
+  created_at: string;
+  priority: 'low' | 'medium' | 'high';
 }

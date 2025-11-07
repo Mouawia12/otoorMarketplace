@@ -5,7 +5,7 @@ import { Product } from '../../../types';
 
 interface FeaturedGridProps {
   title: { ar: string; en: string };
-  products: any[];
+  products: Product[];
   ctaText: { ar: string; en: string };
   ctaLink: string;
   type?: 'new' | 'used';
@@ -22,27 +22,6 @@ export default function FeaturedGrid({
   const lang = i18n.language as 'ar' | 'en';
 
   if (!products.length) return null;
-
-  const transformProduct = (mockProduct: any): Product => ({
-    id: mockProduct.id,
-    seller_id: 1,
-    name_ar: mockProduct.name.ar,
-    name_en: mockProduct.name.en,
-    description_ar: '',
-    description_en: '',
-    product_type: 'perfume',
-    brand: mockProduct.brand,
-    category: 'fragrance',
-    base_price: mockProduct.price_usd,
-    size_ml: 100,
-    concentration: 'EDP',
-    condition: type === 'used' ? 'used' : 'new',
-    stock_quantity: 10,
-    image_urls: [mockProduct.image],
-    status: 'active',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 md:py-12">
@@ -64,7 +43,7 @@ export default function FeaturedGrid({
       {/* 👇 الشبكة: 2 (موبايل) / 3 (تابلت) / 6 (لابتوب+) */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
         {products.map((product) => (
-          <ProductCard key={product.id} product={transformProduct(product)} type={type} />
+          <ProductCard key={product.id} product={product} type={type} />
         ))}
       </div>
     </section>

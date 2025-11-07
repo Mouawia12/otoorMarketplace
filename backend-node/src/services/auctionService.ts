@@ -1,4 +1,4 @@
-import { AuctionStatus, Prisma } from "@prisma/client";
+import { AuctionStatus, Prisma, ProductStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "../prisma/client";
@@ -279,4 +279,180 @@ export const getAuctionBids = async (auctionId: number) => {
   });
 
   return bids.map((bid) => normalizeBid(bid));
+};
+
+const createAuctionSchema = z.object({
+  sellerId: z.number().int().positive(),
+  productId: z.number().int().positive(),
+  startingPrice: z.number().positive(),
+  minimumIncrement: z.number().positive(),
+  startTime: z.coerce.date(),
+  endTime: z.coerce.date(),
+});
+
+const mapAuctionStatus = (start: Date, end: Date) => {
+  const now = new Date();
+  if (end <= start) {
+    throw AppError.badRequest("Auction end time must be after the start time");
+  }
+  if (end <= now) {
+    throw AppError.badRequest("Auction end time must be in the future");
+  }
+  if (start > now) {
+    return AuctionStatus.SCHEDULED;
+  }
+  return AuctionStatus.ACTIVE;
+};
+
+export const createAuction = async (input: z.infer<typeof createAuctionSchema>) => {
+  const data = createAuctionSchema.parse(input);
+
+  const product = await prisma.product.findUnique({
+    where: { id: data.productId },
+    select: {
+      id: true,
+      sellerId: true,
+      status: true,
+    },
+  });
+
+  if (!product || product.sellerId !== data.sellerId) {
+    throw AppError.notFound("Product not found for seller");
+  }
+
+  if (product.status !== ProductStatus.PUBLISHED) {
+    throw AppError.badRequest("Product must be published before starting an auction");
+  }
+
+  const existing = await prisma.auction.findUnique({
+    where: { productId: data.productId },
+  });
+
+  if (
+    existing &&
+    existing.status !== AuctionStatus.COMPLETED &&
+    existing.status !== AuctionStatus.CANCELLED
+  ) {
+    throw AppError.badRequest("Auction already exists for this product");
+  }
+
+  const status = mapAuctionStatus(data.startTime, data.endTime);
+
+  const auction = await prisma.auction.create({
+    data: {
+      productId: data.productId,
+      sellerId: data.sellerId,
+      startingPrice: new Prisma.Decimal(data.startingPrice),
+      currentPrice: new Prisma.Decimal(data.startingPrice),
+      minimumIncrement: new Prisma.Decimal(data.minimumIncrement),
+      startTime: data.startTime,
+      endTime: data.endTime,
+      status,
+    },
+    include: {
+      product: {
+        include: {
+          images: { orderBy: { sortOrder: "asc" } },
+          seller: {
+            select: {
+              id: true,
+              fullName: true,
+              verifiedSeller: true,
+            },
+          },
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          fullName: true,
+          verifiedSeller: true,
+        },
+      },
+      _count: { select: { bids: true } },
+    },
+  });
+
+  return normalizeAuction({
+    ...auction,
+    total_bids: auction._count?.bids ?? 0,
+  });
+};
+
+const updateAuctionSchema = z.object({
+  endTime: z.coerce.date().optional(),
+  status: z.enum(["scheduled", "active", "completed", "cancelled"]).optional(),
+});
+
+export const updateAuction = async (auctionId: number, payload: unknown) => {
+  const data = updateAuctionSchema.parse(payload ?? {});
+
+  const updateData: Prisma.AuctionUpdateInput = {};
+
+  const existing = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    select: {
+      startTime: true,
+      endTime: true,
+      status: true,
+    },
+  });
+
+  if (!existing) {
+    throw AppError.notFound("Auction not found");
+  }
+
+  if (data.endTime) {
+    if (data.endTime <= existing.startTime) {
+      throw AppError.badRequest("Auction end time must be after the start time");
+    }
+    if (data.endTime <= new Date()) {
+      throw AppError.badRequest("Auction end time must be in the future");
+    }
+    updateData.endTime = data.endTime;
+  }
+
+  if (data.status) {
+    const normalized = data.status.toUpperCase() as AuctionStatus;
+    if (!Object.values(AuctionStatus).includes(normalized)) {
+      throw AppError.badRequest("Unsupported auction status");
+    }
+    updateData.status = normalized;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw AppError.badRequest("No auction updates provided");
+  }
+
+  const auction = await prisma.auction.update({
+    where: { id: auctionId },
+    data: updateData,
+    include: {
+      product: {
+        include: {
+          images: { orderBy: { sortOrder: "asc" } },
+          seller: {
+            select: {
+              id: true,
+              fullName: true,
+              verifiedSeller: true,
+            },
+          },
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          fullName: true,
+          verifiedSeller: true,
+        },
+      },
+      _count: { select: { bids: true } },
+    },
+  });
+
+  return normalizeAuction({
+    ...auction,
+    total_bids: auction._count?.bids ?? 0,
+  });
 };

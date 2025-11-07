@@ -25,12 +25,18 @@ export default function BrandsCarousel({ brands }: BrandsCarouselProps) {
               to={`/search?brand=${encodeURIComponent(brand.name)}`}
               className="flex items-center justify-center bg-ivory rounded-lg p-6 hover:bg-sand transition-colors shadow-md hover:shadow-luxury w-40 h-24 md:w-auto flex-shrink-0"
             >
-              <img
-                src={brand.logo}
-                alt={brand.name}
-                className="max-w-full max-h-full object-contain opacity-70 hover:opacity-100 transition-opacity"
-                loading="lazy"
-              />
+              {brand.logo ? (
+                <img
+                  src={brand.logo}
+                  alt={brand.name}
+                  className="max-w-full max-h-full object-contain opacity-70 hover:opacity-100 transition-opacity"
+                  loading="lazy"
+                />
+              ) : (
+                <span className="text-charcoal font-semibold text-sm text-center">
+                  {brand.name}
+                </span>
+              )}
             </Link>
           ))}
         </div>

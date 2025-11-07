@@ -1,71 +1,165 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import api from "../lib/api";
+import type { Product } from "../types";
+import { useUIStore } from "../store/uiStore";
+import { formatPrice } from "../utils/currency";
 
 type AdminStatus = "all" | "pending" | "approved" | "rejected" | "hidden";
 
-interface ProductRow {
-  id: number;
-  title: string;
-  seller: string;
-  price: number;
-  status: Exclude<AdminStatus, "all">;
-}
-
 const STATUS_META: Record<
   Exclude<AdminStatus, "all">,
-  { dotClass: string; labelKey: string }
+  { dotClass: string; labelKey: string; apiValue: string; productValues: string[] }
 > = {
-  pending:  { dotClass: "bg-amber-500",  labelKey: "admin.pending"  },
-  approved: { dotClass: "bg-emerald-600",labelKey: "admin.approved" },
-  rejected: { dotClass: "bg-rose-500",   labelKey: "admin.rejected" },
-  hidden:   { dotClass: "bg-slate-400",  labelKey: "admin.hidden"   },
+  pending: {
+    dotClass: "bg-amber-500",
+    labelKey: "admin.pending",
+    apiValue: "pending",
+    productValues: ["pending", "pending_review", "draft"],
+  },
+  approved: {
+    dotClass: "bg-emerald-600",
+    labelKey: "admin.approved",
+    apiValue: "approved",
+    productValues: ["published"],
+  },
+  rejected: {
+    dotClass: "bg-rose-500",
+    labelKey: "admin.rejected",
+    apiValue: "rejected",
+    productValues: ["rejected"],
+  },
+  hidden: {
+    dotClass: "bg-slate-400",
+    labelKey: "admin.hidden",
+    apiValue: "hidden",
+    productValues: ["archived"],
+  },
+};
+
+const productStatusToAdmin = (status: string): Exclude<AdminStatus, "all"> => {
+  const match = (Object.keys(STATUS_META) as Exclude<AdminStatus, "all">[]).find((key) =>
+    STATUS_META[key].productValues.includes(status)
+  );
+  return match ?? "pending";
+};
+
+const adminStatusToApi = (status: Exclude<AdminStatus, "all">) =>
+  STATUS_META[status].apiValue;
+
+const adminStatusToProductStatus = (status: Exclude<AdminStatus, "all">) => {
+  switch (status) {
+    case "approved":
+      return "published";
+    case "pending":
+      return "pending";
+    case "rejected":
+      return "rejected";
+    case "hidden":
+      return "archived";
+    default:
+      return status;
+  }
 };
 
 function StatusDot({ s }: { s: Exclude<AdminStatus, "all"> }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${STATUS_META[s].dotClass}`} />;
 }
 
-const MOCK_ROWS: ProductRow[] = [
-  { id: 1, title: "توم فورد عود وود", seller: "Ahmed Store",        price: 1280, status: "approved" },
-  { id: 2, title: "بلو دي شانيل أو دو تواليت 100 مل", seller: "Luxury Perfumes", price: 980,  status: "pending"  },
-  { id: 3, title: "ديور سوفاج", seller: "Dior Outlet",              price: 1150, status: "hidden"   },
-  { id: 4, title: "Ex Nihilo Fleur Narcotique EDP", seller: "Paris Hub",        price: 1490, status: "rejected" },
-];
-
 export default function AdminProductsPage() {
   const { t, i18n } = useTranslation();
+  const { language } = useUIStore();
+  const [products, setProducts] = useState<Product[]>([]);
   const [active, setActive] = useState<AdminStatus>("all");
   const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const rows = MOCK_ROWS;
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await api.get<Product[]>("/admin/products");
+        setProducts(response.data);
+      } catch (err: any) {
+        console.error("Failed to load admin products", err);
+        setError(err?.response?.data?.detail ?? t("common.errorLoading"));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [t]);
 
   const counts = useMemo(() => {
-    const c = { all: rows.length, pending: 0, approved: 0, rejected: 0, hidden: 0 };
-    rows.forEach(r => { (c as any)[r.status] += 1; });
-    return c;
-  }, [rows]);
+    const base = { all: products.length, pending: 0, approved: 0, rejected: 0, hidden: 0 };
+    products.forEach((product) => {
+      const status = productStatusToAdmin(product.status);
+      (base as any)[status] += 1;
+    });
+    return base;
+  }, [products]);
 
   const filtered = useMemo(() => {
-    let list = rows;
-    if (active !== "all") list = list.filter(r => r.status === active);
+    let list = products;
+    if (active !== "all") {
+      const acceptedStatuses = STATUS_META[active].productValues;
+      list = list.filter((product) => acceptedStatuses.includes(product.status));
+    }
     if (q.trim()) {
-      const k = q.trim().toLowerCase();
-      list = list.filter(
-        r =>
-          r.title.toLowerCase().includes(k) ||
-          r.seller.toLowerCase().includes(k) ||
-          String(r.id).includes(k)
-      );
+      const term = q.trim().toLowerCase();
+      list = list.filter((product) => {
+        return (
+          product.name_en.toLowerCase().includes(term) ||
+          product.name_ar.includes(q.trim()) ||
+          product.brand.toLowerCase().includes(term) ||
+          String(product.id).includes(term)
+        );
+      });
     }
     return list;
-  }, [rows, active, q]);
+  }, [products, active, q]);
 
-  const locale = i18n.language === "ar" ? "ar-SA" : "en-US";
-  const nf = new Intl.NumberFormat(locale);
+  const handleStatusChange = async (product: Product, status: Exclude<AdminStatus, "all">) => {
+    try {
+      await api.patch(`/admin/products/${product.id}/status`, { status: adminStatusToApi(status) });
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id ? { ...p, status: adminStatusToProductStatus(status) } : p
+        )
+      );
+    } catch (err: any) {
+      console.error("Failed to update product status", err);
+      alert(err?.response?.data?.detail ?? t("seller.updateFailed", "Failed to update product"));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t("common.loading")}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-luxury p-8 shadow-luxury text-center">
+        <p className="text-red-600 font-semibold mb-3">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition"
+        >
+          {t("common.retry")}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
-      {/* العنوان + البحث */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-lg sm:text-xl font-extrabold text-charcoal">
           {t("admin.products")}
@@ -82,7 +176,6 @@ export default function AdminProductsPage() {
         </div>
       </div>
 
-      {/* تبويبات الحالة */}
       <div className="flex flex-wrap items-center gap-1.5">
         {([
           { id: "all", label: t("admin.all"), count: counts.all },
@@ -103,7 +196,6 @@ export default function AdminProductsPage() {
         ))}
       </div>
 
-      {/* جدول مضغوط بدون تمرير أفقي */}
       <div className="rounded-lg border border-sand/60 bg-white">
         <table className="w-full table-auto text-xs sm:text-sm">
           <thead className="bg-sand/60 text-charcoal">
@@ -117,37 +209,55 @@ export default function AdminProductsPage() {
           </thead>
 
           <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id} className="border-t border-sand/40">
-                {/* رقم: يبقى في سطر واحد لسهولة القراءة */}
-                <td className="px-2 py-2 align-top whitespace-nowrap text-taupe">#{r.id}</td>
-
-                {/* العنوان: يسمح باللفّ ويكسر الكلمات الطويلة */}
-                <td className="px-2 py-2 align-top whitespace-normal break-words break-keep leading-5">
-                  {r.title}
-                </td>
-
-                {/* البائع: أيضًا يسمح باللفّ */}
-                <td className="px-2 py-2 align-top whitespace-normal break-words break-keep text-taupe leading-5">
-                  {r.seller}
-                </td>
-
-                {/* السعر: بسطر واحد */}
-                <td className="px-2 py-2 align-top whitespace-nowrap font-bold">
-                  {nf.format(r.price)}
-                </td>
-
-                {/* الحالة: نقطة + نص صغير */}
-                <td className="px-2 py-2 align-top whitespace-nowrap">
-                  <span className="inline-flex items-center gap-1.5">
-                    <StatusDot s={r.status} />
-                    <span className="text-[11px] sm:text-xs text-taupe">
-                      {t(STATUS_META[r.status].labelKey)}
+            {filtered.map((product) => {
+              const sellerName = product.seller?.full_name ?? t("admin.unknownSeller", "Unknown");
+              const adminStatus = productStatusToAdmin(product.status);
+              const displayName =
+                i18n.language === "ar" ? product.name_ar : product.name_en;
+              return (
+                <tr key={product.id} className="border-t border-sand/40">
+                  <td className="px-2 py-2 align-top whitespace-nowrap text-taupe">#{product.id}</td>
+                  <td className="px-2 py-2 align-top whitespace-normal break-words break-keep leading-5">
+                    {displayName}
+                  </td>
+                  <td className="px-2 py-2 align-top whitespace-normal break-words break-keep text-taupe leading-5">
+                    {sellerName}
+                  </td>
+                  <td className="px-2 py-2 align-top whitespace-nowrap font-bold">
+                    {formatPrice(product.base_price, language)}
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    <span className="inline-flex items-center gap-1.5">
+                      <StatusDot s={adminStatus} />
+                      <span className="text-[11px] sm:text-xs text-taupe">
+                        {t(STATUS_META[adminStatus].labelKey)}
+                      </span>
                     </span>
-                  </span>
-                </td>
-              </tr>
-            ))}
+                    <div className="mt-2">
+                      <select
+                        value={adminStatus}
+                        onChange={(e) =>
+                          handleStatusChange(
+                            product,
+                            e.target.value as Exclude<AdminStatus, "all">
+                          )
+                        }
+                        className="w-full px-2 py-1 rounded-md border border-sand/60 text-[11px] sm:text-xs"
+                      >
+                        {(["pending", "approved", "rejected", "hidden"] as Exclude<
+                          AdminStatus,
+                          "all"
+                        >[]).map((option) => (
+                          <option key={option} value={option}>
+                            {t(STATUS_META[option].labelKey)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
 
             {filtered.length === 0 && (
               <tr>
@@ -160,7 +270,6 @@ export default function AdminProductsPage() {
         </table>
       </div>
 
-      {/* تلميح صغير لتحسين القراءة على الشاشات الصغيرة */}
       <p className="text-[11px] sm:text-xs text-taupe/80">
         {i18n.language === "ar"
           ? "تم تصغير النص والسماح بلفّه كي ترى كل المحتوى بدون تمرير أفقي."

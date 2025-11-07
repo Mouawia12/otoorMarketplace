@@ -62,7 +62,7 @@ export default function ProductDetail() {
       navigate('/orders');
     } catch (error: any) {
       console.error('Failed to create order:', error);
-      alert(error.response?.data?.detail || 'Failed to create order');
+      alert(error.response?.data?.message || error.response?.data?.detail || 'Failed to create order');
     }
   };
 

@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import ProductCard from '../components/products/ProductCard';
 import ProductFilters from '../components/products/ProductFilters';
 import Pagination from '../components/common/Pagination';
-import { fetchProducts } from '../services/productService';
+import { fetchProducts, fetchProductFiltersMeta, ProductFiltersMeta } from '../services/productService';
 import { fetchAuctions } from '../services/auctionService';
 import { Product, Auction } from '../types';
 
@@ -20,16 +20,45 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterMeta, setFilterMeta] = useState<ProductFiltersMeta | null>(null);
+
+  const lockedCondition = catalogType === 'new' ? 'new' : catalogType === 'used' ? 'used' : undefined;
 
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
     brand: searchParams.get('brand') || '',
     category: searchParams.get('category') || '',
-    condition: catalogType === 'new' ? 'new' : catalogType === 'used' ? 'used' : '',
+    condition: lockedCondition ?? searchParams.get('condition') ?? 'all',
     min_price: searchParams.get('min_price') ? parseFloat(searchParams.get('min_price')!) : undefined,
     max_price: searchParams.get('max_price') ? parseFloat(searchParams.get('max_price')!) : undefined,
-    sort: searchParams.get('sort') || '',
+    sort: searchParams.get('sort') || 'newest',
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMeta = async () => {
+      try {
+        const meta = await fetchProductFiltersMeta();
+        if (!cancelled) {
+          setFilterMeta(meta);
+        }
+      } catch (error) {
+        console.error('Failed to load product filters meta', error);
+      }
+    };
+    loadMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      condition: lockedCondition ?? prev.condition ?? 'all',
+    }));
+    setCurrentPage(1);
+  }, [catalogType]);
 
   useEffect(() => {
     loadProducts();
@@ -54,9 +83,16 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
         setProducts(mapped.map((item) => item.product));
         setTotalPages(Math.max(1, Math.ceil(total / 12)));
       } else {
+        const { condition, ...restFilters } = filters;
+        const effectiveCondition = lockedCondition
+          ? lockedCondition.toUpperCase()
+          : condition && condition !== 'all'
+          ? condition.toUpperCase()
+          : undefined;
+
         const result = await fetchProducts({
-          ...filters,
-          condition: filters.condition,
+          ...restFilters,
+          ...(effectiveCondition ? { condition: effectiveCondition } : {}),
           page: currentPage,
           page_size: 12,
         });
@@ -74,6 +110,7 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
   const applyAuctionFilters = (auctions: Auction[]) => {
     return auctions.filter((auction) => {
       if (!auction.product) return false;
+      if (auction.status !== 'active') return false;
       const product = auction.product;
       const searchMatch =
         !filters.search ||
@@ -120,14 +157,29 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
   };
 
   const handleFilterChange = (newFilters: any) => {
-    setFilters(newFilters);
+    const nextFilters = {
+      ...filters,
+      ...newFilters,
+      condition: lockedCondition ?? newFilters.condition ?? (filters.condition || 'all'),
+    };
+    setFilters(nextFilters);
     setCurrentPage(1);
     
     // Update URL params
     const params = new URLSearchParams();
-    Object.entries(newFilters).forEach(([key, value]) => {
-      if (value) params.set(key, String(value));
-    });
+    if (nextFilters.search) params.set('search', nextFilters.search);
+    if (nextFilters.brand) params.set('brand', nextFilters.brand);
+    if (nextFilters.category) params.set('category', nextFilters.category);
+    if (!lockedCondition && nextFilters.condition && nextFilters.condition !== 'all') {
+      params.set('condition', nextFilters.condition);
+    }
+    if (nextFilters.sort && nextFilters.sort !== 'newest') params.set('sort', nextFilters.sort);
+    if (typeof nextFilters.min_price === 'number') {
+      params.set('min_price', String(nextFilters.min_price));
+    }
+    if (typeof nextFilters.max_price === 'number') {
+      params.set('max_price', String(nextFilters.max_price));
+    }
     setSearchParams(params);
   };
 
@@ -150,7 +202,12 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
         <div className="lg:col-span-1">
-          <ProductFilters filters={filters} onFilterChange={handleFilterChange} />
+          <ProductFilters
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            meta={filterMeta ?? undefined}
+            lockedCondition={lockedCondition}
+          />
         </div>
 
         <div className="lg:col-span-3">
