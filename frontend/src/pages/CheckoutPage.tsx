@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import api from "../lib/api";
 import { useCartStore } from "../store/cartStore";
+import { useAuthStore } from "../store/authStore";
 import { formatPrice } from "../utils/currency";
 
 export default function CheckoutPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { items, shipping, setShipping, coupon, setCoupon, totals, clear } = useCartStore();
+  const { isAuthenticated } = useAuthStore();
   const { sub, discount, shipping: shippingCost, total } = totals();
   const lang = i18n.language as 'ar' | 'en';
 
@@ -24,6 +27,8 @@ export default function CheckoutPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -66,9 +71,42 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async () => {
     if (!validateForm()) return;
 
-    const orderId = `ORD-${Date.now()}`;
-    clear();
-    navigate(`/order/success?orderId=${orderId}`);
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      setPlacingOrder(true);
+      setSubmitError(null);
+      const payload = {
+        payment_method: formData.paymentMethod.toUpperCase(),
+        shipping: {
+          name: formData.name,
+          phone: formData.phone,
+          city: formData.city,
+          region: formData.city,
+          address: formData.address,
+        },
+        items: items.map((item) => ({
+          productId: Number(item.id),
+          quantity: item.qty,
+          unitPrice: item.price,
+        })),
+        discount_amount: coupon?.amount ?? 0,
+        shipping_fee: shippingCost,
+      };
+
+      const response = await api.post("/orders", payload);
+      clear();
+      navigate(`/order/success?orderId=${response.data.id}`);
+    } catch (error: any) {
+      console.error("Failed to place order", error);
+      const apiMessage = error?.response?.data?.message || error?.response?.data?.detail;
+      setSubmitError(apiMessage ?? t('checkout.orderFailed', 'Failed to place order'));
+    } finally {
+      setPlacingOrder(false);
+    }
   };
 
   if (items.length === 0) {
@@ -337,11 +375,16 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {submitError && (
+                <p className="text-red-600 text-sm mb-4">{submitError}</p>
+              )}
+
               <button
                 onClick={handlePlaceOrder}
-                className="w-full bg-gold text-charcoal py-4 rounded-luxury hover:bg-gold-hover transition font-bold text-lg"
+                disabled={placingOrder}
+                className="w-full bg-gold text-charcoal py-4 rounded-luxury hover:bg-gold-hover transition font-bold text-lg disabled:opacity-60"
               >
-                {t('checkout.placeOrder')}
+                {placingOrder ? t('common.loading') : t('checkout.placeOrder')}
               </button>
             </div>
           </div>

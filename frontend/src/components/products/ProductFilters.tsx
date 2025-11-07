@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { ProductFiltersMeta } from "../../services/productService";
 
 type Condition = "all" | "new" | "used";
 
@@ -18,9 +19,17 @@ type ProductFiltersProps = {
   className?: string;
   filters?: FilterState;
   onFilterChange?: (filters: FilterState) => void;
+  meta?: ProductFiltersMeta;
+  lockedCondition?: "new" | "used";
 };
 
-export default function ProductFilters({ className = "", filters, onFilterChange }: ProductFiltersProps) {
+export default function ProductFilters({
+  className = "",
+  filters,
+  onFilterChange,
+  meta,
+  lockedCondition,
+}: ProductFiltersProps) {
   const { i18n } = useTranslation();
   const dir = i18n.language === "ar" ? "rtl" : "ltr";
   const navigate = useNavigate();
@@ -32,7 +41,9 @@ export default function ProductFilters({ className = "", filters, onFilterChange
   const [sort, setSort] = useState(filters?.sort ?? "newest");
   const [brand, setBrand] = useState(filters?.brand ?? "");
   const [category, setCategory] = useState(filters?.category ?? "");
-  const [condition, setCondition] = useState<Condition>((filters?.condition as Condition) ?? "all");
+const [condition, setCondition] = useState<Condition>(
+  (filters?.condition as Condition) ?? lockedCondition ?? "all"
+);
   const [minPrice, setMinPrice] = useState(filters?.min_price?.toString() ?? "");
   const [maxPrice, setMaxPrice] = useState(filters?.max_price?.toString() ?? "");
 
@@ -42,7 +53,9 @@ export default function ProductFilters({ className = "", filters, onFilterChange
       setSort(filters.sort ?? "newest");
       setBrand(filters.brand ?? "");
       setCategory(filters.category ?? "");
-      setCondition((filters.condition as Condition) ?? "all");
+      setCondition(
+        (filters.condition as Condition) ?? lockedCondition ?? "all"
+      );
       setMinPrice(
         typeof filters.min_price === "number" ? String(filters.min_price) : ""
       );
@@ -88,11 +101,11 @@ export default function ProductFilters({ className = "", filters, onFilterChange
     if (sort && sort !== "newest") c++;
     if (brand) c++;
     if (category) c++;
-    if (condition !== "all") c++;
+    if (!lockedCondition && condition !== "all") c++;
     if (minPrice) c++;
     if (maxPrice) c++;
     return c;
-  }, [sort, brand, category, condition, minPrice, maxPrice]);
+  }, [sort, brand, category, condition, minPrice, maxPrice, lockedCondition]);
 
   const inputCls =
     "w-full h-9 rounded-lg border border-sand/60 bg-white text-charcoal placeholder-taupe px-2 outline-none focus:ring-2 focus:ring-gold focus:border-gold transition text-sm";
@@ -103,11 +116,18 @@ export default function ProductFilters({ className = "", filters, onFilterChange
     setSort("newest");
     setBrand("");
     setCategory("");
-    setCondition("all");
+    setCondition(lockedCondition ?? "all");
     setMinPrice("");
     setMaxPrice("");
 
-    onFilterChange?.({ sort: "newest" });
+    onFilterChange?.({
+      sort: "newest",
+      brand: "",
+      category: "",
+      condition: lockedCondition ?? "all",
+      min_price: undefined,
+      max_price: undefined,
+    });
   }
 
   function apply() {
@@ -115,7 +135,7 @@ export default function ProductFilters({ className = "", filters, onFilterChange
       sort,
       brand,
       category,
-      condition: condition === "all" ? undefined : condition,
+      condition: lockedCondition ?? (condition === "all" ? undefined : condition),
       min_price: minPrice ? Number(minPrice) : undefined,
       max_price: maxPrice ? Number(maxPrice) : undefined,
     };
@@ -186,9 +206,10 @@ export default function ProductFilters({ className = "", filters, onFilterChange
               <label className={labelCls}>الترتيب حسب</label>
               <select className={inputCls} value={sort} onChange={(e) => setSort(e.target.value)}>
                 <option value="newest">الأحدث أولاً</option>
-                <option value="price_low">السعر: من الأقل للأعلى</option>
-                <option value="price_high">السعر: من الأعلى للأقل</option>
-                <option value="popular">الأكثر رواجًا</option>
+                <option value="oldest">الأقدم أولاً</option>
+                <option value="price_asc">السعر: من الأقل للأعلى</option>
+                <option value="price_desc">السعر: من الأعلى للأقل</option>
+                <option value="stock">الأكثر توفرًا</option>
               </select>
             </div>
 
@@ -198,18 +219,22 @@ export default function ProductFilters({ className = "", filters, onFilterChange
                 <label className={labelCls}>العلامة التجارية</label>
                 <select className={inputCls} value={brand} onChange={(e) => setBrand(e.target.value)}>
                   <option value="">الكل</option>
-                  <option value="dior">Dior</option>
-                  <option value="chanel">Chanel</option>
-                  <option value="ysl">YSL</option>
+                  {(meta?.brands ?? []).map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1">
                 <label className={labelCls}>الفئة</label>
                 <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>
                   <option value="">الكل</option>
-                  <option value="men">رجالي</option>
-                  <option value="women">نسائي</option>
-                  <option value="unisex">يونيسكس</option>
+                  {(meta?.categories ?? []).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -219,12 +244,17 @@ export default function ProductFilters({ className = "", filters, onFilterChange
               <label className={labelCls}>الحالة</label>
               <div className="grid grid-cols-3 gap-1.5">
                 {(["all", "new", "used"] as Condition[]).map((k) => {
-                  const active = condition === k;
+                  const disabled = Boolean(lockedCondition) && lockedCondition !== k;
+                  const active = condition === k || (!!lockedCondition && lockedCondition === k);
                   const label = k === "all" ? "الكل" : k === "new" ? "جديد" : "مستعمل";
                   return (
                     <button
                       key={k}
-                      onClick={() => setCondition(k)}
+                      onClick={() => {
+                        if (lockedCondition) return;
+                        setCondition(k);
+                      }}
+                      disabled={disabled}
                       className={`${chipCls} ${
                         active
                           ? "bg-gold border-gold text-charcoal"

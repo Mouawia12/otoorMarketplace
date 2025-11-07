@@ -1,0 +1,215 @@
+import { z } from "zod";
+export declare const normalizeProduct: (product: any) => {
+    id: any;
+    seller_id: any;
+    name_ar: any;
+    name_en: any;
+    description_ar: any;
+    description_en: any;
+    product_type: any;
+    brand: any;
+    category: any;
+    base_price: any;
+    size_ml: any;
+    concentration: any;
+    condition: any;
+    stock_quantity: any;
+    image_urls: any;
+    status: string;
+    created_at: any;
+    updated_at: any;
+    seller: {
+        id: any;
+        full_name: any;
+        verified_seller: any;
+    } | undefined;
+};
+export declare const listProducts: (query: unknown) => Promise<{
+    products: {
+        id: any;
+        seller_id: any;
+        name_ar: any;
+        name_en: any;
+        description_ar: any;
+        description_en: any;
+        product_type: any;
+        brand: any;
+        category: any;
+        base_price: any;
+        size_ml: any;
+        concentration: any;
+        condition: any;
+        stock_quantity: any;
+        image_urls: any;
+        status: string;
+        created_at: any;
+        updated_at: any;
+        seller: {
+            id: any;
+            full_name: any;
+            verified_seller: any;
+        } | undefined;
+    }[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+}>;
+export declare const getProductById: (id: number) => Promise<{
+    id: any;
+    seller_id: any;
+    name_ar: any;
+    name_en: any;
+    description_ar: any;
+    description_en: any;
+    product_type: any;
+    brand: any;
+    category: any;
+    base_price: any;
+    size_ml: any;
+    concentration: any;
+    condition: any;
+    stock_quantity: any;
+    image_urls: any;
+    status: string;
+    created_at: any;
+    updated_at: any;
+    seller: {
+        id: any;
+        full_name: any;
+        verified_seller: any;
+    } | undefined;
+}>;
+export declare const getRelatedProducts: (productId: number, limit?: number) => Promise<{
+    id: any;
+    seller_id: any;
+    name_ar: any;
+    name_en: any;
+    description_ar: any;
+    description_en: any;
+    product_type: any;
+    brand: any;
+    category: any;
+    base_price: any;
+    size_ml: any;
+    concentration: any;
+    condition: any;
+    stock_quantity: any;
+    image_urls: any;
+    status: string;
+    created_at: any;
+    updated_at: any;
+    seller: {
+        id: any;
+        full_name: any;
+        verified_seller: any;
+    } | undefined;
+}[]>;
+export declare const getProductFiltersMeta: () => Promise<{
+    brands: string[];
+    categories: string[];
+    conditions: string[];
+}>;
+declare const productInputSchema: z.ZodObject<{
+    sellerId: z.ZodCoercedNumber<unknown>;
+    nameAr: z.ZodString;
+    nameEn: z.ZodString;
+    descriptionAr: z.ZodString;
+    descriptionEn: z.ZodString;
+    productType: z.ZodString;
+    brand: z.ZodString;
+    category: z.ZodString;
+    basePrice: z.ZodCoercedNumber<unknown>;
+    sizeMl: z.ZodCoercedNumber<unknown>;
+    concentration: z.ZodString;
+    condition: z.ZodEnum<{
+        NEW: "NEW";
+        USED: "USED";
+    }>;
+    stockQuantity: z.ZodCoercedNumber<unknown>;
+    status: z.ZodDefault<z.ZodEnum<{
+        DRAFT: "DRAFT";
+        PENDING_REVIEW: "PENDING_REVIEW";
+        PUBLISHED: "PUBLISHED";
+        REJECTED: "REJECTED";
+        ARCHIVED: "ARCHIVED";
+    }>>;
+    imageUrls: z.ZodDefault<z.ZodArray<z.ZodString>>;
+}, z.core.$strip>;
+export declare const createProduct: (input: z.infer<typeof productInputSchema>) => Promise<{
+    id: any;
+    seller_id: any;
+    name_ar: any;
+    name_en: any;
+    description_ar: any;
+    description_en: any;
+    product_type: any;
+    brand: any;
+    category: any;
+    base_price: any;
+    size_ml: any;
+    concentration: any;
+    condition: any;
+    stock_quantity: any;
+    image_urls: any;
+    status: string;
+    created_at: any;
+    updated_at: any;
+    seller: {
+        id: any;
+        full_name: any;
+        verified_seller: any;
+    } | undefined;
+}>;
+export declare const updateProduct: (productId: number, sellerId: number, payload: unknown) => Promise<{
+    id: any;
+    seller_id: any;
+    name_ar: any;
+    name_en: any;
+    description_ar: any;
+    description_en: any;
+    product_type: any;
+    brand: any;
+    category: any;
+    base_price: any;
+    size_ml: any;
+    concentration: any;
+    condition: any;
+    stock_quantity: any;
+    image_urls: any;
+    status: string;
+    created_at: any;
+    updated_at: any;
+    seller: {
+        id: any;
+        full_name: any;
+        verified_seller: any;
+    } | undefined;
+}>;
+export declare const moderateProduct: (productId: number, action: "approve" | "reject") => Promise<{
+    id: any;
+    seller_id: any;
+    name_ar: any;
+    name_en: any;
+    description_ar: any;
+    description_en: any;
+    product_type: any;
+    brand: any;
+    category: any;
+    base_price: any;
+    size_ml: any;
+    concentration: any;
+    condition: any;
+    stock_quantity: any;
+    image_urls: any;
+    status: string;
+    created_at: any;
+    updated_at: any;
+    seller: {
+        id: any;
+        full_name: any;
+        verified_seller: any;
+    } | undefined;
+}>;
+export {};
+//# sourceMappingURL=productService.d.ts.map

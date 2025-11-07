@@ -5,6 +5,7 @@ import {
   getProductById,
   getRelatedProducts,
   createProduct,
+  getProductFiltersMeta,
 } from "../services/productService";
 import { authenticate } from "../middleware/auth";
 import { AppError } from "../utils/errors";
@@ -15,6 +16,15 @@ router.get("/", async (req, res, next) => {
   try {
     const result = await listProducts(req.query);
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/meta", async (_req, res, next) => {
+  try {
+    const meta = await getProductFiltersMeta();
+    res.json(meta);
   } catch (error) {
     next(error);
   }

@@ -1,9 +1,13 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Category } from '../../../services/homeService';
+type CategoryChip = {
+  id: number | string;
+  name: { ar: string; en: string };
+  slug: string;
+};
 
 interface CategoriesChipsProps {
-  categories: Category[];
+  categories: CategoryChip[];
 }
 
 export default function CategoriesChips({ categories }: CategoriesChipsProps) {

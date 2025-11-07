@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Countdown from '../../../components/common/Countdown';
 import SARIcon from '../../../components/common/SARIcon';
+import { Auction, Product } from '../../../types';
 
 interface AuctionsStripProps {
-  auctions: any[];
+  auctions: Auction[];
 }
 
 export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
@@ -12,7 +13,11 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
   const lang = (i18n.language as 'ar' | 'en') || 'ar';
   const locale = lang === 'ar' ? 'ar-SA' : 'en-US';
 
-  if (!auctions.length) return null;
+  const visibleAuctions = auctions.filter(
+    (auction): auction is Auction & { product: Product } => Boolean(auction.product)
+  );
+
+  if (!visibleAuctions.length) return null;
 
   // رقم فقط بدون العملة
   const formatNumber = (v: number) =>
@@ -47,9 +52,11 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
         {/* شريط أفقي ببطاقات أصغر على الجوال، وشبكة على الشاشات الأكبر */}
         <div className="-mx-3 px-3 overflow-x-auto pb-2 md:overflow-visible md:mx-0 md:px-0">
           <div className="flex gap-3 md:grid md:grid-cols-3 lg:grid-cols-5 md:gap-4 min-w-max md:min-w-0">
-            {auctions.slice(0, 8).map((auction: any) => {
-              const title = auction.product_name?.[lang] || auction.name?.[lang] || '';
-              const current = auction.current_bid_usd ?? auction.current_bid ?? 0;
+            {visibleAuctions.slice(0, 8).map((auction) => {
+              const title = lang === 'ar' ? auction.product.name_ar : auction.product.name_en;
+              const current = auction.current_price ?? auction.starting_price ?? 0;
+              const bidsCount = auction.total_bids ?? 0;
+              const image = auction.product.image_urls?.[0] ?? '/images/placeholder-perfume.jpg';
 
               return (
                 <Link
@@ -61,7 +68,7 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
                   {/* الصورة */}
                   <div className="aspect-[3/4] overflow-hidden bg-sand">
                     <img
-                      src={auction.image}
+                      src={image}
                       alt={title}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       loading="lazy"
@@ -96,7 +103,7 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
                           {t('auction.bids')}
                         </p>
                         <p className="text-ivory font-semibold text-sm">
-                          {auction.bids_count ?? 0}
+                          {bidsCount}
                         </p>
                       </div>
                     </div>

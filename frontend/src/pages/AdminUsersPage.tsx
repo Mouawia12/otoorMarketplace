@@ -1,105 +1,131 @@
-import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import api from "../lib/api";
+import type { User } from "../types";
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: 'buyer' | 'seller' | 'moderator' | 'admin';
-  status: 'active' | 'suspended';
-  verifiedSeller: boolean;
-  joined: string;
-}
+const statusTone = (status: string) => {
+  return status === "ACTIVE"
+    ? "bg-green-100 text-green-700"
+    : "bg-red-100 text-red-700";
+};
 
 export default function AdminUsersPage() {
   const { t, i18n } = useTranslation();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<(User & { created_at?: string })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.get<(User & { created_at?: string })[]>("/admin/users");
+      setUsers(response.data);
+    } catch (err: any) {
+      console.error("Failed to load admin users", err);
+      setError(err?.response?.data?.detail ?? t("common.errorLoading"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchUsers();
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchUsers = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setUsers([
-      { id: 1, name: 'Ahmed Mohamed', email: 'ahmed@example.com', role: 'seller', status: 'active', verifiedSeller: true, joined: '2024-08-15' },
-      { id: 2, name: 'Fatima Ali', email: 'fatima@example.com', role: 'buyer', status: 'active', verifiedSeller: false, joined: '2024-09-01' },
-      { id: 3, name: 'Omar Hassan', email: 'omar@example.com', role: 'seller', status: 'active', verifiedSeller: false, joined: '2024-09-10' },
-      { id: 4, name: 'Sara Ibrahim', email: 'sara@example.com', role: 'buyer', status: 'suspended', verifiedSeller: false, joined: '2024-07-20' },
-      { id: 5, name: 'Khalid Ahmed', email: 'khalid@example.com', role: 'moderator', status: 'active', verifiedSeller: false, joined: '2024-06-01' },
-    ]);
-    setLoading(false);
-  };
-
-  const handleStatusToggle = (id: number) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'suspended' : 'active' } : u));
-  };
-
-  const handleRoleChange = (id: number, newRole: User['role']) => {
-    setUsers(users.map(u => u.id === id ? { ...u, role: newRole } : u));
-  };
-
-  const handleVerifyToggle = (id: number) => {
-    setUsers(users.map(u => u.id === id ? { ...u, verifiedSeller: !u.verifiedSeller } : u));
-  };
-
-  const getStatusColor = (status: string) => {
-    return status === 'active' ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100';
+  const handleStatusToggle = async (user: User) => {
+    const nextStatus = user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+    try {
+      await api.patch(`/admin/users/${user.id}`, { status: nextStatus });
+      await loadUsers();
+    } catch (err: any) {
+      console.error("Failed to update user status", err);
+      alert(err?.response?.data?.detail ?? t("admin.updateUserFailed"));
+    }
   };
 
   if (loading) {
-    return <div className="text-center py-12"><p className="text-taupe">{t('common.loading')}</p></div>;
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t("common.loading")}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-luxury p-8 shadow-luxury text-center">
+        <p className="text-red-600 font-semibold mb-3">{error}</p>
+        <button
+          onClick={() => loadUsers()}
+          className="px-4 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition"
+        >
+          {t("common.retry")}
+        </button>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
-        <h1 className="text-h2 text-charcoal mb-6">{t('admin.users')}</h1>
+        <h1 className="text-h2 text-charcoal mb-6">{t("admin.users")}</h1>
 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.id')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.name')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.email')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.role')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.status')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.verified')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.joined')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.actions')}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.id")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.name")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.email")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.role")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.status")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.joined")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.actions")}</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b border-gray-100 hover:bg-sand">
-                  <td className="px-4 py-4 text-charcoal-light">{u.id}</td>
-                  <td className="px-4 py-4 text-charcoal font-medium">{u.name}</td>
-                  <td className="px-4 py-4 text-charcoal-light">{u.email}</td>
+              {users.map((user) => (
+                <tr key={user.id} className="border-b border-gray-100 hover:bg-sand">
+                  <td className="px-4 py-4 text-charcoal-light">#{user.id}</td>
+                  <td className="px-4 py-4 text-charcoal font-medium">{user.full_name}</td>
+                  <td className="px-4 py-4 text-charcoal-light">{user.email}</td>
                   <td className="px-4 py-4">
-                    <select value={u.role} onChange={(e) => handleRoleChange(u.id, e.target.value as User['role'])} className="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-600 border-none">
-                      <option value="buyer">{t('admin.buyer')}</option>
-                      <option value="seller">{t('admin.seller')}</option>
-                      <option value="moderator">{t('admin.moderator')}</option>
-                      <option value="admin">{t('admin.admin')}</option>
-                    </select>
+                    <div className="flex gap-1 flex-wrap justify-end">
+                      {user.roles.map((role) => (
+                        <span
+                          key={role}
+                          className="px-3 py-1 rounded-full text-xs bg-gold-light text-charcoal"
+                        >
+                          {role}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-4 py-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(u.status)}`}>{t(`admin.${u.status}`)}</span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${statusTone(user.status)}`}>
+                      {user.status.toLowerCase()}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-charcoal-light">
+                    {user.created_at
+                      ? new Date(user.created_at).toLocaleDateString(i18n.language === "ar" ? "ar-EG" : "en-US", {
+                          year: "numeric",
+                          month: "short",
+                        })
+                      : "—"}
                   </td>
                   <td className="px-4 py-4">
-                    {u.role === 'seller' && (
-                      <button onClick={() => handleVerifyToggle(u.id)} className={`px-3 py-1 rounded-full text-sm font-semibold ${u.verifiedSeller ? 'bg-gold text-charcoal' : 'bg-gray-200 text-gray-600'}`}>
-                        {u.verifiedSeller ? '✓ ' : ''}
-                        {t('admin.verifiedSeller')}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-charcoal-light">{new Date(u.joined).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short' })}</td>
-                  <td className="px-4 py-4">
-                    <button onClick={() => handleStatusToggle(u.id)} className={`text-sm font-semibold ${u.status === 'active' ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}`}>
-                      {u.status === 'active' ? t('admin.suspend') : t('admin.activate')}
+                    <button
+                      onClick={() => handleStatusToggle(user)}
+                      className={`text-sm font-semibold ${
+                        user.status === "ACTIVE"
+                          ? "text-red-600 hover:text-red-700"
+                          : "text-green-600 hover:text-green-700"
+                      }`}
+                    >
+                      {user.status === "ACTIVE" ? t("admin.suspend") : t("admin.activate")}
                     </button>
                   </td>
                 </tr>

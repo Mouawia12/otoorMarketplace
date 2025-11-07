@@ -10,13 +10,14 @@ import BrandsCarousel from './home/HomeSections/BrandsCarousel';
 import Editorial from './home/HomeSections/Editorial';
 import Newsletter from './home/HomeSections/Newsletter';
 import Testimonials from './home/HomeSections/Testimonials';
+import { Product, Auction } from '../types';
 
 export default function Home() {
   const { t } = useTranslation();
   const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([]);
-  const [featuredNew, setFeaturedNew] = useState<any[]>([]);
-  const [featuredUsed, setFeaturedUsed] = useState<any[]>([]);
-  const [liveAuctions, setLiveAuctions] = useState<any[]>([]);
+  const [featuredNew, setFeaturedNew] = useState<Product[]>([]);
+  const [featuredUsed, setFeaturedUsed] = useState<Product[]>([]);
+  const [liveAuctions, setLiveAuctions] = useState<Auction[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,19 +26,13 @@ export default function Home() {
     const loadHomeData = async () => {
       try {
         setLoading(true);
-        const [slides, newProducts, usedProducts, auctions, brandList] = await Promise.all([
-          homeService.getHeroSlides(),
-          homeService.getFeaturedNew(),
-          homeService.getFeaturedUsed(),
-          homeService.getLiveAuctions(),
-          homeService.getTopBrands()
-        ]);
+        const data = await homeService.getHomeData();
 
-        setHeroSlides(slides);
-        setFeaturedNew(newProducts);
-        setFeaturedUsed(usedProducts);
-        setLiveAuctions(auctions);
-        setBrands(brandList);
+        setHeroSlides(data.heroSlides);
+        setFeaturedNew(data.featuredNew);
+        setFeaturedUsed(data.featuredUsed);
+        setLiveAuctions(data.liveAuctions);
+        setBrands(data.brands);
       } catch (err) {
         console.error('Error loading home data:', err);
         setError(t('common.error'));

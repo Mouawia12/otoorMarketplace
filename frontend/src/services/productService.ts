@@ -22,6 +22,12 @@ interface ProductsResponse {
   total_pages: number;
 }
 
+export interface ProductFiltersMeta {
+  brands: string[];
+  categories: string[];
+  conditions: string[];
+}
+
 export const fetchProducts = async (params: FetchProductsParams = {}): Promise<ProductsResponse> => {
   const response = await api.get('/products', { params });
   return response.data;
@@ -37,4 +43,9 @@ export const fetchRelatedProducts = async (productId: number, limit = 4): Promis
     params: { limit },
   });
   return response.data.products;
+};
+
+export const fetchProductFiltersMeta = async (): Promise<ProductFiltersMeta> => {
+  const response = await api.get('/products/meta');
+  return response.data;
 };

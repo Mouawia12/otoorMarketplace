@@ -75,6 +75,20 @@ const listProductsSchema = z.object({
 });
 
 export const listProducts = async (query: unknown) => {
+  const normalizedQuery =
+    query && typeof query === "object"
+      ? { ...(query as Record<string, unknown>) }
+      : {};
+
+  if (typeof normalizedQuery.condition === "string") {
+    const value = normalizedQuery.condition.toUpperCase();
+    if (Object.values(ProductCondition).includes(value as ProductCondition)) {
+      normalizedQuery.condition = value;
+    } else {
+      delete normalizedQuery.condition;
+    }
+  }
+
   const {
     search,
     brand,
@@ -87,7 +101,7 @@ export const listProducts = async (query: unknown) => {
   page = 1,
   page_size = 12,
   seller,
-} = listProductsSchema.parse(query);
+  } = listProductsSchema.parse(normalizedQuery);
 
   const filters: Prisma.ProductWhereInput = {};
 
@@ -237,6 +251,39 @@ export const getRelatedProducts = async (productId: number, limit = 4) => {
   });
 
   return related.map((product) => normalizeProduct(product));
+};
+
+export const getProductFiltersMeta = async () => {
+  const [brandRows, categoryRows] = await prisma.$transaction([
+    prisma.product.findMany({
+      where: { status: ProductStatus.PUBLISHED },
+      distinct: ["brand"],
+      select: { brand: true },
+      orderBy: { brand: "asc" },
+    }),
+    prisma.product.findMany({
+      where: { status: ProductStatus.PUBLISHED },
+      distinct: ["category"],
+      select: { category: true },
+      orderBy: { category: "asc" },
+    }),
+  ]);
+
+  const brands = brandRows
+    .map((row) => row.brand)
+    .filter((value): value is string => Boolean(value));
+
+  const categories = categoryRows
+    .map((row) => row.category)
+    .filter((value): value is string => Boolean(value));
+
+  return {
+    brands,
+    categories,
+    conditions: Object.values(ProductCondition).map((condition) =>
+      condition.toLowerCase()
+    ),
+  };
 };
 
 const productInputSchema = z.object({

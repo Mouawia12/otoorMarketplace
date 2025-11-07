@@ -1,14 +1,18 @@
 import { Router } from "express";
-import { RoleName } from "@prisma/client";
+import { RoleName, AuctionStatus } from "@prisma/client";
 
 import { authenticate } from "../middleware/auth";
 import {
   getAdminDashboardStats,
+  getAdminModerationQueue,
   listPendingProducts,
+  listProductsForAdmin,
   listUsersForAdmin,
   updateUserStatus,
+  updateProductStatusAsAdmin,
 } from "../services/adminService";
 import { moderateProduct } from "../services/productService";
+import { listAuctions, updateAuction } from "../services/auctionService";
 import { AppError } from "../utils/errors";
 
 const router = Router();
@@ -19,6 +23,15 @@ router.get("/dashboard", adminOnly, async (_req, res, next) => {
   try {
     const stats = await getAdminDashboardStats();
     res.json(stats);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/dashboard/moderation", adminOnly, async (_req, res, next) => {
+  try {
+    const queue = await getAdminModerationQueue();
+    res.json(queue);
   } catch (error) {
     next(error);
   }
@@ -81,6 +94,67 @@ router.patch("/products/:id/moderate", adminOnly, async (req, res, next) => {
 
     const product = await moderateProduct(productId, action);
     res.json(product);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/products", adminOnly, async (req, res, next) => {
+  try {
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const products = await listProductsForAdmin(status);
+    res.json(products);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/products/:id/status", adminOnly, async (req, res, next) => {
+  try {
+    const productId = Number(req.params.id);
+    if (Number.isNaN(productId)) {
+      throw AppError.badRequest("Invalid product id");
+    }
+    const status = req.body?.status;
+    if (typeof status !== "string") {
+      throw AppError.badRequest("Status value is required");
+    }
+    const product = await updateProductStatusAsAdmin(productId, status);
+    res.json(product);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/auctions", adminOnly, async (req, res, next) => {
+  try {
+    const statusParam = typeof req.query.status === "string" ? req.query.status.toUpperCase() : undefined;
+    const status = statusParam && Object.values(AuctionStatus).includes(statusParam as AuctionStatus)
+      ? (statusParam as AuctionStatus)
+      : undefined;
+
+    const auctions = await listAuctions({
+      status,
+    });
+    res.json(auctions);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/auctions/:id", adminOnly, async (req, res, next) => {
+  try {
+    const auctionId = Number(req.params.id);
+    if (Number.isNaN(auctionId)) {
+      throw AppError.badRequest("Invalid auction id");
+    }
+
+    const auction = await updateAuction(auctionId, {
+      endTime: req.body?.endTime,
+      status: req.body?.status,
+    });
+
+    res.json(auction);
   } catch (error) {
     next(error);
   }
