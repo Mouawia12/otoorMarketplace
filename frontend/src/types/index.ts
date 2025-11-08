@@ -63,9 +63,23 @@ export interface Order {
   total_amount: number;
   payment_method: string;
   shipping_address: string;
+  shipping_name?: string;
+  shipping_phone?: string;
+  shipping_city?: string;
+  shipping_region?: string;
+  shipping_method?: string;
+  shipping_fee?: number;
   status: string;
   created_at: string;
   product?: Product;
+  items?: Array<{
+    id: number;
+    product_id: number;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    product?: Product;
+  }>;
 }
 
 export interface ModerationQueueItem {

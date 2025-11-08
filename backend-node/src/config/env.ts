@@ -17,6 +17,8 @@ const envSchema = z.object({
     .string()
     .default("0.1")
     .describe("Commission rate taken on every order (e.g. 0.1 for 10%)"),
+  STANDARD_SHIPPING_FEE: z.string().default("0"),
+  EXPRESS_SHIPPING_FEE: z.string().default("35"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -34,6 +36,8 @@ const {
   JWT_EXPIRES_IN,
   ALLOWED_ORIGINS,
   PLATFORM_COMMISSION_RATE,
+  STANDARD_SHIPPING_FEE,
+  EXPRESS_SHIPPING_FEE,
 } = parsed.data;
 
 const allowedOrigins =
@@ -51,4 +55,8 @@ export const config = {
   jwtExpiresIn: JWT_EXPIRES_IN,
   allowedOrigins,
   platformCommissionRate: Number(PLATFORM_COMMISSION_RATE),
+  shipping: {
+    standard: Number(STANDARD_SHIPPING_FEE),
+    express: Number(EXPRESS_SHIPPING_FEE),
+  },
 };

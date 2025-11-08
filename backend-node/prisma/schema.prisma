@@ -135,6 +135,7 @@ model Order {
   buyerId         Int         @map("buyer_id")
   status          OrderStatus @default(PENDING)
   paymentMethod   String      @map("payment_method")
+  shippingMethod  String      @map("shipping_method") @default("standard")
   shippingName    String      @map("shipping_name")
   shippingPhone   String      @map("shipping_phone")
   shippingCity    String      @map("shipping_city")

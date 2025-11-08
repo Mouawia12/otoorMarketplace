@@ -22,6 +22,7 @@ const createOrderSchema = zod_1.z.object({
         city: zod_1.z.string().min(2),
         region: zod_1.z.string().min(2),
         address: zod_1.z.string().min(3),
+        type: zod_1.z.enum(["standard", "express"]).optional(),
     })
         .optional(),
     items: zod_1.z.array(orderItemSchema).min(1),
@@ -36,7 +37,12 @@ const createOrder = async (input) => {
         city: "Unknown",
         region: "Unknown",
         address: "Pending",
+        type: "standard",
     };
+    const shippingOption = shipping.type === "express" ? "express" : "standard";
+    const shippingFeeValue = shippingOption === "express"
+        ? env_1.config.shipping.express
+        : env_1.config.shipping.standard;
     return client_2.prisma.$transaction(async (tx) => {
         // validate products and stock
         const products = await tx.product.findMany({
@@ -91,6 +97,7 @@ const createOrder = async (input) => {
                 buyerId: data.buyerId,
                 status: client_1.OrderStatus.PENDING,
                 paymentMethod: data.paymentMethod,
+                shippingMethod: shippingOption,
                 shippingName: shipping.name,
                 shippingPhone: shipping.phone,
                 shippingCity: shipping.city,
@@ -98,9 +105,9 @@ const createOrder = async (input) => {
                 shippingAddress: shipping.address,
                 subtotalAmount: new client_1.Prisma.Decimal(subtotal),
                 discountAmount: new client_1.Prisma.Decimal(data.discountAmount),
-                shippingFee: new client_1.Prisma.Decimal(data.shippingFee),
-                totalAmount: new client_1.Prisma.Decimal(subtotal - data.discountAmount + data.shippingFee),
-                platformFee: new client_1.Prisma.Decimal((subtotal - data.discountAmount + data.shippingFee) *
+                shippingFee: new client_1.Prisma.Decimal(shippingFeeValue),
+                totalAmount: new client_1.Prisma.Decimal(subtotal - data.discountAmount + shippingFeeValue),
+                platformFee: new client_1.Prisma.Decimal((subtotal - data.discountAmount + shippingFeeValue) *
                     env_1.config.platformCommissionRate),
                 items: {
                     create: normalizedItems,
@@ -182,21 +189,35 @@ const friendlyToStatus = (status) => {
     }
 };
 const mapOrderToDto = (order) => {
-    const [item] = order.items;
-    const product = item?.product ? (0, productService_1.normalizeProduct)(item.product) : undefined;
+    const items = order.items.map((item) => ({
+        id: item.id,
+        product_id: item.productId,
+        quantity: item.quantity,
+        unit_price: Number(item.unitPrice),
+        total_price: Number(item.totalPrice),
+        product: item.product ? (0, productService_1.normalizeProduct)(item.product) : undefined,
+    }));
+    const [summaryItem] = items;
     return {
         id: order.id,
         buyer_id: order.buyerId,
-        product_id: item?.productId ?? null,
-        quantity: item?.quantity ?? 0,
-        unit_price: item ? Number(item.unitPrice) : 0,
-        total_amount: Number(order.totalAmount ?? item?.totalPrice ?? 0),
+        product_id: summaryItem?.product_id ?? null,
+        quantity: summaryItem?.quantity ?? 0,
+        unit_price: summaryItem?.unit_price ?? 0,
+        total_amount: Number(order.totalAmount ?? summaryItem?.total_price ?? 0),
         payment_method: order.paymentMethod,
         shipping_address: order.shippingAddress,
+        shipping_name: order.shippingName,
+        shipping_phone: order.shippingPhone,
+        shipping_city: order.shippingCity,
+        shipping_region: order.shippingRegion,
+        shipping_method: order.shippingMethod,
+        shipping_fee: Number(order.shippingFee),
         status: statusToFriendly(order.status),
         created_at: order.createdAt.toISOString(),
         platform_fee: Number(order.platformFee ?? 0),
-        product,
+        product: summaryItem?.product,
+        items,
     };
 };
 const listOrdersByUser = async (userId) => {
@@ -239,14 +260,22 @@ const listOrdersForSeller = async (sellerId, status) => {
         include: orderInclude,
         orderBy: { createdAt: "desc" },
     });
-    return orders
-        .map(mapOrderToDto)
-        .map((order) => ({
-        ...order,
-        product: order.product && order.product.seller_id === sellerId
-            ? order.product
-            : order.product,
-    }));
+    return orders.map((order) => {
+        const dto = mapOrderToDto(order);
+        const sellerItems = dto.items?.filter((item) => item.product?.seller_id === sellerId);
+        if (!sellerItems || sellerItems.length === 0) {
+            return dto;
+        }
+        const [primary] = sellerItems;
+        return {
+            ...dto,
+            product: primary?.product ?? dto.product,
+            product_id: primary?.product_id ?? dto.product_id,
+            quantity: sellerItems.reduce((total, item) => total + item.quantity, 0),
+            unit_price: primary?.unit_price ?? dto.unit_price,
+            items: sellerItems,
+        };
+    });
 };
 exports.listOrdersForSeller = listOrdersForSeller;
 const updateOrderStatus = async (orderId, status, actorRoles) => {

@@ -34,6 +34,23 @@ export declare const listSellerProductsWithFilters: (sellerId: number, filters?:
     } | undefined;
 }[]>;
 export declare const listSellerOrders: (sellerId: number, status?: string) => Promise<{
+    id: number;
+    buyer_id: number;
+    product_id: number | null;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    payment_method: string;
+    shipping_address: string;
+    shipping_name: string;
+    shipping_phone: string;
+    shipping_city: string;
+    shipping_region: string;
+    shipping_method: string;
+    shipping_fee: number;
+    status: string;
+    created_at: string;
+    platform_fee: number;
     product: {
         id: any;
         seller_id: any;
@@ -59,16 +76,37 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
             verified_seller: any;
         } | undefined;
     } | undefined;
-    id: number;
-    buyer_id: number;
-    product_id: number | null;
-    quantity: number;
-    unit_price: number;
-    total_amount: number;
-    payment_method: string;
-    shipping_address: string;
-    status: string;
-    created_at: string;
-    platform_fee: number;
+    items: {
+        id: number;
+        product_id: number;
+        quantity: number;
+        unit_price: number;
+        total_price: number;
+        product: {
+            id: any;
+            seller_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            image_urls: any;
+            status: string;
+            created_at: any;
+            updated_at: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+        } | undefined;
+    }[];
 }[]>;
 //# sourceMappingURL=sellerService.d.ts.map
