@@ -7,5 +7,9 @@ export declare const config: {
     jwtExpiresIn: string;
     allowedOrigins: string[];
     platformCommissionRate: number;
+    shipping: {
+        standard: number;
+        express: number;
+    };
 };
 //# sourceMappingURL=env.d.ts.map

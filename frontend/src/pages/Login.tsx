@@ -2,9 +2,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useState } from 'react';
+import api from '../lib/api';
+import { clearPendingOrder, loadPendingOrder } from '../utils/pendingOrder';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -16,12 +18,34 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuthStore();
   const [error, setError] = useState('');
+  const [processingPending, setProcessingPending] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema)
   });
+
+  const tryCompletePendingOrder = async () => {
+    const pending = loadPendingOrder();
+    if (!pending) return false;
+
+    try {
+      setProcessingPending(true);
+      const response = await api.post('/orders', pending);
+      clearPendingOrder();
+      navigate(`/order/success?orderId=${response.data.id}`, { replace: true });
+      return true;
+    } catch (err: any) {
+      clearPendingOrder();
+      const detail = err?.response?.data?.message || err?.response?.data?.detail;
+      setError(detail ?? t('checkout.orderFailed'));
+      return false;
+    } finally {
+      setProcessingPending(false);
+    }
+  };
 
   const onSubmit = async (data: LoginForm) => {
     try {
@@ -29,14 +53,20 @@ export default function Login() {
       const user = await login(data.email, data.password);
 
       const upperRoles = (user.roles ?? []).map((role) => role.toUpperCase());
-      let target = '/account';
+      const params = new URLSearchParams(location.search);
+      const redirectParam = params.get('redirect');
+
+      let target = redirectParam || '/account';
       if (upperRoles.includes('SUPER_ADMIN') || upperRoles.includes('ADMIN')) {
-        target = '/admin/dashboard';
+        target = redirectParam || '/admin/dashboard';
       } else if (upperRoles.includes('SELLER')) {
-        target = '/seller/dashboard';
+        target = redirectParam || '/seller/dashboard';
       }
 
-      navigate(target, { replace: true });
+      const handled = await tryCompletePendingOrder();
+      if (!handled) {
+        navigate(target, { replace: true });
+      }
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (Array.isArray(detail)) {
@@ -93,10 +123,10 @@ export default function Login() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || processingPending}
             className="w-full bg-gold text-charcoal font-semibold py-3 rounded-luxury hover:bg-gold-light transition disabled:opacity-50"
           >
-            {isSubmitting ? t('common.loading') : t('common.login')}
+            {isSubmitting || processingPending ? t('common.loading') : t('common.login')}
           </button>
         </form>
 

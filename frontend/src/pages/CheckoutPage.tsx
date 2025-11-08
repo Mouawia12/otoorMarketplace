@@ -5,6 +5,7 @@ import api from "../lib/api";
 import { useCartStore } from "../store/cartStore";
 import { useAuthStore } from "../store/authStore";
 import { formatPrice } from "../utils/currency";
+import { clearPendingOrder, savePendingOrder, PendingOrderPayload } from "../utils/pendingOrder";
 
 export default function CheckoutPage() {
   const { t, i18n } = useTranslation();
@@ -68,36 +69,37 @@ export default function CheckoutPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handlePlaceOrder = async () => {
-    if (!validateForm()) return;
-
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
+  const buildOrderPayload = (): PendingOrderPayload | null => {
+    if (!validateForm()) {
+      return null;
     }
 
+    return {
+      payment_method: formData.paymentMethod.toUpperCase(),
+      shipping: {
+        name: formData.name,
+        phone: formData.phone,
+        city: formData.city,
+        region: formData.city,
+        address: formData.address,
+        type: shipping,
+      },
+      items: items.map((item) => ({
+        productId: Number(item.id),
+        quantity: item.qty,
+        unitPrice: item.price,
+      })),
+      discount_amount: coupon?.amount ?? 0,
+      shipping_fee: shippingCost,
+    };
+  };
+
+  const submitOrder = async (payload: PendingOrderPayload) => {
     try {
       setPlacingOrder(true);
       setSubmitError(null);
-      const payload = {
-        payment_method: formData.paymentMethod.toUpperCase(),
-        shipping: {
-          name: formData.name,
-          phone: formData.phone,
-          city: formData.city,
-          region: formData.city,
-          address: formData.address,
-        },
-        items: items.map((item) => ({
-          productId: Number(item.id),
-          quantity: item.qty,
-          unitPrice: item.price,
-        })),
-        discount_amount: coupon?.amount ?? 0,
-        shipping_fee: shippingCost,
-      };
-
       const response = await api.post("/orders", payload);
+      clearPendingOrder();
       clear();
       navigate(`/order/success?orderId=${response.data.id}`);
     } catch (error: any) {
@@ -107,6 +109,19 @@ export default function CheckoutPage() {
     } finally {
       setPlacingOrder(false);
     }
+  };
+
+  const handlePlaceOrder = async () => {
+    const payload = buildOrderPayload();
+    if (!payload) return;
+
+    if (!isAuthenticated) {
+      savePendingOrder(payload);
+      navigate('/login?redirect=/checkout');
+      return;
+    }
+
+    await submitOrder(payload);
   };
 
   if (items.length === 0) {
