@@ -11,17 +11,21 @@ const env_1 = require("./config/env");
 const client_1 = require("./prisma/client");
 const routes_1 = __importDefault(require("./routes"));
 const errorHandler_1 = require("./middleware/errorHandler");
+const uploads_1 = require("./utils/uploads");
 const app = (0, express_1.default)();
 const corsOptions = env_1.config.allowedOrigins.length === 1 && env_1.config.allowedOrigins[0] === "*"
     ? { origin: true, credentials: true }
     : { origin: env_1.config.allowedOrigins, credentials: true };
 app.use((0, cors_1.default)(corsOptions));
-app.use((0, helmet_1.default)());
+app.use((0, helmet_1.default)({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 app.use(express_1.default.json({ limit: "1mb" }));
 app.use(express_1.default.urlencoded({ extended: true }));
 if (env_1.config.nodeEnv === "development") {
     app.use((0, morgan_1.default)("dev"));
 }
+app.use("/uploads", express_1.default.static((0, uploads_1.getUploadRoot)()));
 app.use("/api", routes_1.default);
 app.get("/health", async (_req, res) => {
     try {

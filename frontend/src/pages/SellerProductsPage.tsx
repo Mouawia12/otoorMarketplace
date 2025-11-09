@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import api from '../lib/api';
@@ -51,6 +51,7 @@ export default function SellerProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editPrice, setEditPrice] = useState('');
 
@@ -89,7 +90,8 @@ export default function SellerProductsPage() {
       fetchProducts();
     } catch (error: any) {
       console.error('Failed to update status', error);
-      alert(error.response?.data?.detail || t('seller.updateFailed', 'Failed to update product'));
+      const msg = error.response?.data?.message || error.response?.data?.detail;
+      alert(msg || t('seller.updateFailed', 'Failed to update product'));
     }
   };
 
@@ -107,7 +109,8 @@ export default function SellerProductsPage() {
       fetchProducts();
     } catch (error: any) {
       console.error('Failed to update price', error);
-      alert(error.response?.data?.detail || t('seller.updateFailed', 'Failed to update product'));
+      const msg = error.response?.data?.message || error.response?.data?.detail;
+      alert(msg || t('seller.updateFailed', 'Failed to update product'));
     }
   };
 
@@ -164,6 +167,7 @@ export default function SellerProductsPage() {
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.price')}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.status')}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.createdAt')}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -226,6 +230,14 @@ export default function SellerProductsPage() {
                       i18n.language === 'ar' ? 'ar-EG' : 'en-US'
                     )}
                   </td>
+                  <td className="px-4 py-4 text-right">
+                    <button
+                      onClick={() => setEditingProduct(product)}
+                      className="px-3 py-1 rounded-luxury border border-gold text-charcoal hover:bg-gold/10 transition text-sm"
+                    >
+                      {t('common.edit')}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -239,11 +251,23 @@ export default function SellerProductsPage() {
         )}
       </div>
 
-      <AddProductModal
+      <ProductFormModal
+        mode="add"
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onCreated={() => {
+        onSuccess={() => {
           setShowAddModal(false);
+          fetchProducts();
+        }}
+      />
+
+      <ProductFormModal
+        mode="edit"
+        product={editingProduct || undefined}
+        isOpen={Boolean(editingProduct)}
+        onClose={() => setEditingProduct(null)}
+        onSuccess={() => {
+          setEditingProduct(null);
           fetchProducts();
         }}
       />
@@ -251,29 +275,76 @@ export default function SellerProductsPage() {
   );
 }
 
-type AddProductModalProps = {
+type ProductFormModalProps = {
+  mode: 'add' | 'edit';
   isOpen: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onSuccess: () => void;
+  product?: Product;
 };
 
-function AddProductModal({ isOpen, onClose, onCreated }: AddProductModalProps) {
+type ProductFormState = {
+  name_en: string;
+  name_ar: string;
+  brand: string;
+  product_type: string;
+  category: string;
+  base_price: string;
+  size_ml: string;
+  concentration: string;
+  stock_quantity: string;
+  description_en: string;
+  description_ar: string;
+  image_urls: string[];
+  condition: 'NEW' | 'USED';
+};
+
+const createInitialFormState = (): ProductFormState => ({
+  name_en: '',
+  name_ar: '',
+  brand: '',
+  product_type: 'EDP',
+  category: '',
+  base_price: '',
+  size_ml: '',
+  concentration: '',
+  stock_quantity: '',
+  description_en: '',
+  description_ar: '',
+  image_urls: [],
+  condition: 'NEW',
+});
+
+function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: ProductFormModalProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name_en: '',
-    name_ar: '',
-    brand: '',
-    product_type: 'EDP',
-    category: '',
-    base_price: '',
-    size_ml: '',
-    concentration: '',
-    stock_quantity: '',
-    description_en: '',
-    description_ar: '',
-    image_urls: '',
-  });
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [formData, setFormData] = useState<ProductFormState>(() => createInitialFormState());
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    if (mode === 'edit' && product) {
+      setFormData({
+        name_en: product.name_en || '',
+        name_ar: product.name_ar || '',
+        brand: product.brand || '',
+        product_type: product.product_type || '',
+        category: product.category || '',
+        base_price: product.base_price?.toString?.() || '',
+        size_ml: product.size_ml?.toString?.() || '',
+        concentration: product.concentration || '',
+        stock_quantity: product.stock_quantity?.toString?.() || '',
+        description_en: product.description_en || '',
+        description_ar: product.description_ar || '',
+        image_urls: product.image_urls || [],
+        condition: (product.condition?.toUpperCase?.() === 'USED' ? 'USED' : 'NEW'),
+      });
+    } else if (mode === 'add') {
+      setFormData(createInitialFormState());
+    }
+  }, [isOpen, mode, product]);
 
   if (!isOpen) return null;
 
@@ -281,7 +352,13 @@ function AddProductModal({ isOpen, onClose, onCreated }: AddProductModalProps) {
     event.preventDefault();
     try {
       setLoading(true);
-      await api.post('/seller/products', {
+      if (formData.image_urls.length === 0) {
+        alert(t('seller.imageRequired', 'Please upload at least one image'));
+        return;
+      }
+
+      const imageUrls = formData.image_urls;
+      const payload = {
         nameEn: formData.name_en,
         nameAr: formData.name_ar,
         brand: formData.brand,
@@ -293,43 +370,82 @@ function AddProductModal({ isOpen, onClose, onCreated }: AddProductModalProps) {
         stockQuantity: parseInt(formData.stock_quantity || '0', 10),
         descriptionEn: formData.description_en,
         descriptionAr: formData.description_ar,
-        condition: 'NEW',
-        imageUrls: formData.image_urls
-          .split(',')
-          .map((url) => url.trim())
-          .filter(Boolean),
-      });
-      onCreated();
-      setFormData({
-        name_en: '',
-        name_ar: '',
-        brand: '',
-        product_type: 'EDP',
-        category: '',
-        base_price: '',
-        size_ml: '',
-        concentration: '',
-        stock_quantity: '',
-        description_en: '',
-        description_ar: '',
-        image_urls: '',
-      });
+        condition: formData.condition || 'NEW',
+        imageUrls,
+      };
+
+      if (mode === 'add') {
+        await api.post('/seller/products', payload);
+      } else if (product) {
+        await api.patch(`/seller/products/${product.id}`, payload);
+      }
+
+      onSuccess();
+      if (mode === 'add') {
+        setFormData(createInitialFormState());
+      }
     } catch (error: any) {
       console.error('Failed to create product', error);
-      alert(error.response?.data?.detail || t('seller.addFailed', 'Failed to add product'));
+      const msg = error.response?.data?.message || error.response?.data?.detail;
+      alert(
+        msg ||
+          (mode === 'add'
+            ? t('seller.addFailed', 'Failed to add product')
+            : t('seller.updateFailed', 'Failed to update product'))
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (field: keyof typeof formData) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+  const handleChange =
+    (field: keyof Omit<ProductFormState, 'image_urls'>) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+    };
+
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.target;
+    const files = input.files ? Array.from(input.files) : [];
+    input.value = '';
+    if (!files.length) return;
+
+    try {
+      setUploadingImages(true);
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const formDataPayload = new FormData();
+        formDataPayload.append('image', file);
+        const { data } = await api.post('/uploads/image', formDataPayload, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        uploadedUrls.push(data?.url || data?.path);
+      }
+      setFormData((prev) => ({
+        ...prev,
+        image_urls: [...prev.image_urls, ...uploadedUrls.filter(Boolean)],
+      }));
+    } catch (error: any) {
+      console.error('Failed to upload image', error);
+      alert(error.response?.data?.message || t('seller.uploadFailed', 'Failed to upload image'));
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  const handleRemoveImage = (url: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      image_urls: prev.image_urls.filter((img) => img !== url),
+    }));
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-luxury p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <h3 className="text-h3 text-charcoal mb-6">{t('seller.addProduct')}</h3>
+        <h3 className="text-h3 text-charcoal mb-6">
+          {mode === 'add' ? t('seller.addProduct') : t('seller.editProduct', 'Edit product')}
+        </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -416,6 +532,20 @@ function AddProductModal({ isOpen, onClose, onCreated }: AddProductModalProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label className="block text-charcoal font-semibold mb-2">{t('seller.condition', 'Condition')}</label>
+              <select
+                value={formData.condition}
+                onChange={handleChange('condition')}
+                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+              >
+                <option value="NEW">{t('seller.conditionNew', 'New')}</option>
+                <option value="USED">{t('seller.conditionUsed', 'Used')}</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
               <label className="block text-charcoal font-semibold mb-2">{t('seller.size', 'Size (ml)')}</label>
               <input
                 type="number"
@@ -459,15 +589,38 @@ function AddProductModal({ isOpen, onClose, onCreated }: AddProductModalProps) {
           </div>
 
           <div>
-            <label className="block text-charcoal font-semibold mb-2">{t('seller.imageUrls', 'Image URLs')}</label>
-            <input
-              type="text"
-              value={formData.image_urls}
-              onChange={handleChange('image_urls')}
-              className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
-              placeholder="https://... , https://..."
-            />
-            <p className="text-sm text-taupe mt-1">{t('seller.imageUrlsHint', 'Separate multiple URLs with commas')}</p>
+            <label className="block text-charcoal font-semibold mb-2">{t('seller.images', 'Images')}</label>
+            <div className="space-y-3">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none bg-white"
+                disabled={uploadingImages}
+              />
+              <p className="text-sm text-taupe">
+                {uploadingImages
+                  ? t('seller.uploading', 'Uploading images...')
+                  : t('seller.imageUploadHint', 'PNG, JPG or WEBP up to 5MB each.')}
+              </p>
+              {formData.image_urls.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {formData.image_urls.map((url) => (
+                    <div key={url} className="relative border border-gray-200 rounded-lg overflow-hidden">
+                      <img src={url} alt="Product" className="w-full h-28 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(url)}
+                        className="absolute top-2 right-2 bg-white/90 text-red-600 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
@@ -475,16 +628,16 @@ function AddProductModal({ isOpen, onClose, onCreated }: AddProductModalProps) {
               type="button"
               onClick={onClose}
               className="px-4 py-2 rounded-luxury border border-gray-300 text-charcoal hover:bg-gray-100"
-              disabled={loading}
+              disabled={loading || uploadingImages}
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
               className="px-4 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover disabled:opacity-50"
-              disabled={loading}
+              disabled={loading || uploadingImages}
             >
-              {loading ? t('common.loading') : t('common.save')}
+              {loading || uploadingImages ? t('common.loading') : t('common.save')}
             </button>
           </div>
         </form>
