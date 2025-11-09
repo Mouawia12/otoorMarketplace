@@ -11,5 +11,9 @@ export declare const config: {
         standard: number;
         express: number;
     };
+    uploads: {
+        dir: string;
+        maxFileSizeMb: number;
+    };
 };
 //# sourceMappingURL=env.d.ts.map

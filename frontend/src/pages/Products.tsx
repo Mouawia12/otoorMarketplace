@@ -64,7 +64,9 @@ export default function Products() {
         const params = buildApiFilters(location.search);
         const res = await api.get("/products", { params });
         if (!active) return;
-        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        const data = Array.isArray(res.data)
+          ? res.data
+          : res.data?.products || res.data?.data || [];
         setProducts(data);
       } catch (e) {
         if (!active) return;

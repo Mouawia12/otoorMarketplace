@@ -257,6 +257,10 @@ const getProductFiltersMeta = async () => {
     };
 };
 exports.getProductFiltersMeta = getProductFiltersMeta;
+const imageUrlSchema = zod_1.z
+    .string()
+    .min(1)
+    .refine((value) => /^https?:\/\//.test(value) || value.startsWith("/"), "Image URL must be an absolute or relative URL");
 const productInputSchema = zod_1.z.object({
     sellerId: zod_1.z.coerce.number().int().positive(),
     nameAr: zod_1.z.string().min(2),
@@ -272,7 +276,7 @@ const productInputSchema = zod_1.z.object({
     condition: zod_1.z.nativeEnum(client_1.ProductCondition),
     stockQuantity: zod_1.z.coerce.number().int().nonnegative(),
     status: zod_1.z.nativeEnum(client_1.ProductStatus).default(client_1.ProductStatus.PENDING_REVIEW),
-    imageUrls: zod_1.z.array(zod_1.z.string().url()).default([]),
+    imageUrls: zod_1.z.array(imageUrlSchema).default([]),
 });
 const createProduct = async (input) => {
     const data = productInputSchema.parse(input);
@@ -341,7 +345,7 @@ const updateProductSchema = zod_1.z.object({
         zod_1.z.enum(["pending", "published", "draft", "rejected", "archived"]),
     ])
         .optional(),
-    imageUrls: zod_1.z.array(zod_1.z.string().url()).optional(),
+    imageUrls: zod_1.z.array(imageUrlSchema).optional(),
 });
 const updateProduct = async (productId, sellerId, payload) => {
     const data = updateProductSchema.parse(payload);

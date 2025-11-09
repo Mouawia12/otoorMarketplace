@@ -286,6 +286,14 @@ export const getProductFiltersMeta = async () => {
   };
 };
 
+const imageUrlSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => /^https?:\/\//.test(value) || value.startsWith("/"),
+    "Image URL must be an absolute or relative URL"
+  );
+
 const productInputSchema = z.object({
   sellerId: z.coerce.number().int().positive(),
   nameAr: z.string().min(2),
@@ -301,7 +309,7 @@ const productInputSchema = z.object({
   condition: z.nativeEnum(ProductCondition),
   stockQuantity: z.coerce.number().int().nonnegative(),
   status: z.nativeEnum(ProductStatus).default(ProductStatus.PENDING_REVIEW),
-  imageUrls: z.array(z.string().url()).default([]),
+  imageUrls: z.array(imageUrlSchema).default([]),
 });
 
 export const createProduct = async (input: z.infer<typeof productInputSchema>) => {
@@ -376,7 +384,7 @@ const updateProductSchema = z.object({
       z.enum(["pending", "published", "draft", "rejected", "archived"]),
     ])
     .optional(),
-  imageUrls: z.array(z.string().url()).optional(),
+  imageUrls: z.array(imageUrlSchema).optional(),
 });
 
 export const updateProduct = async (

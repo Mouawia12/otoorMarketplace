@@ -38,7 +38,8 @@
     "quantity": "الكمية",
     "retry": "إعادة المحاولة",
     "errorLoading": "تعذر تحميل المحتوى. يرجى المحاولة مرة أخرى.",
-    "notFound": "عذرًا، لم نعثر على ما تبحث عنه."
+    "notFound": "عذرًا، لم نعثر على ما تبحث عنه.",
+    "noResults": "لا توجد منتجات مطابقة حاليًا."
   },
   "cart": {
     "title": "سلة المشتريات",
@@ -430,6 +431,7 @@
     "thisMonth": "هذا الشهر",
     "viewDetails": "عرض التفاصيل",
     "addProduct": "إضافة منتج",
+    "editProduct": "تعديل المنتج",
     "importCSV": "استيراد CSV",
     "searchProducts": "البحث في المنتجات...",
     "allStatuses": "كل الحالات",
@@ -441,6 +443,9 @@
     "brand": "العلامة التجارية",
     "type": "النوع",
     "price": "السعر",
+    "condition": "الحالة",
+    "conditionNew": "جديد",
+    "conditionUsed": "مستعمل",
     "status": "الحالة",
     "createdAt": "تاريخ الإنشاء",
     "actions": "الإجراءات",
@@ -451,6 +456,10 @@
     "titleEn": "العنوان (EN)",
     "titleAr": "العنوان (AR)",
     "images": "الصور",
+    "imageUploadHint": "يدعم PNG أو JPG أو WEBP بحد أقصى ٥ ميجابايت لكل صورة",
+    "imageRequired": "يرجى رفع صورة واحدة على الأقل",
+    "uploadFailed": "تعذر رفع الصورة",
+    "uploading": "جاري رفع الصور...",
     "maxImages": "الحد الأقصى 5 صور",
     "maxImagesNote": "يمكنك رفع حتى 5 صور",
     "createProduct": "إنشاء منتج",

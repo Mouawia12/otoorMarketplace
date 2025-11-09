@@ -7,6 +7,7 @@ import ordersRouter from "./orders";
 import wishlistRouter from "./wishlist";
 import adminRouter from "./admin";
 import sellerRouter from "./seller";
+import uploadsRouter from "./uploads";
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use("/orders", ordersRouter);
 router.use("/wishlist", wishlistRouter);
 router.use("/admin", adminRouter);
 router.use("/seller", sellerRouter);
+router.use("/uploads", uploadsRouter);
 
 export default router;

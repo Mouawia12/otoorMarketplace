@@ -37,7 +37,8 @@
     "quantity": "Quantity",
     "retry": "Retry",
     "errorLoading": "Failed to load content. Please try again.",
-    "notFound": "We couldn't find what you were looking for."
+    "notFound": "We couldn't find what you were looking for.",
+    "noResults": "No products match your filters right now."
   },
   "cart": {
     "title": "Shopping Cart",
@@ -428,6 +429,7 @@
     "thisMonth": "This Month",
     "viewDetails": "View Details",
     "addProduct": "Add Product",
+    "editProduct": "Edit Product",
     "importCSV": "Import CSV",
     "searchProducts": "Search products...",
     "allStatuses": "All Statuses",
@@ -439,6 +441,9 @@
     "brand": "Brand",
     "type": "Type",
     "price": "Price",
+    "condition": "Condition",
+    "conditionNew": "New",
+    "conditionUsed": "Used",
     "status": "Status",
     "createdAt": "Created At",
     "actions": "Actions",
@@ -449,6 +454,10 @@
     "titleEn": "Title (EN)",
     "titleAr": "Title (AR)",
     "images": "Images",
+    "imageUploadHint": "PNG, JPG or WEBP up to 5MB each",
+    "imageRequired": "Please upload at least one image",
+    "uploadFailed": "Failed to upload image",
+    "uploading": "Uploading images...",
     "maxImages": "Maximum 5 images",
     "maxImagesNote": "You can upload up to 5 images",
     "createProduct": "Create Product",

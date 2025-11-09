@@ -19,6 +19,8 @@ const envSchema = z.object({
     .describe("Commission rate taken on every order (e.g. 0.1 for 10%)"),
   STANDARD_SHIPPING_FEE: z.string().default("0"),
   EXPRESS_SHIPPING_FEE: z.string().default("35"),
+  UPLOAD_DIR: z.string().default("uploads"),
+  MAX_UPLOAD_SIZE_MB: z.coerce.number().default(5),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -38,6 +40,8 @@ const {
   PLATFORM_COMMISSION_RATE,
   STANDARD_SHIPPING_FEE,
   EXPRESS_SHIPPING_FEE,
+  UPLOAD_DIR,
+  MAX_UPLOAD_SIZE_MB,
 } = parsed.data;
 
 const allowedOrigins =
@@ -58,5 +62,9 @@ export const config = {
   shipping: {
     standard: Number(STANDARD_SHIPPING_FEE),
     express: Number(EXPRESS_SHIPPING_FEE),
+  },
+  uploads: {
+    dir: UPLOAD_DIR,
+    maxFileSizeMb: MAX_UPLOAD_SIZE_MB,
   },
 };
