@@ -6,6 +6,7 @@ import { Order } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
+import { resolveImageUrl } from '../utils/image';
 
 export default function Orders() {
   const { t, i18n } = useTranslation();
@@ -184,7 +185,7 @@ export default function Orders() {
             const productName = primaryProduct
               ? (language === 'ar' ? primaryProduct.name_ar : primaryProduct.name_en)
               : t('products.unknownProduct');
-            const imageUrl = primaryProduct?.image_urls?.[0] || '/images/placeholder-perfume.svg';
+            const imageUrl = resolveImageUrl(primaryProduct?.image_urls?.[0]) || '/images/placeholder-perfume.svg';
 
             return (
               <div key={order.id} className="bg-white rounded-luxury shadow-luxury overflow-hidden">
@@ -275,7 +276,7 @@ export default function Orders() {
                           const itemName = itemProduct
                             ? (language === 'ar' ? itemProduct.name_ar : itemProduct.name_en)
                             : t('products.unknownProduct');
-                          const itemImage = itemProduct?.image_urls?.[0] || '/images/placeholder-perfume.svg';
+                          const itemImage = resolveImageUrl(itemProduct?.image_urls?.[0]) || '/images/placeholder-perfume.svg';
                           const totalPrice =
                             typeof item.total_price === 'number'
                               ? item.total_price

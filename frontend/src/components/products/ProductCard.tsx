@@ -8,6 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
 import SARIcon from '../common/SARIcon';
 import { formatSAR } from '../../utils/currency';
+import { resolveImageUrl } from '../../utils/image';
 import CountdownTimer from '../auctions/CountdownTimer';
 
 interface ProductCardProps {
@@ -33,7 +34,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const { isAuthenticated } = useAuthStore();
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
-  const imageUrl = product.image_urls?.[0] || '/images/placeholder-perfume.svg';
+  const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || '/images/placeholder-perfume.svg';
   const displayPrice = type === 'auction' && currentBid ? currentBid : product.base_price;
   
   const defaultAuctionEnd = auctionEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -53,7 +54,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
           id: product.id.toString(),
           name,
           price: displayPrice,
-          image: imageUrl,
+          image: resolvedImage,
           brand: product.brand,
         });
       }
@@ -68,7 +69,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
         id: product.id.toString(),
         name,
         price: displayPrice,
-        image: imageUrl,
+        image: resolvedImage,
         brand: product.brand,
       },
       1
@@ -84,7 +85,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
       <div className="relative">
         <Link to={productLink(product)} className="block aspect-[4/5] w-full bg-sand/60 overflow-hidden">
           <img
-            src={imageUrl}
+            src={resolvedImage}
             alt={name}
             loading="lazy"
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"

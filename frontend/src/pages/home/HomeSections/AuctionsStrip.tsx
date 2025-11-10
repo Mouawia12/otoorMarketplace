@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Countdown from '../../../components/common/Countdown';
 import SARIcon from '../../../components/common/SARIcon';
 import { Auction, Product } from '../../../types';
+import { resolveImageUrl } from '../../../utils/image';
 
 interface AuctionsStripProps {
   auctions: Auction[];
@@ -56,7 +57,7 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
               const title = lang === 'ar' ? auction.product.name_ar : auction.product.name_en;
               const current = auction.current_price ?? auction.starting_price ?? 0;
               const bidsCount = auction.total_bids ?? 0;
-              const image = auction.product.image_urls?.[0] ?? '/images/placeholder-perfume.jpg';
+              const image = resolveImageUrl(auction.product.image_urls?.[0]) || '/images/placeholder-perfume.jpg';
 
               return (
                 <Link
