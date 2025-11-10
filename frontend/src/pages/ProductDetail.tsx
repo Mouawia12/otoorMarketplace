@@ -6,6 +6,7 @@ import { Product } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
+import { resolveImageUrl } from '../utils/image';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -80,7 +81,8 @@ export default function ProductDetail() {
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
-  const images = product.image_urls?.length > 0 ? product.image_urls : ['/placeholder-perfume.jpg'];
+  const baseImages = product.image_urls?.length > 0 ? product.image_urls : ['/images/placeholder-perfume.svg'];
+  const images = baseImages.map((img) => resolveImageUrl(img) || '/images/placeholder-perfume.svg');
   const isInStock = product.stock_quantity > 0;
 
   return (

@@ -5,6 +5,7 @@ import api from '../lib/api';
 import { Product } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
+import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
 
 type StatusFilter = 'all' | 'published' | 'draft' | 'pending' | 'rejected';
 
@@ -338,7 +339,11 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         stock_quantity: product.stock_quantity?.toString?.() || '',
         description_en: product.description_en || '',
         description_ar: product.description_ar || '',
-        image_urls: product.image_urls || [],
+        image_urls: product.image_urls
+          ? product.image_urls
+              .map((url) => normalizeImagePathForStorage(url) || '')
+              .filter(Boolean)
+          : [],
         condition: (product.condition?.toUpperCase?.() === 'USED' ? 'USED' : 'NEW'),
       });
     } else if (mode === 'add') {
@@ -412,18 +417,24 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
 
     try {
       setUploadingImages(true);
-      const uploadedUrls: string[] = [];
+      const uploadedPaths: string[] = [];
       for (const file of files) {
         const formDataPayload = new FormData();
         formDataPayload.append('image', file);
         const { data } = await api.post('/uploads/image', formDataPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        uploadedUrls.push(data?.url || data?.path);
+        const stored = normalizeImagePathForStorage(data?.path || data?.url);
+        const fallback = data?.path || data?.url;
+        if (stored) {
+          uploadedPaths.push(stored);
+        } else if (fallback) {
+          uploadedPaths.push(fallback);
+        }
       }
       setFormData((prev) => ({
         ...prev,
-        image_urls: [...prev.image_urls, ...uploadedUrls.filter(Boolean)],
+        image_urls: [...prev.image_urls, ...uploadedPaths.filter(Boolean)],
       }));
     } catch (error: any) {
       console.error('Failed to upload image', error);
@@ -606,9 +617,11 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
               </p>
               {formData.image_urls.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {formData.image_urls.map((url) => (
+                  {formData.image_urls.map((url) => {
+                    const preview = resolveImageUrl(url) || url;
+                    return (
                     <div key={url} className="relative border border-gray-200 rounded-lg overflow-hidden">
-                      <img src={url} alt="Product" className="w-full h-28 object-cover" />
+                      <img src={preview} alt="Product" className="w-full h-28 object-cover" />
                       <button
                         type="button"
                         onClick={() => handleRemoveImage(url)}
@@ -617,7 +630,8 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                         ×
                       </button>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </div>

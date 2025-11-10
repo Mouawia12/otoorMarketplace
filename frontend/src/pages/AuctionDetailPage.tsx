@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import { fetchAuctionById, fetchAuctionBids, placeBid } from '../services/auctionService';
 import { Auction, Bid, Product } from '../types';
 import { formatPrice } from '../utils/currency';
+import { resolveImageUrl } from '../utils/image';
 import Countdown from '../components/common/Countdown';
 
 export default function AuctionDetailPage() {
@@ -144,7 +145,10 @@ export default function AuctionDetailPage() {
   const product: Product = auction.product;
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
-  const images = product.image_urls || [];
+  const images =
+    (product.image_urls || [])
+      .map((img) => resolveImageUrl(img) || '')
+      .filter(Boolean);
   const isEnded = new Date(auction.end_time).getTime() < new Date().getTime();
   const seller = auction.seller || { id: 0, full_name: 'Unknown', verified_seller: false };
 

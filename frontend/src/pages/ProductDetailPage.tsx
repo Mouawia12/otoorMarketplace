@@ -7,6 +7,7 @@ import { fetchAuctionByProductId } from '../services/auctionService';
 import ProductCard from '../components/products/ProductCard';
 import { Product, Auction } from '../types';
 import { formatPrice } from '../utils/currency';
+import { resolveImageUrl } from '../utils/image';
 import Countdown from '../components/common/Countdown';
 
 export default function ProductDetailPage() {
@@ -82,7 +83,7 @@ export default function ProductDetailPage() {
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
-  const images = product.image_urls || [];
+  const images = (product.image_urls || []).map((img) => resolveImageUrl(img) || '').filter(Boolean);
   const isInStock = product.stock_quantity > 0;
 
   return (

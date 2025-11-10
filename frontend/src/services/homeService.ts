@@ -5,6 +5,7 @@ import {
   ProductFiltersMeta,
 } from './productService';
 import { Auction, Product } from '../types';
+import { resolveImageUrl } from '../utils/image';
 
 export interface HeroSlide {
   id: string;
@@ -33,7 +34,7 @@ export interface HomeData {
 const placeholderImage = '/images/placeholder-perfume.jpg';
 
 const buildHeroSlideFromProduct = (product: Product, index: number): HeroSlide => {
-  const image = product.image_urls?.[0] ?? placeholderImage;
+  const image = resolveImageUrl(product.image_urls?.[0]) || placeholderImage;
   return {
     id: `product-${product.id}-${index}`,
     image,
@@ -65,7 +66,7 @@ const buildHeroSlideFromProduct = (product: Product, index: number): HeroSlide =
 const buildHeroSlideFromAuction = (auction: Auction, index: number): HeroSlide | null => {
   if (!auction.product) return null;
   const product = auction.product;
-  const image = product.image_urls?.[0] ?? placeholderImage;
+  const image = resolveImageUrl(product.image_urls?.[0]) || placeholderImage;
   return {
     id: `auction-${auction.id}-${index}`,
     image,
