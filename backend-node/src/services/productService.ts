@@ -5,6 +5,7 @@ import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { toPlainObject } from "../utils/serializer";
 import { makeSlug } from "../utils/slugify";
+import { normalizeImagePathForStorage, toPublicAssetUrl } from "../utils/assets";
 
 const normalizeStatus = (status: string | null | undefined) => {
   if (!status) return status ?? "";
@@ -19,9 +20,13 @@ const normalizeStatus = (status: string | null | undefined) => {
 
 export const normalizeProduct = (product: any) => {
   const plain = toPlainObject(product);
-  const images = Array.isArray(plain.images)
+  const rawImages = Array.isArray(plain.images)
     ? plain.images.map((image: any) => image.url)
     : plain.image_urls ?? [];
+  const images = (Array.isArray(rawImages) ? rawImages : [])
+    .map((url: any) => (typeof url === "string" ? url : null))
+    .filter((url): url is string => Boolean(url))
+    .map((url) => toPublicAssetUrl(url));
 
   return {
     id: plain.id,
@@ -38,7 +43,7 @@ export const normalizeProduct = (product: any) => {
     concentration: plain.concentration,
     condition: plain.condition?.toLowerCase?.() ?? plain.condition,
     stock_quantity: plain.stockQuantity,
-    image_urls: images,
+  image_urls: images,
     status: normalizeStatus(plain.status),
     created_at: plain.createdAt,
     updated_at: plain.updatedAt,
@@ -326,6 +331,10 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
       ? `${slugBase}-${Date.now().toString(36)}`
       : slugBase;
 
+  const sanitizedImages = data.imageUrls
+    .map((url) => normalizeImagePathForStorage(url))
+    .filter((value): value is string => Boolean(value));
+
   const product = await prisma.product.create({
     data: {
       sellerId: data.sellerId,
@@ -344,7 +353,7 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
       stockQuantity: data.stockQuantity,
       status: data.status,
       images: {
-        create: data.imageUrls.map((url, index) => ({
+        create: sanitizedImages.map((url, index) => ({
           url,
           sortOrder: index,
         })),
@@ -430,10 +439,13 @@ export const updateProduct = async (
     data.imageUrls !== undefined
       ? {
           deleteMany: {},
-          create: data.imageUrls.map((url, index) => ({
-            url,
-            sortOrder: index,
-          })),
+          create: data.imageUrls
+            .map((url) => normalizeImagePathForStorage(url))
+            .filter((url): url is string => Boolean(url))
+            .map((url, index) => ({
+              url,
+              sortOrder: index,
+            })),
         }
       : undefined;
 

@@ -54,7 +54,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -85,7 +85,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
             concentration: any;
             condition: any;
             stock_quantity: any;
-            image_urls: any;
+            image_urls: string[];
             status: string;
             created_at: any;
             updated_at: any;
@@ -130,7 +130,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -161,7 +161,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
             concentration: any;
             condition: any;
             stock_quantity: any;
-            image_urls: any;
+            image_urls: string[];
             status: string;
             created_at: any;
             updated_at: any;
@@ -206,7 +206,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -237,7 +237,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
             concentration: any;
             condition: any;
             stock_quantity: any;
-            image_urls: any;
+            image_urls: string[];
             status: string;
             created_at: any;
             updated_at: any;
@@ -282,7 +282,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -313,7 +313,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
             concentration: any;
             condition: any;
             stock_quantity: any;
-            image_urls: any;
+            image_urls: string[];
             status: string;
             created_at: any;
             updated_at: any;
@@ -358,7 +358,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -389,7 +389,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
             concentration: any;
             condition: any;
             stock_quantity: any;
-            image_urls: any;
+            image_urls: string[];
             status: string;
             created_at: any;
             updated_at: any;
