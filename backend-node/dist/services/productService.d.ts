@@ -14,7 +14,7 @@ export declare const normalizeProduct: (product: any) => {
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -40,7 +40,7 @@ export declare const listProducts: (query: unknown) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -70,7 +70,7 @@ export declare const getProductById: (id: number) => Promise<{
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -95,7 +95,7 @@ export declare const getRelatedProducts: (productId: number, limit?: number) => 
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -151,7 +151,7 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>) 
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -176,7 +176,7 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -201,7 +201,7 @@ export declare const moderateProduct: (productId: number, action: "approve" | "r
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;

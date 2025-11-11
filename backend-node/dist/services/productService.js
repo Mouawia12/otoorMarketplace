@@ -7,6 +7,7 @@ const client_2 = require("../prisma/client");
 const errors_1 = require("../utils/errors");
 const serializer_1 = require("../utils/serializer");
 const slugify_1 = require("../utils/slugify");
+const assets_1 = require("../utils/assets");
 const normalizeStatus = (status) => {
     if (!status)
         return status ?? "";
@@ -25,9 +26,13 @@ const normalizeStatus = (status) => {
 };
 const normalizeProduct = (product) => {
     const plain = (0, serializer_1.toPlainObject)(product);
-    const images = Array.isArray(plain.images)
+    const rawImages = Array.isArray(plain.images)
         ? plain.images.map((image) => image.url)
         : plain.image_urls ?? [];
+    const images = (Array.isArray(rawImages) ? rawImages : [])
+        .map((url) => (typeof url === "string" ? url : null))
+        .filter((url) => Boolean(url))
+        .map((url) => (0, assets_1.toPublicAssetUrl)(url));
     return {
         id: plain.id,
         seller_id: plain.sellerId,
@@ -288,6 +293,9 @@ const createProduct = async (input) => {
     const slug = existingSlug && existingSlug.id
         ? `${slugBase}-${Date.now().toString(36)}`
         : slugBase;
+    const sanitizedImages = data.imageUrls
+        .map((url) => (0, assets_1.normalizeImagePathForStorage)(url))
+        .filter((value) => Boolean(value));
     const product = await client_2.prisma.product.create({
         data: {
             sellerId: data.sellerId,
@@ -306,7 +314,7 @@ const createProduct = async (input) => {
             stockQuantity: data.stockQuantity,
             status: data.status,
             images: {
-                create: data.imageUrls.map((url, index) => ({
+                create: sanitizedImages.map((url, index) => ({
                     url,
                     sortOrder: index,
                 })),
@@ -394,7 +402,10 @@ const updateProduct = async (productId, sellerId, payload) => {
     const imagesUpdate = data.imageUrls !== undefined
         ? {
             deleteMany: {},
-            create: data.imageUrls.map((url, index) => ({
+            create: data.imageUrls
+                .map((url) => (0, assets_1.normalizeImagePathForStorage)(url))
+                .filter((url) => Boolean(url))
+                .map((url, index) => ({
                 url,
                 sortOrder: index,
             })),

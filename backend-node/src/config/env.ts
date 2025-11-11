@@ -21,6 +21,7 @@ const envSchema = z.object({
   EXPRESS_SHIPPING_FEE: z.string().default("35"),
   UPLOAD_DIR: z.string().default("uploads"),
   MAX_UPLOAD_SIZE_MB: z.coerce.number().default(5),
+  ASSET_BASE_URL: z.string().default("http://localhost:8080"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -42,6 +43,7 @@ const {
   EXPRESS_SHIPPING_FEE,
   UPLOAD_DIR,
   MAX_UPLOAD_SIZE_MB,
+  ASSET_BASE_URL,
 } = parsed.data;
 
 const allowedOrigins =
@@ -67,4 +69,5 @@ export const config = {
     dir: UPLOAD_DIR,
     maxFileSizeMb: MAX_UPLOAD_SIZE_MB,
   },
+  assetBaseUrl: ASSET_BASE_URL.replace(/\/+$/, ""),
 };

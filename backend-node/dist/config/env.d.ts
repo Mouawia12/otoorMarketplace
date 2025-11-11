@@ -15,5 +15,6 @@ export declare const config: {
         dir: string;
         maxFileSizeMb: number;
     };
+    assetBaseUrl: string;
 };
 //# sourceMappingURL=env.d.ts.map

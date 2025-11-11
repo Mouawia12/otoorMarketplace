@@ -37,7 +37,7 @@ export declare const listPendingProducts: () => Promise<{
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -62,7 +62,7 @@ export declare const listProductsForAdmin: (status?: string) => Promise<{
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -87,7 +87,7 @@ export declare const updateProductStatusAsAdmin: (productId: number, status: str
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;

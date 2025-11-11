@@ -23,7 +23,7 @@ export declare const listSellerProductsWithFilters: (sellerId: number, filters?:
     concentration: any;
     condition: any;
     stock_quantity: any;
-    image_urls: any;
+    image_urls: string[];
     status: string;
     created_at: any;
     updated_at: any;
@@ -66,7 +66,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -97,7 +97,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
             concentration: any;
             condition: any;
             stock_quantity: any;
-            image_urls: any;
+            image_urls: string[];
             status: string;
             created_at: any;
             updated_at: any;

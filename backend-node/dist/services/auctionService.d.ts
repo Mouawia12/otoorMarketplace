@@ -27,7 +27,7 @@ export declare const listAuctions: (query: unknown) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -83,7 +83,7 @@ export declare const getAuctionById: (id: number) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -127,7 +127,7 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -208,7 +208,7 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
@@ -252,7 +252,7 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
         concentration: any;
         condition: any;
         stock_quantity: any;
-        image_urls: any;
+        image_urls: string[];
         status: string;
         created_at: any;
         updated_at: any;
