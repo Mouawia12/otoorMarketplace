@@ -7,6 +7,7 @@ const productService_1 = require("../services/productService");
 const sellerService_1 = require("../services/sellerService");
 const auctionService_1 = require("../services/auctionService");
 const errors_1 = require("../utils/errors");
+const productTemplateService_1 = require("../services/productTemplateService");
 const router = (0, express_1.Router)();
 const sellerRoles = [client_1.RoleName.SELLER, client_1.RoleName.ADMIN, client_1.RoleName.SUPER_ADMIN];
 const sellerOnly = (0, auth_1.authenticate)({ roles: sellerRoles });
@@ -94,6 +95,28 @@ router.get("/auctions", sellerOnly, async (req, res, next) => {
             status,
         });
         res.json(auctions);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/product-templates", sellerOnly, async (req, res, next) => {
+    try {
+        const templates = await (0, productTemplateService_1.listProductTemplates)(req.query);
+        res.json(templates);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/product-templates/:id", sellerOnly, async (req, res, next) => {
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id)) {
+            throw errors_1.AppError.badRequest("Invalid template id");
+        }
+        const template = await (0, productTemplateService_1.getProductTemplateById)(id);
+        res.json(template);
     }
     catch (error) {
         next(error);

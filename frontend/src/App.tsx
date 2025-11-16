@@ -43,6 +43,7 @@ import AdminSupportPage from './pages/AdminSupportPage';
 import AdminReportsPage from './pages/AdminReportsPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import AdminAuditPage from './pages/AdminAuditPage';
+import AdminProductLibraryPage from './pages/AdminProductLibraryPage';
 
 // ✅ صفحات الفوتر الثابتة (صفحة واحدة تُستخدم لكل المسارات)
 import InfoPage from './pages/static/InfoPage';
@@ -146,6 +147,7 @@ function App() {
           <Route path="admin" element={<AdminLayout />}>
             <Route path="dashboard" element={<AdminDashboardPage />} />
             <Route path="products" element={<AdminProductsPage />} />
+            <Route path="library" element={<AdminProductLibraryPage />} />
             <Route path="auctions" element={<AdminAuctionsPage />} />
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="users" element={<AdminUsersPage />} />

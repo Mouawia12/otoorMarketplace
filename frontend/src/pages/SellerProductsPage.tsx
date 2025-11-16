@@ -2,10 +2,11 @@ import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import api from '../lib/api';
-import { Product } from '../types';
+import { Product, ProductTemplate } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
 import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
+import { sellerSearchTemplates } from '../services/productTemplateService';
 
 type StatusFilter = 'all' | 'published' | 'draft' | 'pending' | 'rejected';
 
@@ -157,7 +158,7 @@ export default function SellerProductsPage() {
           </select>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto lg:overflow-visible">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
@@ -234,9 +235,10 @@ export default function SellerProductsPage() {
                   <td className="px-4 py-4 text-right">
                     <button
                       onClick={() => setEditingProduct(product)}
-                      className="px-3 py-1 rounded-luxury border border-gold text-charcoal hover:bg-gold/10 transition text-sm"
+                      className="px-2 py-1 rounded-full border border-gold text-charcoal hover:bg-gold/10 transition"
+                      aria-label={t('seller.moreActions', 'المزيد من الإجراءات')}
                     >
-                      {t('common.edit')}
+                      ⋮
                     </button>
                   </td>
                 </tr>
@@ -317,10 +319,15 @@ const createInitialFormState = (): ProductFormState => ({
 });
 
 function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: ProductFormModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [formData, setFormData] = useState<ProductFormState>(() => createInitialFormState());
+  const [templateQuery, setTemplateQuery] = useState('');
+  const [templateResults, setTemplateResults] = useState<ProductTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -346,10 +353,47 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
           : [],
         condition: (product.condition?.toUpperCase?.() === 'USED' ? 'USED' : 'NEW'),
       });
+      setSelectedTemplateId(null);
     } else if (mode === 'add') {
       setFormData(createInitialFormState());
+      setSelectedTemplateId(null);
+      setTemplateQuery('');
     }
   }, [isOpen, mode, product]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const term = templateQuery.trim();
+    if (term.length === 1) {
+      return;
+    }
+    let cancelled = false;
+    setTemplatesLoading(true);
+    (async () => {
+      try {
+        const templates = await sellerSearchTemplates({
+          limit: 8,
+          ...(term ? { search: term } : {}),
+        });
+        if (!cancelled) {
+          setTemplateResults(templates);
+          setTemplateError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTemplateError(t('seller.templateLoadFailed', 'فشل تحميل القوالب'));
+        }
+      } finally {
+        if (!cancelled) {
+          setTemplatesLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, templateQuery, t]);
 
   if (!isOpen) return null;
 
@@ -409,6 +453,25 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       setFormData((prev) => ({ ...prev, [field]: event.target.value }));
     };
 
+  const applyTemplate = (template: ProductTemplate) => {
+    setSelectedTemplateId(template.id);
+    setFormData({
+      name_en: template.name_en || '',
+      name_ar: template.name_ar || '',
+      brand: template.brand || '',
+      product_type: template.product_type || 'EDP',
+      category: template.category || '',
+      base_price: (template.base_price ?? '').toString(),
+      size_ml: (template.size_ml ?? '').toString(),
+      concentration: template.concentration || '',
+      stock_quantity: '',
+      description_en: template.description_en || '',
+      description_ar: template.description_ar || '',
+      image_urls: template.image_urls?.slice?.() || [],
+      condition: 'NEW',
+    });
+  };
+
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.target;
     const files = input.files ? Array.from(input.files) : [];
@@ -458,6 +521,72 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
           {mode === 'add' ? t('seller.addProduct') : t('seller.editProduct', 'Edit product')}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'add' && (
+            <div className="space-y-3 rounded-luxury border border-gray-200 bg-sand/30 p-4">
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="flex-1">
+                  <label className="block text-charcoal font-semibold mb-1">{t('seller.templateLibraryTitle', 'منتجات جاهزة من الإدارة')}</label>
+                  <input
+                    type="text"
+                    value={templateQuery}
+                    onChange={(e) => setTemplateQuery(e.target.value)}
+                    placeholder={t('seller.templateSearchPlaceholder', 'ابحث عن منتج جاهز...')}
+                    className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTemplateQuery('');
+                    setSelectedTemplateId(null);
+                  }}
+                  className="px-4 py-2 rounded-luxury border border-gray-300 text-charcoal hover:bg-white"
+                >
+                  {t('seller.templateClear', 'إعادة التعيين')}
+                </button>
+              </div>
+              <p className="text-sm text-taupe">{t('seller.templateHint', 'اختر قالباً احترافياً ثم عدّل التفاصيل قبل النشر')}</p>
+              <div className="space-y-2">
+                {templatesLoading && (
+                  <p className="text-sm text-taupe">{t('common.loading')}</p>
+                )}
+                {!templatesLoading && templateError && (
+                  <p className="text-sm text-red-600">{templateError}</p>
+                )}
+                {!templatesLoading && !templateError && templateResults.length === 0 && (
+                  <p className="text-sm text-taupe">{t('seller.templateNoResults', 'لا توجد قوالب')}</p>
+                )}
+                {!templatesLoading && templateResults.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {templateResults.map((template) => {
+                      const title = i18n.language === 'ar' ? template.name_ar : template.name_en;
+                      const preview = resolveImageUrl(template.image_urls?.[0]) || '/images/placeholder-perfume.svg';
+                      const isActive = selectedTemplateId === template.id;
+                      return (
+                        <button
+                          type="button"
+                          key={template.id}
+                          onClick={() => applyTemplate(template)}
+                          className={`flex items-center gap-3 rounded-luxury border p-3 text-left transition hover:border-gold ${
+                            isActive ? 'border-gold bg-white' : 'border-gray-200 bg-white'
+                          }`}
+                        >
+                          <img src={preview} alt={title} className="w-16 h-16 rounded-lg object-cover" />
+                          <div className="flex-1">
+                            <p className="font-semibold text-charcoal">{title}</p>
+                            <p className="text-sm text-taupe">{template.brand}</p>
+                            <span className={`inline-flex items-center gap-1 text-xs mt-1 ${isActive ? 'text-green-600' : 'text-gold'}`}>
+                              {isActive ? t('seller.templateApplied', 'تم التطبيق') : t('seller.templateApply', 'استخدام القالب')}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-charcoal font-semibold mb-2">{t('seller.titleEn', 'Title (EN)')}</label>

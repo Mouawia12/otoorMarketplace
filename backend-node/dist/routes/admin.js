@@ -7,6 +7,7 @@ const adminService_1 = require("../services/adminService");
 const productService_1 = require("../services/productService");
 const auctionService_1 = require("../services/auctionService");
 const errors_1 = require("../utils/errors");
+const productTemplateService_1 = require("../services/productTemplateService");
 const router = (0, express_1.Router)();
 const adminOnly = (0, auth_1.authenticate)({ roles: [client_1.RoleName.ADMIN, client_1.RoleName.SUPER_ADMIN] });
 router.get("/dashboard", adminOnly, async (_req, res, next) => {
@@ -135,6 +136,69 @@ router.patch("/auctions/:id", adminOnly, async (req, res, next) => {
             status: req.body?.status,
         });
         res.json(auction);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/product-templates", adminOnly, async (req, res, next) => {
+    try {
+        const templates = await (0, productTemplateService_1.listProductTemplates)(req.query);
+        res.json(templates);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/product-templates", adminOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const template = await (0, productTemplateService_1.createProductTemplate)({
+            ...req.body,
+            createdById: req.user.id,
+        });
+        res.status(201).json(template);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/product-templates/:id", adminOnly, async (req, res, next) => {
+    try {
+        const templateId = Number(req.params.id);
+        if (Number.isNaN(templateId)) {
+            throw errors_1.AppError.badRequest("Invalid template id");
+        }
+        const template = await (0, productTemplateService_1.getProductTemplateById)(templateId);
+        res.json(template);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.patch("/product-templates/:id", adminOnly, async (req, res, next) => {
+    try {
+        const templateId = Number(req.params.id);
+        if (Number.isNaN(templateId)) {
+            throw errors_1.AppError.badRequest("Invalid template id");
+        }
+        const template = await (0, productTemplateService_1.updateProductTemplate)(templateId, req.body);
+        res.json(template);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.delete("/product-templates/:id", adminOnly, async (req, res, next) => {
+    try {
+        const templateId = Number(req.params.id);
+        if (Number.isNaN(templateId)) {
+            throw errors_1.AppError.badRequest("Invalid template id");
+        }
+        await (0, productTemplateService_1.deleteProductTemplate)(templateId);
+        res.status(204).end();
     }
     catch (error) {
         next(error);

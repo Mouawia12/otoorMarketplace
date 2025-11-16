@@ -24,7 +24,9 @@ export default function BrandLogo({
 }: BrandLogoProps) {
   const { language } = useUIStore();
 
-  const basePath = "/brand";
+  const basePath = import.meta.env.VITE_CDN_BASE_URL
+    ? `${import.meta.env.VITE_CDN_BASE_URL.replace(/\/+$/, "")}/brand`
+    : `${window.location.origin}/brand`;
   const fileBase =
     language === "ar" ? "logo-ao-wordmark-ar" : "logo-ao-wordmark-en";
 
