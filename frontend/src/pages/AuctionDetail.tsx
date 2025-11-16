@@ -8,6 +8,7 @@ import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 
 export default function AuctionDetail() {
   const { id } = useParams<{ id: string }>();
@@ -134,7 +135,7 @@ export default function AuctionDetail() {
   const product = auction.product;
   const name = product ? (language === 'ar' ? product.name_ar : product.name_en) : 'Unknown Product';
   const description = product ? (language === 'ar' ? product.description_ar : product.description_en) : '';
-  const imageUrl = resolveImageUrl(product?.image_urls?.[0]) || '/images/placeholder-perfume.svg';
+  const imageUrl = resolveImageUrl(product?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const isActive = auction.status === 'running' && new Date(auction.end_time) > new Date();
   const minBidAmount = auction.current_price + auction.minimum_increment;
 
@@ -155,7 +156,7 @@ export default function AuctionDetail() {
               alt={name}
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = '/placeholder-perfume.jpg';
+                e.currentTarget.src = PLACEHOLDER_PERFUME;
               }}
             />
           </div>

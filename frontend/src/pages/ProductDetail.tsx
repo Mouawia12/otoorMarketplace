@@ -7,6 +7,7 @@ import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME, PLACEHOLDER_PERFUME_KEY } from '../utils/staticAssets';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -81,8 +82,8 @@ export default function ProductDetail() {
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
-  const baseImages = product.image_urls?.length > 0 ? product.image_urls : ['/images/placeholder-perfume.svg'];
-  const images = baseImages.map((img) => resolveImageUrl(img) || '/images/placeholder-perfume.svg');
+  const baseImages = product.image_urls?.length > 0 ? product.image_urls : [PLACEHOLDER_PERFUME_KEY];
+  const images = baseImages.map((img) => resolveImageUrl(img) || PLACEHOLDER_PERFUME);
   const isInStock = product.stock_quantity > 0;
 
   return (
@@ -102,7 +103,7 @@ export default function ProductDetail() {
               alt={name}
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = '/placeholder-perfume.jpg';
+                e.currentTarget.src = PLACEHOLDER_PERFUME;
               }}
             />
           </div>

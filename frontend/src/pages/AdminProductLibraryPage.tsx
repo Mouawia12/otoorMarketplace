@@ -9,6 +9,7 @@ import {
   adminUpdateTemplate,
 } from '../services/productTemplateService';
 import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import api from '../lib/api';
 
 type ModalMode = 'create' | 'edit';
@@ -136,7 +137,7 @@ export default function AdminProductLibraryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {visibleTemplates.map((template) => {
               const name = i18n.language === 'ar' ? template.name_ar : template.name_en;
-              const image = resolveImageUrl(template.image_urls?.[0]) || '/images/placeholder-perfume.svg';
+              const image = resolveImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
               return (
                 <div key={template.id} className="border border-gray-200 rounded-luxury overflow-hidden bg-white flex flex-col">
                   <img src={image} alt={name} className="w-full h-40 object-cover" />

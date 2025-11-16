@@ -10,6 +10,7 @@ import SARIcon from '../common/SARIcon';
 import { formatSAR } from '../../utils/currency';
 import { resolveImageUrl } from '../../utils/image';
 import CountdownTimer from '../auctions/CountdownTimer';
+import { PLACEHOLDER_PERFUME } from '../../utils/staticAssets';
 
 interface ProductCardProps {
   product: Product;
@@ -34,7 +35,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const { isAuthenticated } = useAuthStore();
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
-  const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || '/images/placeholder-perfume.svg';
+  const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const displayPrice = type === 'auction' && currentBid ? currentBid : product.base_price;
   
   const defaultAuctionEnd = auctionEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();

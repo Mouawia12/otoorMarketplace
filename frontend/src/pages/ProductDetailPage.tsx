@@ -9,6 +9,7 @@ import { Product, Auction } from '../types';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
 import Countdown from '../components/common/Countdown';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -83,7 +84,10 @@ export default function ProductDetailPage() {
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
-  const images = (product.image_urls || []).map((img) => resolveImageUrl(img) || '').filter(Boolean);
+  const resolvedImages = (product.image_urls || [])
+    .map((img) => resolveImageUrl(img) || '')
+    .filter(Boolean);
+  const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isInStock = product.stock_quantity > 0;
 
   return (
@@ -128,11 +132,11 @@ export default function ProductDetailPage() {
         <div className="space-y-4">
           <div className="bg-ivory rounded-luxury overflow-hidden aspect-square">
             <img
-              src={images[selectedImage] || '/images/placeholder-perfume.svg'}
+              src={images[selectedImage] || PLACEHOLDER_PERFUME}
               alt={name}
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = '/images/placeholder-perfume.svg';
+                e.currentTarget.src = PLACEHOLDER_PERFUME;
               }}
             />
           </div>
@@ -148,11 +152,11 @@ export default function ProductDetailPage() {
                   }`}
                 >
                   <img
-                    src={img || '/images/placeholder-perfume.svg'}
+                    src={img || PLACEHOLDER_PERFUME}
                     alt={`${name} ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.src = '/images/placeholder-perfume.svg';
+                      e.currentTarget.src = PLACEHOLDER_PERFUME;
                     }}
                   />
                 </button>

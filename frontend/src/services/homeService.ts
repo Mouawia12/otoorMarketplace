@@ -6,6 +6,7 @@ import {
 } from './productService';
 import { Auction, Product } from '../types';
 import { resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 
 export interface HeroSlide {
   id: string;
@@ -31,7 +32,7 @@ export interface HomeData {
   filtersMeta: ProductFiltersMeta;
 }
 
-const placeholderImage = '/images/placeholder-perfume.jpg';
+const placeholderImage = PLACEHOLDER_PERFUME;
 
 const buildHeroSlideFromProduct = (product: Product, index: number): HeroSlide => {
   const image = resolveImageUrl(product.image_urls?.[0]) || placeholderImage;

@@ -7,6 +7,7 @@ import { fetchAuctionById, fetchAuctionBids, placeBid } from '../services/auctio
 import { Auction, Bid, Product } from '../types';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import Countdown from '../components/common/Countdown';
 
 export default function AuctionDetailPage() {
@@ -145,10 +146,11 @@ export default function AuctionDetailPage() {
   const product: Product = auction.product;
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
-  const images =
+  const resolvedImages =
     (product.image_urls || [])
       .map((img) => resolveImageUrl(img) || '')
       .filter(Boolean);
+  const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isEnded = new Date(auction.end_time).getTime() < new Date().getTime();
   const seller = auction.seller || { id: 0, full_name: 'Unknown', verified_seller: false };
 
@@ -171,11 +173,11 @@ export default function AuctionDetailPage() {
         <div className="space-y-4">
           <div className="bg-ivory rounded-luxury overflow-hidden aspect-square">
             <img
-              src={images[selectedImage] || '/images/placeholder-perfume.svg'}
+              src={images[selectedImage] || PLACEHOLDER_PERFUME}
               alt={name}
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = '/images/placeholder-perfume.svg';
+                e.currentTarget.src = PLACEHOLDER_PERFUME;
               }}
             />
           </div>
@@ -191,11 +193,11 @@ export default function AuctionDetailPage() {
                   }`}
                 >
                   <img
-                    src={img || '/images/placeholder-perfume.svg'}
+                    src={img || PLACEHOLDER_PERFUME}
                     alt={`${name} ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.src = '/images/placeholder-perfume.svg';
+                      e.currentTarget.src = PLACEHOLDER_PERFUME;
                     }}
                   />
                 </button>

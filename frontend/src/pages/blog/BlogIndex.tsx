@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
 import { getPostsByLang, getAllCategories, getAllTags } from '../../services/blogService';
+import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
 
 const POSTS_PER_PAGE = 12;
 
@@ -249,8 +250,7 @@ export default function BlogIndex() {
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src =
-                          '/images/blog/placeholder.jpg';
+                        (e.currentTarget as HTMLImageElement).src = BLOG_PLACEHOLDER;
                       }}
                     />
                   </div>
