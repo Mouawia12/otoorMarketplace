@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
 import { getPostsByTag } from '../../services/blogService';
+import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
 
 export default function TagPage() {
   const { tag } = useParams<{ tag: string }>();
@@ -96,7 +97,7 @@ export default function TagPage() {
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
-                        e.currentTarget.src = '/images/blog/placeholder.jpg';
+                        e.currentTarget.src = BLOG_PLACEHOLDER;
                       }}
                     />
                   </div>

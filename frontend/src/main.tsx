@@ -5,6 +5,7 @@ import App from './App';
 import './index.css';
 import './i18n/config';
 import i18n from './i18n/config';
+import './pwa/registerPwaAssets';
 
 // Set initial RTL/LTR direction based on language
 const initialLang = i18n.language || 'ar';

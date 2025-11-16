@@ -6,6 +6,7 @@ import { useUIStore } from "../store/uiStore";
 import { formatPrice } from "../utils/currency";
 import { normalizeImagePathForStorage, resolveImageUrl } from "../utils/image";
 import { sellerSearchTemplates } from "../services/productTemplateService";
+import { PLACEHOLDER_PERFUME } from "../utils/staticAssets";
 
 type AuctionFilter = "all" | "active" | "scheduled" | "completed" | "cancelled";
 
@@ -533,7 +534,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {templates.map((template) => {
                     const title = i18n.language === "ar" ? template.name_ar : template.name_en;
-                    const preview = resolveImageUrl(template.image_urls?.[0]) || '/images/placeholder-perfume.svg';
+                    const preview = resolveImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
                     const isActive = selectedTemplateId === template.id;
                     return (
                       <button

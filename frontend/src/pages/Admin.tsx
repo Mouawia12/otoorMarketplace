@@ -7,6 +7,7 @@ import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 
 interface DashboardStats {
   total_products: number;
@@ -157,7 +158,7 @@ export default function Admin() {
                 pendingProducts.map(product => {
                   const name = language === 'ar' ? product.name_ar : product.name_en;
                   const description = language === 'ar' ? product.description_ar : product.description_en;
-                  const imageUrl = resolveImageUrl(product.image_urls?.[0]) || '/placeholder-perfume.jpg';
+                  const imageUrl = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
 
                   return (
                     <div key={product.id} className="bg-white rounded-luxury shadow-luxury p-6">
@@ -167,7 +168,7 @@ export default function Admin() {
                           alt={name}
                           className="w-24 h-24 object-cover rounded-luxury"
                           onError={(e) => {
-                            e.currentTarget.src = '/placeholder-perfume.jpg';
+                            e.currentTarget.src = PLACEHOLDER_PERFUME;
                           }}
                         />
                         

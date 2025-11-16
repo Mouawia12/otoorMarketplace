@@ -7,6 +7,7 @@ import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 
 export default function Orders() {
   const { t, i18n } = useTranslation();
@@ -185,7 +186,7 @@ export default function Orders() {
             const productName = primaryProduct
               ? (language === 'ar' ? primaryProduct.name_ar : primaryProduct.name_en)
               : t('products.unknownProduct');
-            const imageUrl = resolveImageUrl(primaryProduct?.image_urls?.[0]) || '/images/placeholder-perfume.svg';
+            const imageUrl = resolveImageUrl(primaryProduct?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
 
             return (
               <div key={order.id} className="bg-white rounded-luxury shadow-luxury overflow-hidden">
@@ -196,7 +197,7 @@ export default function Orders() {
                       alt={productName}
                       className="w-20 h-20 object-cover rounded-luxury"
                       onError={(e) => {
-                        e.currentTarget.src = '/placeholder-perfume.jpg';
+                        e.currentTarget.src = PLACEHOLDER_PERFUME;
                       }}
                     />
                     
@@ -276,7 +277,7 @@ export default function Orders() {
                           const itemName = itemProduct
                             ? (language === 'ar' ? itemProduct.name_ar : itemProduct.name_en)
                             : t('products.unknownProduct');
-                          const itemImage = resolveImageUrl(itemProduct?.image_urls?.[0]) || '/images/placeholder-perfume.svg';
+                          const itemImage = resolveImageUrl(itemProduct?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
                           const totalPrice =
                             typeof item.total_price === 'number'
                               ? item.total_price
@@ -292,9 +293,9 @@ export default function Orders() {
                                   src={itemImage}
                                   alt={itemName}
                                   className="w-14 h-14 object-cover rounded-md"
-                                  onError={(e) => {
-                                    e.currentTarget.src = '/placeholder-perfume.jpg';
-                                  }}
+                                    onError={(e) => {
+                                      e.currentTarget.src = PLACEHOLDER_PERFUME;
+                                    }}
                                 />
                                 <div>
                                   <p className="text-sm font-semibold text-charcoal">{itemName}</p>

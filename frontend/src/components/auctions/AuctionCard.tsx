@@ -5,6 +5,7 @@ import { resolveImageUrl } from '../../utils/image';
 import { useUIStore } from '../../store/uiStore';
 import { formatPrice } from '../../utils/currency';
 import Countdown from '../common/Countdown';
+import { PLACEHOLDER_PERFUME } from '../../utils/staticAssets';
 
 interface AuctionCardProps {
   auction: Auction;
@@ -16,7 +17,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
 
   const product = auction.product;
   const name = product ? (language === 'ar' ? product.name_ar : product.name_en) : 'Unknown Product';
-  const imageUrl = resolveImageUrl(product?.image_urls?.[0]) || '/placeholder-perfume.jpg';
+  const imageUrl = resolveImageUrl(product?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const isActive = auction.status === 'running';
   const bidsCount = auction.total_bids || 0;
 
@@ -29,7 +30,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
             alt={name}
             className="w-full h-full object-cover"
             onError={(e) => {
-              e.currentTarget.src = '/placeholder-perfume.jpg';
+              e.currentTarget.src = PLACEHOLDER_PERFUME;
             }}
           />
           <div className="absolute top-2 right-2 bg-gold text-charcoal px-3 py-1 rounded-full text-sm font-semibold">

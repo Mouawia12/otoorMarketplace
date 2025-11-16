@@ -2,6 +2,7 @@ import matter from 'gray-matter';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { Buffer } from 'buffer';
+import { BLOG_PLACEHOLDER, resolveStaticAssetUrl } from '../utils/staticAssets';
 
 // Make Buffer available globally for gray-matter
 if (typeof window !== 'undefined') {
@@ -42,11 +43,13 @@ const allPosts: BlogPost[] = Object.entries(modules).map(([_, raw]) => {
   const { data, content } = matter(raw as string);
   const html = DOMPurify.sanitize(marked(content) as string);
   
+  const cover = resolveStaticAssetUrl(data.cover) || BLOG_PLACEHOLDER;
+
   return {
     slug: data.slug,
     title: data.title,
     description: data.description,
-    cover: data.cover || '/images/blog/placeholder.jpg',
+    cover,
     author: data.author,
     category: data.category,
     tags: data.tags || [],

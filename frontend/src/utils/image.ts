@@ -1,3 +1,5 @@
+import { resolveStaticAssetUrl } from './staticAssets';
+
 let cachedBaseUrl: string | null = null;
 
 const computeAssetBaseUrl = () => {
@@ -25,6 +27,11 @@ export const resolveImageUrl = (input?: string | null) => {
   if (!input) return '';
   const value = input.trim();
   if (!value) return '';
+
+  const staticAsset = resolveStaticAssetUrl(value);
+  if (staticAsset !== value) {
+    return staticAsset;
+  }
 
   if (/^https?:\/\//i.test(value)) {
     if (isLocalhostUrl(value)) {
