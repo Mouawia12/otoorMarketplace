@@ -30,8 +30,9 @@ model User {
   auctions     Auction[]      @relation("SellerAuctions")
   bids         Bid[]          @relation("UserBids")
   orders       Order[]        @relation("BuyerOrders")
-  WishlistItem WishlistItem[]
-  Address      Address[]
+  WishlistItem      WishlistItem[]
+  Address           Address[]
+  ProductTemplate   ProductTemplate[]
 }
 
 model Role {
@@ -204,6 +205,41 @@ model Address {
 
   @@index([userId])
   @@map("addresses")
+}
+
+model ProductTemplate {
+  id            Int      @id @default(autoincrement())
+  nameAr        String   @map("name_ar")
+  nameEn        String   @map("name_en")
+  descriptionAr String   @map("description_ar")
+  descriptionEn String   @map("description_en")
+  productType   String   @map("product_type")
+  brand         String
+  category      String
+  basePrice     Decimal  @map("base_price") @db.Decimal(10, 2)
+  sizeMl        Int      @map("size_ml")
+  concentration String
+  createdById   Int      @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  createdBy User                    @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  images   ProductTemplateImage[]
+
+  @@map("product_templates")
+}
+
+model ProductTemplateImage {
+  id         Int      @id @default(autoincrement())
+  templateId Int      @map("template_id")
+  url        String
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  template ProductTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("product_template_images")
 }
 
 enum UserStatus {

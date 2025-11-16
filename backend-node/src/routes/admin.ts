@@ -14,6 +14,13 @@ import {
 import { moderateProduct } from "../services/productService";
 import { listAuctions, updateAuction } from "../services/auctionService";
 import { AppError } from "../utils/errors";
+import {
+  createProductTemplate,
+  deleteProductTemplate,
+  getProductTemplateById,
+  listProductTemplates,
+  updateProductTemplate,
+} from "../services/productTemplateService";
 
 const router = Router();
 
@@ -155,6 +162,69 @@ router.patch("/auctions/:id", adminOnly, async (req, res, next) => {
     });
 
     res.json(auction);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/product-templates", adminOnly, async (req, res, next) => {
+  try {
+    const templates = await listProductTemplates(req.query);
+    res.json(templates);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/product-templates", adminOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const template = await createProductTemplate({
+      ...req.body,
+      createdById: req.user.id,
+    });
+    res.status(201).json(template);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/product-templates/:id", adminOnly, async (req, res, next) => {
+  try {
+    const templateId = Number(req.params.id);
+    if (Number.isNaN(templateId)) {
+      throw AppError.badRequest("Invalid template id");
+    }
+    const template = await getProductTemplateById(templateId);
+    res.json(template);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/product-templates/:id", adminOnly, async (req, res, next) => {
+  try {
+    const templateId = Number(req.params.id);
+    if (Number.isNaN(templateId)) {
+      throw AppError.badRequest("Invalid template id");
+    }
+    const template = await updateProductTemplate(templateId, req.body);
+    res.json(template);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/product-templates/:id", adminOnly, async (req, res, next) => {
+  try {
+    const templateId = Number(req.params.id);
+    if (Number.isNaN(templateId)) {
+      throw AppError.badRequest("Invalid template id");
+    }
+    await deleteProductTemplate(templateId);
+    res.status(204).end();
   } catch (error) {
     next(error);
   }

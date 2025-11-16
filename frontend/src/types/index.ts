@@ -28,6 +28,27 @@ export interface Product {
   updated_at: string;
 }
 
+export interface ProductTemplate {
+  id: number;
+  name_ar: string;
+  name_en: string;
+  description_ar: string;
+  description_en: string;
+  product_type: string;
+  brand: string;
+  category: string;
+  base_price: number;
+  size_ml: number;
+  concentration: string;
+  image_urls: string[];
+  created_at?: string;
+  updated_at?: string;
+  created_by?: {
+    id: number;
+    full_name: string;
+  };
+}
+
 export interface Auction {
   id: number;
   product_id: number;

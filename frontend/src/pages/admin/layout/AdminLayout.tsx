@@ -36,6 +36,7 @@ export default function AdminLayout() {
   const menuItems = [
     { path: '/admin/dashboard', label: t('admin.dashboard'), icon: '📊' },
     { path: '/admin/products',  label: t('admin.products'),  icon: '🛍️' },
+    { path: '/admin/library',   label: t('admin.productLibrary', 'مكتبة المنتجات'), icon: '📚' },
     { path: '/admin/auctions',  label: t('admin.auctions'),  icon: '🔨' },
     { path: '/admin/orders',    label: t('admin.orders'),    icon: '📦' },
     { path: '/admin/users',     label: t('admin.users'),     icon: '👥' },

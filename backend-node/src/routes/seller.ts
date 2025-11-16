@@ -10,6 +10,10 @@ import {
 } from "../services/sellerService";
 import { createAuction, listAuctions } from "../services/auctionService";
 import { AppError } from "../utils/errors";
+import {
+  getProductTemplateById,
+  listProductTemplates,
+} from "../services/productTemplateService";
 
 const router = Router();
 const sellerRoles = [RoleName.SELLER, RoleName.ADMIN, RoleName.SUPER_ADMIN];
@@ -104,6 +108,28 @@ router.get("/auctions", sellerOnly, async (req, res, next) => {
     });
 
     res.json(auctions);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/product-templates", sellerOnly, async (req, res, next) => {
+  try {
+    const templates = await listProductTemplates(req.query);
+    res.json(templates);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/product-templates/:id", sellerOnly, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      throw AppError.badRequest("Invalid template id");
+    }
+    const template = await getProductTemplateById(id);
+    res.json(template);
   } catch (error) {
     next(error);
   }
