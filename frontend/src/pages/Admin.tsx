@@ -20,7 +20,7 @@ interface DashboardStats {
 export default function Admin() {
   const { t } = useTranslation();
   const { language } = useUIStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user: currentUser } = useAuthStore();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
@@ -79,6 +79,18 @@ export default function Admin() {
       fetchDashboardData();
     } catch (error: any) {
       alert(error.response?.data?.detail || t('admin.updateUserFailed'));
+    }
+  };
+
+  const deleteUser = async (userId: number) => {
+    const confirmed = window.confirm(t('admin.confirmDeleteUser'));
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      fetchDashboardData();
+    } catch (error: any) {
+      alert(error.response?.data?.detail || t('admin.deleteUserFailed'));
     }
   };
 
@@ -221,7 +233,7 @@ export default function Admin() {
           {activeTab === 'users' && (
             <div className="bg-white rounded-luxury shadow-luxury overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-max">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-charcoal-light uppercase tracking-wider">
@@ -239,10 +251,18 @@ export default function Admin() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-charcoal-light uppercase tracking-wider">
                         {t('admin.actions')}
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-charcoal-light uppercase tracking-wider">
+                        {t('admin.deleteUser')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {users.map(user => (
+                    {users.map(user => {
+                      const isSuperAdmin = user.roles.includes('super_admin');
+                      const isSelf = currentUser && currentUser.id === user.id;
+                      const canDelete = !isSuperAdmin && !isSelf;
+
+                      return (
                       <tr key={user.id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-charcoal">{user.full_name}</div>
@@ -266,25 +286,44 @@ export default function Admin() {
                             {user.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {user.status === 'active' ? (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm min-w-[150px]">
+                          <div className="flex flex-col items-start gap-2">
+                            {user.status === 'active' ? (
+                              <button
+                                onClick={() => updateUserStatus(user.id, 'suspended')}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                {t('admin.suspend')}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => updateUserStatus(user.id, 'active')}
+                                className="text-green-600 hover:text-green-900"
+                              >
+                                {t('admin.activate')}
+                              </button>
+                            )}
+
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm min-w-[140px]">
+                          {canDelete ? (
                             <button
-                              onClick={() => updateUserStatus(user.id, 'suspended')}
+                              onClick={() => deleteUser(user.id)}
                               className="text-red-600 hover:text-red-900"
                             >
-                              {t('admin.suspend')}
+                              {t('admin.deleteUser')}
                             </button>
                           ) : (
-                            <button
-                              onClick={() => updateUserStatus(user.id, 'active')}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              {t('admin.activate')}
-                            </button>
+                            <span className="text-charcoal-light text-xs max-w-[180px] leading-snug">
+                              {isSuperAdmin
+                                ? t('admin.cannotDeleteSuperAdmin', 'لا يمكن حذف super admin')
+                                : t('admin.cannotDeleteSelf', 'لا يمكن حذف حسابك الحالي')}
+                            </span>
                           )}
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

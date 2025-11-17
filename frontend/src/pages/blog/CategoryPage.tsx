@@ -2,15 +2,30 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
-import { getPostsByCategory } from '../../services/blogService';
 import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
+import { useEffect, useState } from 'react';
+import { BlogPost, fetchPosts } from '../../services/blogApi';
 
 export default function CategoryPage() {
   const { category } = useParams<{ category: string }>();
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const posts = category ? getPostsByCategory(category, language) : [];
+  useEffect(() => {
+    const load = async () => {
+      if (!category) return;
+      setLoading(true);
+      try {
+        const data = await fetchPosts(language, 'published');
+        setPosts(data.filter((p) => p.category.toLowerCase() === category.toLowerCase()));
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [language, category]);
   
   const pageTitle = `${t('blog.category')}: ${category}`;
   const canonicalUrl = `${window.location.origin}/blog/category/${category}`;
@@ -75,7 +90,11 @@ export default function CategoryPage() {
             </p>
           </div>
 
-          {posts.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <p className="text-xl text-taupe">{t('common.loading')}</p>
+            </div>
+          ) : posts.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-xl text-taupe mb-6">{t('blog.noPosts')}</p>
               <Link to="/blog" className="text-gold hover:underline">
@@ -108,7 +127,7 @@ export default function CategoryPage() {
                         { year: 'numeric', month: 'long', day: 'numeric' }
                       )}</span>
                       <span>•</span>
-                      <span>{post.readingTime} {t('blog.minRead')}</span>
+                      <span>{post.readingTime || 2} {t('blog.minRead')}</span>
                     </div>
                     <h3 className="text-xl font-bold text-charcoal mb-2 group-hover:text-gold transition line-clamp-2">
                       {post.title}

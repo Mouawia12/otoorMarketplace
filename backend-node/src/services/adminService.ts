@@ -95,6 +95,45 @@ export const updateUserStatus = async (
   };
 };
 
+export const deleteUserByAdmin = async (
+  userId: number,
+  actorRoles: RoleName[],
+  actorId?: number
+) => {
+  const isAdmin =
+    actorRoles.includes(RoleName.ADMIN) || actorRoles.includes(RoleName.SUPER_ADMIN);
+  if (!isAdmin) {
+    throw AppError.forbidden();
+  }
+
+  if (actorId && userId === actorId) {
+    throw AppError.badRequest("You cannot delete your own account");
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { roles: { include: { role: true } } },
+  });
+
+  if (!targetUser) {
+    throw AppError.notFound("User not found");
+  }
+
+  const targetRoles = targetUser.roles.map((r) => r.role.name as RoleName);
+  if (
+    targetRoles.includes(RoleName.SUPER_ADMIN) &&
+    !actorRoles.includes(RoleName.SUPER_ADMIN)
+  ) {
+    throw AppError.forbidden("Cannot delete a super admin");
+  }
+
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+
+  return { success: true };
+};
+
 export const listPendingProducts = async () => {
   const products = await prisma.product.findMany({
     where: { status: ProductStatus.PENDING_REVIEW },

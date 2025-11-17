@@ -20,6 +20,7 @@ const getUserProfile = async (userId) => {
         id: user.id,
         email: user.email,
         full_name: user.fullName,
+        created_at: user.createdAt,
         phone: user.phone,
         avatar_url: user.avatarUrl,
         verified_seller: user.verifiedSeller,

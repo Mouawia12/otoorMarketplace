@@ -38,7 +38,7 @@
     "retry": "Retry",
     "errorLoading": "Failed to load content. Please try again.",
     "notFound": "We couldn't find what you were looking for.",
-    "noResults": "No products match your filters right now."
+    "noResults": "No results match right now."
   },
   "cart": {
     "title": "Shopping Cart",
@@ -612,6 +612,11 @@
     "verifiedSeller": "Verified Seller",
     "suspend": "Suspend",
     "activate": "Activate",
+    "deleteUser": "Delete",
+    "confirmDeleteUser": "Delete this user permanently?",
+    "deleteUserFailed": "Failed to delete user",
+    "cannotDeleteSuperAdmin": "Cannot delete a super admin account.",
+    "cannotDeleteSelf": "Cannot delete your own account.",
     "validator": "Validator",
     "submitted": "Submitted",
     "assign": "Assign",

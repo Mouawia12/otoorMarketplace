@@ -31,6 +31,18 @@ router.post("/login", async (req, res, next) => {
         next(error);
     }
 });
+router.post("/google", async (req, res, next) => {
+    try {
+        const payload = await (0, authService_1.authenticateWithGoogle)(req.body);
+        res.json({
+            access_token: payload.token,
+            user: payload.user,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.get("/me", (0, auth_1.authenticate)(), async (req, res, next) => {
     try {
         if (!req.user) {

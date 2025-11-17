@@ -24,6 +24,7 @@ const envSchema = z.object({
   ASSET_BASE_URL: z.string().default("http://localhost:8080"),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  SUPPORT_EMAIL: z.string().email().default("support@otourmarketplace.com"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -48,6 +49,7 @@ const {
   ASSET_BASE_URL,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
+  SUPPORT_EMAIL,
 } = parsed.data;
 
 const allowedOrigins =
@@ -77,5 +79,8 @@ export const config = {
   google: {
     clientId: GOOGLE_CLIENT_ID,
     clientSecret: GOOGLE_CLIENT_SECRET,
+  },
+  support: {
+    email: SUPPORT_EMAIL,
   },
 };

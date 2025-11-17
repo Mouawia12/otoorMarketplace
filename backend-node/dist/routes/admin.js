@@ -8,6 +8,7 @@ const productService_1 = require("../services/productService");
 const auctionService_1 = require("../services/auctionService");
 const errors_1 = require("../utils/errors");
 const productTemplateService_1 = require("../services/productTemplateService");
+const blogService_1 = require("../services/blogService");
 const router = (0, express_1.Router)();
 const adminOnly = (0, auth_1.authenticate)({ roles: [client_1.RoleName.ADMIN, client_1.RoleName.SUPER_ADMIN] });
 router.get("/dashboard", adminOnly, async (_req, res, next) => {
@@ -52,6 +53,22 @@ router.patch("/users/:id", adminOnly, async (req, res, next) => {
         }
         const user = await (0, adminService_1.updateUserStatus)(id, status, req.user.roles);
         res.json(user);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.delete("/users/:id", adminOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const id = Number(req.params.id);
+        if (Number.isNaN(id)) {
+            throw errors_1.AppError.badRequest("Invalid user id");
+        }
+        const result = await (0, adminService_1.deleteUserByAdmin)(id, req.user.roles, req.user.id);
+        res.json(result);
     }
     catch (error) {
         next(error);
@@ -199,6 +216,101 @@ router.delete("/product-templates/:id", adminOnly, async (req, res, next) => {
         }
         await (0, productTemplateService_1.deleteProductTemplate)(templateId);
         res.status(204).end();
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/blog", adminOnly, async (_req, res, next) => {
+    try {
+        const posts = await (0, blogService_1.listAllPosts)();
+        res.json(posts);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/blog/:id", adminOnly, async (req, res, next) => {
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id)) {
+            throw errors_1.AppError.badRequest("Invalid post id");
+        }
+        const post = await (0, blogService_1.getPostById)(id);
+        res.json(post);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+const toStringArray = (value) => {
+    if (Array.isArray(value)) {
+        return value.map((v) => String(v)).filter(Boolean);
+    }
+    if (typeof value === "string") {
+        return value
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean);
+    }
+    return [];
+};
+router.post("/blog", adminOnly, async (req, res, next) => {
+    try {
+        const body = req.body || {};
+        const post = await (0, blogService_1.createPost)({
+            title: body.title,
+            slug: body.slug,
+            description: body.description,
+            content: body.content,
+            coverData: body.coverData,
+            coverUrl: body.coverUrl,
+            author: body.author,
+            category: body.category,
+            tags: toStringArray(body.tags),
+            status: body.status?.toUpperCase(),
+            lang: (body.lang || "ar").toLowerCase(),
+        });
+        res.status(201).json(post);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.put("/blog/:id", adminOnly, async (req, res, next) => {
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id)) {
+            throw errors_1.AppError.badRequest("Invalid post id");
+        }
+        const body = req.body || {};
+        const post = await (0, blogService_1.updatePost)(id, {
+            title: body.title,
+            slug: body.slug,
+            description: body.description,
+            content: body.content,
+            coverData: body.coverData,
+            coverUrl: body.coverUrl,
+            author: body.author,
+            category: body.category,
+            tags: toStringArray(body.tags),
+            status: body.status?.toUpperCase(),
+            lang: body.lang,
+        });
+        res.json(post);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.delete("/blog/:id", adminOnly, async (req, res, next) => {
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id)) {
+            throw errors_1.AppError.badRequest("Invalid post id");
+        }
+        const result = await (0, blogService_1.deletePost)(id);
+        res.json(result);
     }
     catch (error) {
         next(error);

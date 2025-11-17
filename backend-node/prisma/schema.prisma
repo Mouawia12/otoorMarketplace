@@ -270,6 +270,32 @@ enum ProductStatus {
   ARCHIVED
 }
 
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum PostLang {
+  AR
+  EN
+}
+
+model Post {
+  id          Int        @id @default(autoincrement())
+  title       String
+  slug        String     @unique
+  description String
+  coverUrl    String     @map("cover_url")
+  author      String
+  category    String?
+  tags        String?
+  content     String
+  status      PostStatus @default(DRAFT)
+  lang        PostLang
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+}
+
 enum AuctionStatus {
   SCHEDULED
   ACTIVE

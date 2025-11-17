@@ -12,6 +12,7 @@ const wishlist_1 = __importDefault(require("./wishlist"));
 const admin_1 = __importDefault(require("./admin"));
 const seller_1 = __importDefault(require("./seller"));
 const uploads_1 = __importDefault(require("./uploads"));
+const blog_1 = __importDefault(require("./blog"));
 const router = (0, express_1.Router)();
 router.use("/auth", auth_1.default);
 router.use("/products", products_1.default);
@@ -21,5 +22,6 @@ router.use("/wishlist", wishlist_1.default);
 router.use("/admin", admin_1.default);
 router.use("/seller", seller_1.default);
 router.use("/uploads", uploads_1.default);
+router.use("/blog", blog_1.default);
 exports.default = router;
 //# sourceMappingURL=index.js.map

@@ -1,16 +1,28 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authenticateUser = exports.registerUser = exports.loginSchema = exports.registerSchema = void 0;
+exports.authenticateUser = exports.authenticateWithGoogle = exports.registerUser = exports.googleLoginSchema = exports.loginSchema = exports.registerSchema = void 0;
+const crypto_1 = __importDefault(require("crypto"));
+const google_auth_library_1 = require("google-auth-library");
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
 const password_1 = require("../utils/password");
 const errors_1 = require("../utils/errors");
 const jwt_1 = require("../utils/jwt");
+const env_1 = require("../config/env");
+const userWithRolesInclude = client_1.Prisma.validator()({
+    roles: { include: { role: true } },
+});
 const serializeUser = (user) => ({
     id: user.id,
     email: user.email,
     full_name: user.fullName,
+    avatar_url: user.avatarUrl,
+    created_at: user.createdAt,
+    status: user.status,
     roles: user.roles.map((roleRelation) => roleRelation.role.name.toLowerCase()),
 });
 exports.registerSchema = zod_1.z.object({
@@ -23,6 +35,9 @@ exports.registerSchema = zod_1.z.object({
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
     password: zod_1.z.string().min(6),
+});
+exports.googleLoginSchema = zod_1.z.object({
+    idToken: zod_1.z.string().min(10, "Invalid Google token"),
 });
 const registerUser = async (input) => {
     const data = exports.registerSchema.parse(input);
@@ -48,11 +63,7 @@ const registerUser = async (input) => {
                 })),
             },
         },
-        include: {
-            roles: {
-                include: { role: true },
-            },
-        },
+        include: userWithRolesInclude,
     });
     const token = (0, jwt_1.signAccessToken)({
         sub: user.id,
@@ -64,6 +75,73 @@ const registerUser = async (input) => {
     };
 };
 exports.registerUser = registerUser;
+const getGoogleClient = () => {
+    const clientId = env_1.config.google.clientId;
+    if (!clientId) {
+        throw errors_1.AppError.badRequest("GOOGLE_CLIENT_ID is not configured");
+    }
+    return { client: new google_auth_library_1.OAuth2Client(clientId), clientId };
+};
+const authenticateWithGoogle = async (input) => {
+    const { client, clientId } = getGoogleClient();
+    const data = exports.googleLoginSchema.parse(input);
+    let payload;
+    try {
+        const ticket = await client.verifyIdToken({
+            idToken: data.idToken,
+            audience: clientId,
+        });
+        payload = ticket.getPayload();
+    }
+    catch (error) {
+        throw errors_1.AppError.unauthorized("Invalid Google token");
+    }
+    if (!payload || !payload.email || !payload.email_verified) {
+        throw errors_1.AppError.unauthorized("Google account email is not verified");
+    }
+    const email = payload.email;
+    const fullNameFromParts = `${payload.given_name ?? ""} ${payload.family_name ?? ""}`.trim();
+    const fullName = payload.name ?? (fullNameFromParts ? fullNameFromParts : undefined);
+    const picture = payload.picture ?? undefined;
+    const user = (await client_2.prisma.user.findUnique({
+        where: { email },
+        include: userWithRolesInclude,
+    }));
+    if (user && user.status === "SUSPENDED") {
+        throw errors_1.AppError.forbidden(`Your account is suspended. Please contact support at ${env_1.config.support.email}`);
+    }
+    let ensuredUser = user;
+    if (!ensuredUser) {
+        const passwordHash = await (0, password_1.hashPassword)(crypto_1.default.randomBytes(32).toString("hex"));
+        const normalizedFullName = (fullName ?? "").trim();
+        const createFullName = (normalizedFullName.length > 0 ? normalizedFullName : email.split("@")[0]);
+        ensuredUser = (await client_2.prisma.user.create({
+            data: {
+                email,
+                passwordHash,
+                fullName: createFullName,
+                avatarUrl: picture ?? null,
+                roles: {
+                    create: [{ role: { connect: { name: client_1.RoleName.BUYER } } }],
+                },
+            },
+            include: userWithRolesInclude,
+        }));
+    }
+    if (!ensuredUser) {
+        throw errors_1.AppError.unauthorized("Unable to authenticate with Google");
+    }
+    const finalUser = ensuredUser;
+    const token = (0, jwt_1.signAccessToken)({
+        sub: finalUser.id,
+        roles: finalUser.roles.map((role) => role.role.name),
+    });
+    return {
+        token,
+        user: serializeUser(finalUser),
+    };
+};
+exports.authenticateWithGoogle = authenticateWithGoogle;
 const authenticateUser = async (input) => {
     const data = exports.loginSchema.parse(input);
     const user = await client_2.prisma.user.findUnique({
@@ -76,6 +154,9 @@ const authenticateUser = async (input) => {
     });
     if (!user) {
         throw errors_1.AppError.unauthorized("Invalid credentials");
+    }
+    if (user.status === "SUSPENDED") {
+        throw errors_1.AppError.forbidden(`Your account is suspended. Please contact support at ${env_1.config.support.email}`);
     }
     const valid = await (0, password_1.verifyPassword)(data.password, user.passwordHash);
     if (!valid) {

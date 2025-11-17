@@ -16,5 +16,12 @@ export declare const config: {
         maxFileSizeMb: number;
     };
     assetBaseUrl: string;
+    google: {
+        clientId: string | undefined;
+        clientSecret: string | undefined;
+    };
+    support: {
+        email: string;
+    };
 };
 //# sourceMappingURL=env.d.ts.map

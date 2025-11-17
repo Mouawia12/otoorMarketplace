@@ -31,6 +31,24 @@ interface TOCItem {
   level: number;
 }
 
+type StoredAdminPost = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  cover?: string;
+  coverData?: string;
+  author?: string;
+  category?: string;
+  tags: string;
+  lang: 'ar' | 'en';
+  date: string;
+  status: 'published' | 'draft';
+  content: string;
+};
+
+const STORAGE_KEY = "admin_blog_posts";
+
 // Load all markdown files
 const modules = import.meta.glob('/src/content/blog/*.md', { 
   query: '?raw',
@@ -38,42 +56,82 @@ const modules = import.meta.glob('/src/content/blog/*.md', {
   eager: true 
 });
 
-// Parse all posts
-const allPosts: BlogPost[] = Object.entries(modules).map(([_, raw]) => {
-  const { data, content } = matter(raw as string);
-  const html = DOMPurify.sanitize(marked(content) as string);
-  
-  const cover = resolveStaticAssetUrl(data.cover) || BLOG_PLACEHOLDER;
+const parseMarkdownPosts = (): BlogPost[] =>
+  Object.entries(modules).map(([_, raw]) => {
+    const { data, content } = matter(raw as string);
+    const html = DOMPurify.sanitize(marked(content) as string);
 
-  return {
-    slug: data.slug,
-    title: data.title,
-    description: data.description,
-    cover,
-    author: data.author,
-    category: data.category,
-    tags: data.tags || [],
-    date: data.date,
-    lang: data.lang,
-    status: data.status || 'draft',
-    content,
-    html,
-    readingTime: estimateReadingTime(content),
-  };
-});
+    const cover = resolveStaticAssetUrl(data.cover) || BLOG_PLACEHOLDER;
+
+    return {
+      slug: data.slug,
+      title: data.title,
+      description: data.description,
+      cover,
+      author: data.author,
+      category: data.category,
+      tags: data.tags || [],
+      date: data.date,
+      lang: data.lang,
+      status: data.status || 'draft',
+      content,
+      html,
+      readingTime: estimateReadingTime(content),
+    };
+  });
+
+const parseStoredAdminPosts = (): BlogPost[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const stored = JSON.parse(raw) as StoredAdminPost[];
+    return stored.map((p) => {
+      const content = p.content || "";
+      const html = DOMPurify.sanitize(marked(content) as string);
+      const cover = p.coverData || p.cover || BLOG_PLACEHOLDER;
+      return {
+        slug: p.slug || p.id,
+        title: p.title,
+        description: p.description,
+        cover,
+        author: p.author || "",
+        category: p.category || "",
+        tags: p.tags ? p.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        date: p.date,
+        lang: p.lang,
+        status: p.status || "draft",
+        content,
+        html,
+        readingTime: estimateReadingTime(content),
+      };
+    });
+  } catch (_e) {
+    return [];
+  }
+};
+
+const getSources = (): BlogPost[] => {
+  const stored = parseStoredAdminPosts();
+  if (stored.length > 0) {
+    return stored;
+  }
+  return parseMarkdownPosts();
+};
+
+const filterByStatus = (posts: BlogPost[], status: 'published' | 'draft' | 'all') => {
+  if (status === 'all') return posts;
+  return posts.filter((p) => p.status === status);
+};
 
 /**
  * Get all published posts, sorted by date (DESC)
  */
 export function getAllPosts(includeStatus?: 'published' | 'draft' | 'all'): BlogPost[] {
   const status = includeStatus || 'published';
-  
-  let filtered = allPosts;
-  if (status !== 'all') {
-    filtered = allPosts.filter(p => p.status === status);
-  }
-  
-  return filtered.sort((a, b) => 
+  const posts = filterByStatus(getSources(), status);
+
+  return posts.sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 }
@@ -89,7 +147,7 @@ export function getPostsByLang(lang: 'ar' | 'en', includeStatus?: 'published' | 
  * Get a single post by slug and language
  */
 export function getPostBySlug(slug: string, lang: 'ar' | 'en'): BlogPost | null {
-  const post = allPosts.find(p => p.slug === slug && p.lang === lang);
+  const post = getSources().find(p => p.slug === slug && p.lang === lang && p.status === 'published');
   return post || null;
 }
 
@@ -120,7 +178,7 @@ export function getPostsByAuthor(author: string, lang: 'ar' | 'en'): BlogPost[] 
 export function getRelated(slug: string, lang: 'ar' | 'en', limit = 3): BlogPost[] {
   const current = getPostBySlug(slug, lang);
   if (!current) return [];
-  
+
   const posts = getPostsByLang(lang, 'published').filter(p => p.slug !== slug);
   
   // Score posts by relevance

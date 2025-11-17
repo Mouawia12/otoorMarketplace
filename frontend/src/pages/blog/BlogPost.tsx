@@ -3,8 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
-import { getPostBySlug, getRelated, extractToc, type BlogPost as BlogPostType } from '../../services/blogService';
+import { extractToc } from '../../services/blogService';
 import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
+import { BlogPost as BlogPostType, fetchPost, fetchPosts } from '../../services/blogApi';
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -15,20 +16,47 @@ export default function BlogPost() {
   const [relatedPosts, setRelatedPosts] = useState<BlogPostType[]>([]);
   const [toc, setToc] = useState<{ id: string; text: string; level: number }[]>([]);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!slug) return;
+    const load = async () => {
+      const foundPost = await fetchPost(slug, language);
+      if (!foundPost) {
+        navigate('/blog');
+        return;
+      }
+      setPost(foundPost);
+      setToc(extractToc(foundPost.html || ''));
 
-    const foundPost = getPostBySlug(slug, language);
-    if (!foundPost) {
-      navigate('/blog');
-      return;
-    }
-
-    setPost(foundPost);
-    setRelatedPosts(getRelated(slug, language, 3));
-    setToc(extractToc(foundPost.html));
+      const all = await fetchPosts(language, 'published');
+      const related = all
+        .filter((p) => p.slug !== slug)
+        .map((p) => ({
+          ...p,
+          score:
+            (p.category === foundPost.category ? 3 : 0) +
+            p.tags.filter((tg) => foundPost.tags.includes(tg)).length,
+        }))
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        })
+        .slice(0, 3)
+        .map(({ score, ...rest }) => rest);
+      setRelatedPosts(related);
+      setLoading(false);
+    };
+    load();
   }, [slug, language, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-sand flex items-center justify-center">
+        <p className="text-charcoal-light">{t('common.loading')}</p>
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -46,7 +74,12 @@ export default function BlogPost() {
   const pageTitle = post.title;
   const pageDesc = post.description;
   const canonicalUrl = `${window.location.origin}/blog/${post.slug}`;
-  const imageUrl = post.cover.startsWith('http') ? post.cover : `${window.location.origin}${post.cover}`;
+  const imageUrl = (() => {
+    if (!post.cover) return `${window.location.origin}/logo.png`;
+    if (post.cover.startsWith('http')) return post.cover;
+    if (post.cover.startsWith('data:') || post.cover.startsWith('blob:')) return post.cover;
+    return `${window.location.origin}${post.cover}`;
+  })();
 
   const articleSchema = {
     "@context": "https://schema.org",
@@ -181,7 +214,7 @@ export default function BlogPost() {
                     { year: 'numeric', month: 'long', day: 'numeric' }
                   )}</span>
                   <span>•</span>
-                  <span>{post.readingTime} {t('blog.minRead')}</span>
+                  <span>{post.readingTime || 2} {t('blog.minRead')}</span>
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-bold text-charcoal mb-4">
@@ -213,7 +246,7 @@ export default function BlogPost() {
               {/* Content */}
               <div
                 className={`prose prose-lg max-w-none mb-12 ${i18n.language === 'ar' ? 'prose-rtl' : ''}`}
-                dangerouslySetInnerHTML={{ __html: post.html }}
+                dangerouslySetInnerHTML={{ __html: post.html || '' }}
                 style={{
                   direction: i18n.language === 'ar' ? 'rtl' : 'ltr',
                 }}
