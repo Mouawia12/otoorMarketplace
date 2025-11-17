@@ -2,10 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '../lib/api';
 
-interface User {
+export interface User {
   id: number;
   email: string;
   full_name: string;
+  created_at?: string;
+  avatar_url?: string | null;
   roles: string[];
 }
 
@@ -14,6 +16,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
+  loginWithGoogle: (idToken: string) => Promise<User>;
   register: (data: { email: string; password: string; full_name: string; phone?: string }) => Promise<User>;
   logout: () => void;
   fetchUser: () => Promise<void>;
@@ -29,6 +32,14 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string) => {
         const response = await api.post('/auth/login', { email, password });
 
+        const { access_token, user } = response.data;
+        localStorage.setItem('auth_token', access_token);
+        set({ token: access_token, isAuthenticated: true, user });
+        return user;
+      },
+
+      loginWithGoogle: async (idToken: string) => {
+        const response = await api.post('/auth/google', { idToken });
         const { access_token, user } = response.data;
         localStorage.setItem('auth_token', access_token);
         set({ token: access_token, isAuthenticated: true, user });
