@@ -248,7 +248,9 @@
     "loginSuccess": "Login successful",
     "registerSuccess": "Account created successfully",
     "loginWithGoogle": "Continue with Google",
-    "googleError": "Google sign-in failed"
+    "googleError": "Google sign-in failed",
+    "accountTypeBuyer": "Buyer account",
+    "accountTypeSeller": "Seller account"
   },
   "products": {
     "title": "Premium Perfumes",
@@ -735,5 +737,128 @@
     "seller": "Seller",
     "admin": "Admin",
     "help": "Help"
+  },
+  "pages": {
+    "about": {
+      "title": "About Aalam Al-Otoor",
+      "desc": "Discover who we are and how we curate luxury fragrances.",
+      "body": {
+        "p1": "We connect perfume lovers with authentic luxury and niche scents.",
+        "p2": "Our team handpicks products and verifies authenticity to protect your purchases.",
+        "l1": "Curated collection of luxury perfumes",
+        "l2": "Trusted sellers and verified products",
+        "l3": "Dedicated support for every order"
+      }
+    },
+    "authenticity": {
+      "title": "Authenticity Guarantee",
+      "desc": "How we verify perfumes before they reach you.",
+      "body": {
+        "p1": "Each item is inspected for batch codes, packaging, and condition.",
+        "p2": "We reject items that fail our authenticity or quality checks.",
+        "l1": "Batch code and packaging inspections",
+        "l2": "Condition and storage verification",
+        "l3": "Return assistance if doubts arise"
+      }
+    },
+    "how-it-works": {
+      "title": "How It Works",
+      "desc": "From browsing to checkout, here is your seamless journey.",
+      "body": {
+        "p1": "Browse curated collections, add to cart, and choose secure payment options.",
+        "p2": "Track your order and request authenticity support whenever needed.",
+        "l1": "Browse and filter by brand or category",
+        "l2": "Secure checkout and tracked delivery",
+        "l3": "Support team on standby"
+      }
+    },
+    "help": {
+      "title": "Help Center",
+      "desc": "Get answers to common questions about orders and auctions.",
+      "body": {
+        "p1": "Find guidance on shipping, returns, bidding, and authenticity requests.",
+        "p2": "If you need more help, reach our support team anytime.",
+        "l1": "Shipping and returns basics",
+        "l2": "Bidding and buying guides",
+        "l3": "Contact support for more help"
+      }
+    },
+    "help-buying-preowned": {
+      "title": "Buying Pre-Owned Perfumes Guide",
+      "desc": "Best practices to buy pre-owned fragrances safely.",
+      "body": {
+        "p1": "Review seller ratings and request clear photos (bottle, batch code, box).",
+        "p2": "Confirm storage conditions and remaining juice level before purchase.",
+        "l1": "Verify batch codes and compare with official markings",
+        "l2": "Ask about storage (cool, dark place) and usage level",
+        "l3": "Use tracked shipping and keep proof of payment"
+      }
+    },
+    "help-bidding-guide": {
+      "title": "Bidding Guide for Auctions",
+      "desc": "Strategies and tips to win live auctions confidently.",
+      "body": {
+        "p1": "Set a budget cap and avoid emotional bidding wars.",
+        "p2": "Place incremental bids toward the end while tracking fees and shipping.",
+        "l1": "Start with small bids to gauge competition",
+        "l2": "Increase in sensible increments, minding your cap",
+        "l3": "Include shipping and fees in your final number"
+      }
+    },
+    "shipping": {
+      "title": "Shipping Information",
+      "desc": "Learn about delivery times, fees, and tracking.",
+      "body": {
+        "p1": "We offer standard and express options depending on your location.",
+        "p2": "All shipments are trackable, and support can assist with delays.",
+        "l1": "Tracked shipping for every order",
+        "l2": "Express options where available",
+        "l3": "Support for delivery issues"
+      }
+    },
+    "returns": {
+      "title": "Returns & Refunds",
+      "desc": "Policies for returns, exchanges, and authenticity claims.",
+      "body": {
+        "p1": "Report issues promptly with photos to speed up resolutions.",
+        "p2": "Authenticity concerns are prioritized for review.",
+        "l1": "Initiate a return within the allowed window",
+        "l2": "Share evidence for damaged or incorrect items",
+        "l3": "Track refund status via support"
+      }
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "desc": "How we handle your data and keep it secure.",
+      "body": {
+        "p1": "We collect only what is necessary for orders and support.",
+        "p2": "We do not sell your data; security is a core priority.",
+        "l1": "Minimal data collection",
+        "l2": "Secure storage and encryption where applicable",
+        "l3": "Control over your preferences"
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "desc": "Review our terms and conditions.",
+      "body": {
+        "p1": "These terms govern your use of our marketplace and services.",
+        "p2": "Using the platform means you agree to these conditions.",
+        "l1": "Follow marketplace rules and policies",
+        "l2": "Respect bidding and payment guidelines",
+        "l3": "Reach support for clarifications"
+      }
+    },
+    "contact": {
+      "title": "Contact Us",
+      "desc": "We are here to help with orders, auctions, and authenticity.",
+      "body": {
+        "p1": "Reach us for questions about products, auctions, or returns.",
+        "p2": "Our team responds as quickly as possible during business hours.",
+        "l1": "Support via email and chat",
+        "l2": "Guidance for bidding and buying",
+        "l3": "Help with shipping and returns"
+      }
+    }
   }
 }

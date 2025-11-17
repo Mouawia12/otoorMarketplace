@@ -123,6 +123,8 @@ function App() {
           <Route path="privacy" element={<InfoPage />} />
           <Route path="terms" element={<InfoPage />} />
           <Route path="contact" element={<InfoPage />} />
+          <Route path="help/buying-preowned" element={<InfoPage />} />
+          <Route path="help/bidding-guide" element={<InfoPage />} />
 
           {/* Account */}
           <Route path="account" element={<AccountLayout />}>

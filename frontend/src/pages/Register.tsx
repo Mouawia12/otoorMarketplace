@@ -21,6 +21,7 @@ export default function Register() {
   const navigate = useNavigate();
   const { register: registerUser } = useAuthStore();
   const [error, setError] = useState('');
+  const [accountType, setAccountType] = useState<'buyer' | 'seller'>('buyer');
   const hasGoogleClient = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const {
@@ -39,7 +40,8 @@ export default function Register() {
         full_name: data.full_name,
         email: data.email,
         password: data.password,
-      });
+        roles: accountType === 'seller' ? ['SELLER'] : ['BUYER'],
+      } as any);
       navigate('/login');
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
@@ -67,6 +69,28 @@ export default function Register() {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="flex gap-3">
+            <label className="flex items-center gap-2 text-sm text-charcoal">
+              <input
+                type="radio"
+                name="accountType"
+                value="buyer"
+                checked={accountType === 'buyer'}
+                onChange={() => setAccountType('buyer')}
+              />
+              {t('auth.accountTypeBuyer', 'حساب مشتري')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-charcoal">
+              <input
+                type="radio"
+                name="accountType"
+                value="seller"
+                checked={accountType === 'seller'}
+                onChange={() => setAccountType('seller')}
+              />
+              {t('auth.accountTypeSeller', 'حساب تاجر')}
+            </label>
+          </div>
           {/* الاسم الكامل */}
           <div>
             <label className="block text-charcoal font-medium mb-2">
@@ -130,7 +154,10 @@ export default function Register() {
               <span>{t('auth.loginWithGoogle', 'أو المتابعة عبر جوجل')}</span>
               <span className="flex-1 h-px bg-gray-200" />
             </div>
-            <GoogleAuthButton onLoggedIn={() => navigate('/account', { replace: true })} />
+            <GoogleAuthButton
+              role={accountType}
+              onLoggedIn={() => navigate('/account', { replace: true })}
+            />
           </div>
         )}
 

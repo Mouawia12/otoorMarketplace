@@ -8,6 +8,8 @@ type PageKey =
   | 'authenticity'
   | 'how-it-works'
   | 'help'
+  | 'help-buying-preowned'
+  | 'help-bidding-guide'
   | 'shipping'
   | 'returns'
   | 'privacy'
@@ -18,15 +20,26 @@ export default function InfoPage() {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
 
-  // نستخرج الـ slug من المسار: /about → "about"
-  const slug = useMemo<PageKey>(() => {
-    const s = loc.pathname.replace(/^\/+/, ''); // remove leading /
-    // لو فيه path فرعي مثل /help/faq نأخذ أول جزء فقط
-    const first = s.split('/')[0] as PageKey;
-    return ([
+  // نستخرج الـ slug من المسار: نحافظ على المسارات الفرعية المخصصة
+  const { slug, canonicalPath } = useMemo(() => {
+    const parts = loc.pathname.replace(/^\/+/, '').split('/').filter(Boolean);
+    const first = parts[0] || 'help';
+    const second = parts[1];
+
+    const joined = second && first === 'help'
+      ? (`help-${second}` as PageKey)
+      : (first as PageKey);
+
+    const allowed: PageKey[] = [
       'about','authenticity','how-it-works','help',
+      'help-buying-preowned','help-bidding-guide',
       'shipping','returns','privacy','terms','contact'
-    ] as PageKey[]).includes(first) ? first : 'help';
+    ];
+
+    const resolved: PageKey = allowed.includes(joined) ? joined : 'help';
+    const canonical = `/${parts.join('/') || resolved}`;
+
+    return { slug: resolved, canonicalPath: canonical };
   }, [loc.pathname]);
 
   // عناوين وأوصاف SEO من الترجمة
@@ -38,7 +51,7 @@ export default function InfoPage() {
       <Helmet>
         <title>{title} | {t('common.siteName')}</title>
         <meta name="description" content={desc} />
-        <link rel="canonical" href={`${window.location.origin}/${slug}`} />
+        <link rel="canonical" href={`${window.location.origin}${canonicalPath}`} />
       </Helmet>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">

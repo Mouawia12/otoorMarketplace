@@ -251,9 +251,6 @@ export default function Admin() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-charcoal-light uppercase tracking-wider">
                         {t('admin.actions')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-charcoal-light uppercase tracking-wider">
-                        {t('admin.deleteUser')}
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -286,41 +283,39 @@ export default function Admin() {
                             {user.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm min-w-[150px]">
-                          <div className="flex flex-col items-start gap-2">
-                            {user.status === 'active' ? (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm min-w-[200px]">
+                          <div className="flex flex-wrap items-center gap-4">
+                            <button
+                              onClick={() =>
+                                updateUserStatus(
+                                  user.id,
+                                  user.status === 'active' ? 'suspended' : 'active'
+                                )
+                              }
+                              className={`font-semibold ${
+                                user.status === 'active'
+                                  ? 'text-red-600 hover:text-red-900'
+                                  : 'text-green-600 hover:text-green-900'
+                              }`}
+                            >
+                              {user.status === 'active' ? t('admin.suspend') : t('admin.activate')}
+                            </button>
+
+                            {canDelete ? (
                               <button
-                                onClick={() => updateUserStatus(user.id, 'suspended')}
-                                className="text-red-600 hover:text-red-900"
+                                onClick={() => deleteUser(user.id)}
+                                className="text-red-600 hover:text-red-900 font-semibold"
                               >
-                                {t('admin.suspend')}
+                                {t('admin.deleteUser')}
                               </button>
                             ) : (
-                              <button
-                                onClick={() => updateUserStatus(user.id, 'active')}
-                                className="text-green-600 hover:text-green-900"
-                              >
-                                {t('admin.activate')}
-                              </button>
+                              <span className="text-charcoal-light text-xs max-w-[180px] leading-snug">
+                                {isSuperAdmin
+                                  ? t('admin.cannotDeleteSuperAdmin', 'لا يمكن حذف super admin')
+                                  : t('admin.cannotDeleteSelf', 'لا يمكن حذف حسابك الحالي')}
+                              </span>
                             )}
-
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm min-w-[140px]">
-                          {canDelete ? (
-                            <button
-                              onClick={() => deleteUser(user.id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              {t('admin.deleteUser')}
-                            </button>
-                          ) : (
-                            <span className="text-charcoal-light text-xs max-w-[180px] leading-snug">
-                              {isSuperAdmin
-                                ? t('admin.cannotDeleteSuperAdmin', 'لا يمكن حذف super admin')
-                                : t('admin.cannotDeleteSelf', 'لا يمكن حذف حسابك الحالي')}
-                            </span>
-                          )}
                         </td>
                       </tr>
                     )})}

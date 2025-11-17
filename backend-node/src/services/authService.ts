@@ -42,6 +42,10 @@ export const loginSchema = z.object({
 
 export const googleLoginSchema = z.object({
   idToken: z.string().min(10, "Invalid Google token"),
+  role: z
+    .enum(["buyer", "seller"])
+    .optional()
+    .describe("requested role for new accounts (default buyer)"),
 });
 
 export const registerUser = async (input: z.infer<typeof registerSchema>) => {
@@ -147,6 +151,9 @@ export const authenticateWithGoogle = async (
       normalizedFullName.length > 0 ? normalizedFullName : email.split("@")[0]
     ) as string;
 
+    const requestedRole =
+      data.role === "seller" ? RoleName.SELLER : RoleName.BUYER;
+
     ensuredUser = (await prisma.user.create({
       data: {
         email,
@@ -154,7 +161,7 @@ export const authenticateWithGoogle = async (
         fullName: createFullName,
         avatarUrl: picture ?? null,
         roles: {
-          create: [{ role: { connect: { name: RoleName.BUYER } } }],
+          create: [{ role: { connect: { name: requestedRole } } }],
         },
       },
       include: userWithRolesInclude,
