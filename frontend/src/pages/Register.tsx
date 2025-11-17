@@ -32,17 +32,30 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
   });
 
+  const redirectAfterSignup = (roles: string[]) => {
+    const upper = roles.map((r) => r.toUpperCase());
+    if (upper.includes('SUPER_ADMIN') || upper.includes('ADMIN')) {
+      navigate('/admin/dashboard', { replace: true });
+      return;
+    }
+    if (upper.includes('SELLER')) {
+      navigate('/seller/dashboard', { replace: true });
+      return;
+    }
+    navigate('/account', { replace: true });
+  };
+
   const onSubmit = async (data: RegisterForm) => {
     try {
       setError('');
       // نرسل فقط الحقول المطلوبة
-      await registerUser({
+      const user = await registerUser({
         full_name: data.full_name,
         email: data.email,
         password: data.password,
         roles: accountType === 'seller' ? ['SELLER'] : ['BUYER'],
       } as any);
-      navigate('/login');
+      redirectAfterSignup(user.roles ?? []);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (Array.isArray(detail)) {
@@ -156,7 +169,7 @@ export default function Register() {
             </div>
             <GoogleAuthButton
               role={accountType}
-              onLoggedIn={() => navigate('/account', { replace: true })}
+              onLoggedIn={(user) => redirectAfterSignup(user.roles ?? [])}
             />
           </div>
         )}
