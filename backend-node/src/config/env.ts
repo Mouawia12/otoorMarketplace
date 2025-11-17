@@ -22,6 +22,8 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().default("uploads"),
   MAX_UPLOAD_SIZE_MB: z.coerce.number().default(5),
   ASSET_BASE_URL: z.string().default("http://localhost:8080"),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -44,6 +46,8 @@ const {
   UPLOAD_DIR,
   MAX_UPLOAD_SIZE_MB,
   ASSET_BASE_URL,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
 } = parsed.data;
 
 const allowedOrigins =
@@ -70,4 +74,8 @@ export const config = {
     maxFileSizeMb: MAX_UPLOAD_SIZE_MB,
   },
   assetBaseUrl: ASSET_BASE_URL.replace(/\/+$/, ""),
+  google: {
+    clientId: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+  },
 };

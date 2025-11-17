@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
+import api from '../lib/api';
 
 interface AccountStats {
   totalOrders: number;
@@ -16,26 +18,43 @@ interface UserProfile {
 
 export default function AccountOverviewPage() {
   const { t, i18n } = useTranslation();
+  const { user, fetchUser } = useAuthStore();
   const [stats, setStats] = useState<AccountStats>({ totalOrders: 0, activeBids: 0, favoritesCount: 0 });
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
-    const mockProfile: UserProfile = {
-      name: 'Ahmed Mohamed',
-      email: 'ahmed@example.com',
-      joinDate: '2024-01-15',
+    const load = async () => {
+      await fetchUser();
+      try {
+        // TODO: replace with real stats endpoint when available
+        const [ordersRes, bidsRes, favoritesRes] = await Promise.allSettled([
+          api.get('/orders/count'),
+          api.get('/auctions/active/count'),
+          api.get('/wishlist/count'),
+        ]);
+
+        setStats({
+          totalOrders: ordersRes.status === 'fulfilled' ? ordersRes.value.data.count ?? 0 : 0,
+          activeBids: bidsRes.status === 'fulfilled' ? bidsRes.value.data.count ?? 0 : 0,
+          favoritesCount: favoritesRes.status === 'fulfilled' ? favoritesRes.value.data.count ?? 0 : 0,
+        });
+      } catch {
+        // ignore, defaults to 0
+      }
     };
 
-    const mockStats: AccountStats = {
-      totalOrders: 12,
-      activeBids: 3,
-      favoritesCount: 8,
-    };
+    load();
+  }, [fetchUser]);
 
-    setProfile(mockProfile);
-    setStats(mockStats);
-  }, []);
+  useEffect(() => {
+    if (!user) return;
+    setProfile({
+      name: user.full_name,
+      email: user.email,
+      joinDate: user.created_at ?? new Date().toISOString(),
+    });
+  }, [user]);
 
   if (!profile) {
     return (

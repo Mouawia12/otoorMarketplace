@@ -248,7 +248,9 @@
     "noAccount": "ليس لديك حساب؟",
     "hasAccount": "لديك حساب بالفعل؟",
     "loginSuccess": "تم تسجيل الدخول بنجاح",
-    "registerSuccess": "تم إنشاء الحساب بنجاح"
+    "registerSuccess": "تم إنشاء الحساب بنجاح",
+    "loginWithGoogle": "المتابعة عبر جوجل",
+    "googleError": "فشل تسجيل الدخول عبر جوجل"
   },
   "products": {
     "title": "العطور الفاخرة",

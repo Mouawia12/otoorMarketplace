@@ -3,10 +3,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore, User } from '../store/authStore';
 import { useState } from 'react';
 import api from '../lib/api';
 import { clearPendingOrder, loadPendingOrder } from '../utils/pendingOrder';
+import { GoogleAuthButton } from '../components/GoogleAuthButton';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -22,6 +23,7 @@ export default function Login() {
   const { login } = useAuthStore();
   const [error, setError] = useState('');
   const [processingPending, setProcessingPending] = useState(false);
+  const hasGoogleClient = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema)
@@ -47,26 +49,29 @@ export default function Login() {
     }
   };
 
+  const postLoginNavigation = async (user: User) => {
+    const upperRoles = (user.roles ?? []).map((role) => role.toUpperCase());
+    const params = new URLSearchParams(location.search);
+    const redirectParam = params.get('redirect');
+
+    let target = redirectParam || '/account';
+    if (upperRoles.includes('SUPER_ADMIN') || upperRoles.includes('ADMIN')) {
+      target = redirectParam || '/admin/dashboard';
+    } else if (upperRoles.includes('SELLER')) {
+      target = redirectParam || '/seller/dashboard';
+    }
+
+    const handled = await tryCompletePendingOrder();
+    if (!handled) {
+      navigate(target, { replace: true });
+    }
+  };
+
   const onSubmit = async (data: LoginForm) => {
     try {
       setError('');
       const user = await login(data.email, data.password);
-
-      const upperRoles = (user.roles ?? []).map((role) => role.toUpperCase());
-      const params = new URLSearchParams(location.search);
-      const redirectParam = params.get('redirect');
-
-      let target = redirectParam || '/account';
-      if (upperRoles.includes('SUPER_ADMIN') || upperRoles.includes('ADMIN')) {
-        target = redirectParam || '/admin/dashboard';
-      } else if (upperRoles.includes('SELLER')) {
-        target = redirectParam || '/seller/dashboard';
-      }
-
-      const handled = await tryCompletePendingOrder();
-      if (!handled) {
-        navigate(target, { replace: true });
-      }
+      await postLoginNavigation(user);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (Array.isArray(detail)) {
@@ -129,6 +134,17 @@ export default function Login() {
             {isSubmitting || processingPending ? t('common.loading') : t('common.login')}
           </button>
         </form>
+
+        {hasGoogleClient && (
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center gap-2 text-sm text-charcoal-light">
+              <span className="flex-1 h-px bg-gray-200" />
+              <span>{t('auth.loginWithGoogle', 'أو المتابعة عبر جوجل')}</span>
+              <span className="flex-1 h-px bg-gray-200" />
+            </div>
+            <GoogleAuthButton onLoggedIn={postLoginNavigation} />
+          </div>
+        )}
 
         <p className="text-center mt-6 text-charcoal-light">
           {t('auth.noAccount')}{' '}

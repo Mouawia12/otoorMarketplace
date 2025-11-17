@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { authenticateUser, registerUser, loginSchema } from "../services/authService";
+import {
+  authenticateUser,
+  registerUser,
+  loginSchema,
+  authenticateWithGoogle,
+} from "../services/authService";
 import { authenticate } from "../middleware/auth";
 import { getUserProfile } from "../services/userService";
 import { toPlainObject } from "../utils/serializer";
@@ -24,6 +29,18 @@ router.post("/login", async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
     const payload = await authenticateUser(data);
+    res.json({
+      access_token: payload.token,
+      user: payload.user,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/google", async (req, res, next) => {
+  try {
+    const payload = await authenticateWithGoogle(req.body);
     res.json({
       access_token: payload.token,
       user: payload.user,
