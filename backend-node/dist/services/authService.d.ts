@@ -19,6 +19,10 @@ export declare const loginSchema: z.ZodObject<{
 }, z.core.$strip>;
 export declare const googleLoginSchema: z.ZodObject<{
     idToken: z.ZodString;
+    role: z.ZodOptional<z.ZodEnum<{
+        buyer: "buyer";
+        seller: "seller";
+    }>>;
 }, z.core.$strip>;
 export declare const registerUser: (input: z.infer<typeof registerSchema>) => Promise<{
     token: string;

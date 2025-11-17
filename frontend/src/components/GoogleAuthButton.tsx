@@ -5,9 +5,10 @@ import { useAuthStore, User } from '../store/authStore';
 
 type Props = {
   onLoggedIn?: (user: User) => void | Promise<void>;
+  role?: 'buyer' | 'seller';
 };
 
-export function GoogleAuthButton({ onLoggedIn }: Props) {
+export function GoogleAuthButton({ onLoggedIn, role }: Props) {
   const { t } = useTranslation();
   const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
   const [error, setError] = useState('');
@@ -22,7 +23,7 @@ export function GoogleAuthButton({ onLoggedIn }: Props) {
     try {
       setLoading(true);
       setError('');
-      const user = await loginWithGoogle(credentialResponse.credential);
+      const user = await loginWithGoogle(credentialResponse.credential, role);
       await onLoggedIn?.(user);
     } catch (err: any) {
       const detail = err?.response?.data?.detail ?? err?.response?.data?.message;
