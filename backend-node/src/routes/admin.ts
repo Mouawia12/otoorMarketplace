@@ -9,6 +9,7 @@ import {
   listProductsForAdmin,
   listUsersForAdmin,
   updateUserStatus,
+  deleteUserByAdmin,
   updateProductStatusAsAdmin,
 } from "../services/adminService";
 import { moderateProduct } from "../services/productService";
@@ -21,6 +22,13 @@ import {
   listProductTemplates,
   updateProductTemplate,
 } from "../services/productTemplateService";
+import {
+  listAllPosts,
+  getPostById,
+  createPost,
+  updatePost,
+  deletePost,
+} from "../services/blogService";
 
 const router = Router();
 
@@ -73,6 +81,26 @@ router.patch("/users/:id", adminOnly, async (req, res, next) => {
       req.user.roles as RoleName[]
     );
     res.json(user);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/users/:id", adminOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      throw AppError.badRequest("Invalid user id");
+    }
+    const result = await deleteUserByAdmin(
+      id,
+      req.user.roles as RoleName[],
+      req.user.id
+    );
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -225,6 +253,102 @@ router.delete("/product-templates/:id", adminOnly, async (req, res, next) => {
     }
     await deleteProductTemplate(templateId);
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/blog", adminOnly, async (_req, res, next) => {
+  try {
+    const posts = await listAllPosts();
+    res.json(posts);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/blog/:id", adminOnly, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      throw AppError.badRequest("Invalid post id");
+    }
+    const post = await getPostById(id);
+    res.json(post);
+  } catch (error) {
+    next(error);
+  }
+});
+
+const toStringArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v)).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+router.post("/blog", adminOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const post = await createPost({
+      title: body.title,
+      slug: body.slug,
+      description: body.description,
+      content: body.content,
+      coverData: body.coverData,
+      coverUrl: body.coverUrl,
+      author: body.author,
+      category: body.category,
+      tags: toStringArray(body.tags),
+      status: body.status?.toUpperCase(),
+      lang: (body.lang || "ar").toLowerCase(),
+    } as any);
+    res.status(201).json(post);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/blog/:id", adminOnly, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      throw AppError.badRequest("Invalid post id");
+    }
+    const body = req.body || {};
+    const post = await updatePost(id, {
+      title: body.title,
+      slug: body.slug,
+      description: body.description,
+      content: body.content,
+      coverData: body.coverData,
+      coverUrl: body.coverUrl,
+      author: body.author,
+      category: body.category,
+      tags: toStringArray(body.tags),
+      status: body.status?.toUpperCase(),
+      lang: body.lang,
+    } as any);
+    res.json(post);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/blog/:id", adminOnly, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      throw AppError.badRequest("Invalid post id");
+    }
+    const result = await deletePost(id);
+    res.json(result);
   } catch (error) {
     next(error);
   }

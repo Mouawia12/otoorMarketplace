@@ -39,7 +39,7 @@
     "retry": "إعادة المحاولة",
     "errorLoading": "تعذر تحميل المحتوى. يرجى المحاولة مرة أخرى.",
     "notFound": "عذرًا، لم نعثر على ما تبحث عنه.",
-    "noResults": "لا توجد منتجات مطابقة حاليًا."
+    "noResults": "لا توجد نتائج مطابقة حاليًا."
   },
   "cart": {
     "title": "سلة المشتريات",
@@ -614,6 +614,11 @@
     "verifiedSeller": "بائع موثق",
     "suspend": "تعليق",
     "activate": "تفعيل",
+    "deleteUser": "حذف",
+    "confirmDeleteUser": "هل أنت متأكد من حذف هذا المستخدم نهائياً؟",
+    "deleteUserFailed": "فشل حذف المستخدم",
+    "cannotDeleteSuperAdmin": "لا يمكن حذف حساب super admin",
+    "cannotDeleteSelf": "لا يمكن حذف حسابك الحالي",
     "validator": "المدقق",
     "submitted": "مقدم",
     "assign": "تعيين",

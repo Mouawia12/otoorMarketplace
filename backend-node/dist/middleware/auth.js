@@ -4,6 +4,7 @@ exports.authenticate = void 0;
 const client_1 = require("../prisma/client");
 const jwt_1 = require("../utils/jwt");
 const errors_1 = require("../utils/errors");
+const env_1 = require("../config/env");
 const authenticate = (options = {}) => async (req, _res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -21,6 +22,9 @@ const authenticate = (options = {}) => async (req, _res, next) => {
         });
         if (!user) {
             throw errors_1.AppError.unauthorized();
+        }
+        if (user.status === "SUSPENDED") {
+            throw errors_1.AppError.forbidden(`Your account is suspended. Please contact support at ${env_1.config.support.email}`);
         }
         const userRoles = user.roles.map((r) => r.role.name);
         if (options.roles &&

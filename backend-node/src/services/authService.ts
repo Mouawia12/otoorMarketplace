@@ -23,6 +23,7 @@ const serializeUser = (user: UserWithRoles) => ({
   full_name: user.fullName,
   avatar_url: user.avatarUrl,
   created_at: user.createdAt,
+  status: user.status,
   roles: user.roles.map((roleRelation) => roleRelation.role.name.toLowerCase()),
 });
 
@@ -128,6 +129,12 @@ export const authenticateWithGoogle = async (
     include: userWithRolesInclude,
   })) as UserWithRoles | null;
 
+  if (user && user.status === "SUSPENDED") {
+    throw AppError.forbidden(
+      `Your account is suspended. Please contact support at ${config.support.email}`,
+    );
+  }
+
   let ensuredUser: UserWithRoles | null = user;
 
   if (!ensuredUser) {
@@ -185,6 +192,12 @@ export const authenticateUser = async (input: z.infer<typeof loginSchema>) => {
 
   if (!user) {
     throw AppError.unauthorized("Invalid credentials");
+  }
+
+  if (user.status === "SUSPENDED") {
+    throw AppError.forbidden(
+      `Your account is suspended. Please contact support at ${config.support.email}`,
+    );
   }
 
   const valid = await verifyPassword(data.password, user.passwordHash);

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAdminModerationQueue = exports.updateProductStatusAsAdmin = exports.listProductsForAdmin = exports.listPendingProducts = exports.updateUserStatus = exports.listUsersForAdmin = exports.getAdminDashboardStats = void 0;
+exports.getAdminModerationQueue = exports.updateProductStatusAsAdmin = exports.listProductsForAdmin = exports.listPendingProducts = exports.deleteUserByAdmin = exports.updateUserStatus = exports.listUsersForAdmin = exports.getAdminDashboardStats = void 0;
 const client_1 = require("@prisma/client");
 const client_2 = require("../prisma/client");
 const errors_1 = require("../utils/errors");
@@ -75,6 +75,32 @@ const updateUserStatus = async (userId, status, allowedRoles) => {
     };
 };
 exports.updateUserStatus = updateUserStatus;
+const deleteUserByAdmin = async (userId, actorRoles, actorId) => {
+    const isAdmin = actorRoles.includes(client_1.RoleName.ADMIN) || actorRoles.includes(client_1.RoleName.SUPER_ADMIN);
+    if (!isAdmin) {
+        throw errors_1.AppError.forbidden();
+    }
+    if (actorId && userId === actorId) {
+        throw errors_1.AppError.badRequest("You cannot delete your own account");
+    }
+    const targetUser = await client_2.prisma.user.findUnique({
+        where: { id: userId },
+        include: { roles: { include: { role: true } } },
+    });
+    if (!targetUser) {
+        throw errors_1.AppError.notFound("User not found");
+    }
+    const targetRoles = targetUser.roles.map((r) => r.role.name);
+    if (targetRoles.includes(client_1.RoleName.SUPER_ADMIN) &&
+        !actorRoles.includes(client_1.RoleName.SUPER_ADMIN)) {
+        throw errors_1.AppError.forbidden("Cannot delete a super admin");
+    }
+    await client_2.prisma.user.delete({
+        where: { id: userId },
+    });
+    return { success: true };
+};
+exports.deleteUserByAdmin = deleteUserByAdmin;
 const listPendingProducts = async () => {
     const products = await client_2.prisma.product.findMany({
         where: { status: client_1.ProductStatus.PENDING_REVIEW },

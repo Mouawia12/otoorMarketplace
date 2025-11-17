@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
-import { getPostsByLang, getAllCategories, getAllTags } from '../../services/blogService';
 import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
+import { fetchPosts, BlogPost } from '../../services/blogApi';
 
 const POSTS_PER_PAGE = 12;
 
@@ -45,13 +45,35 @@ export default function BlogIndex() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const allPosts = getPostsByLang(language, 'published');
-  const categories = getAllCategories(language); // تُرجع سلاجز
-  const tags = getAllTags(language);             // تُرجع سلاجز
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchPosts(language, 'published');
+        setPosts(data);
+      } catch (error) {
+        console.error("Failed to load blog posts", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [language]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(posts.map((p) => p.category).filter(Boolean))),
+    [posts]
+  );
+  const tags = useMemo(
+    () => Array.from(new Set(posts.flatMap((p) => p.tags || []).filter(Boolean))),
+    [posts]
+  );
 
   const filteredPosts = useMemo(() => {
-    let filtered = allPosts;
+    let filtered = posts;
 
     if (selectedCategory) {
       filtered = filtered.filter((p) => normalizeSlug(p.category) === normalizeSlug(selectedCategory));
@@ -71,7 +93,7 @@ export default function BlogIndex() {
     }
 
     return filtered;
-  }, [allPosts, selectedCategory, selectedTag, searchQuery]);
+  }, [posts, selectedCategory, selectedTag, searchQuery]);
 
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
   const paginatedPosts = filteredPosts.slice(
@@ -97,7 +119,7 @@ export default function BlogIndex() {
         url: `${window.location.origin}/logo.png`,
       },
     },
-    blogPost: allPosts.slice(0, 10).map((post) => ({
+    blogPost: posts.slice(0, 10).map((post) => ({
       '@type': 'BlogPosting',
       headline: post.title,
       description: post.description,
@@ -230,7 +252,11 @@ export default function BlogIndex() {
           </p>
 
           {/* Posts Grid */}
-          {paginatedPosts.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <p className="text-xl text-taupe">{t('common.loading')}</p>
+            </div>
+          ) : paginatedPosts.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-xl text-taupe">{t('blog.noPosts')}</p>
             </div>
@@ -266,9 +292,9 @@ export default function BlogIndex() {
                       </span>
                       <span>•</span>
                       <span>
-                        {(post.readingTime as number) || 2}{' '}
+                        {post.readingTime || 2}{' '}
                         {t('blog.minRead_other', {
-                          count: (post.readingTime as number) || 2,
+                          count: post.readingTime || 2,
                         })}
                       </span>
                     </div>

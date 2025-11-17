@@ -22,6 +22,9 @@ export declare const updateUserStatus: (userId: number, status: string, allowedR
     status: import(".prisma/client").$Enums.UserStatus;
     roles: string[];
 }>;
+export declare const deleteUserByAdmin: (userId: number, actorRoles: RoleName[], actorId?: number) => Promise<{
+    success: boolean;
+}>;
 export declare const listPendingProducts: () => Promise<{
     id: any;
     seller_id: any;

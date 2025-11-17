@@ -17,12 +17,30 @@ export declare const loginSchema: z.ZodObject<{
     email: z.ZodString;
     password: z.ZodString;
 }, z.core.$strip>;
+export declare const googleLoginSchema: z.ZodObject<{
+    idToken: z.ZodString;
+}, z.core.$strip>;
 export declare const registerUser: (input: z.infer<typeof registerSchema>) => Promise<{
     token: string;
     user: {
         id: number;
         email: string;
         full_name: string;
+        avatar_url: string | null;
+        created_at: Date;
+        status: import(".prisma/client").$Enums.UserStatus;
+        roles: string[];
+    };
+}>;
+export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginSchema>) => Promise<{
+    token: string;
+    user: {
+        id: number;
+        email: string;
+        full_name: string;
+        avatar_url: string | null;
+        created_at: Date;
+        status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
     };
 }>;
@@ -32,6 +50,9 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
         id: number;
         email: string;
         full_name: string;
+        avatar_url: string | null;
+        created_at: Date;
+        status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
     };
 }>;

@@ -4,6 +4,7 @@ import { RoleName } from "@prisma/client";
 import { prisma } from "../prisma/client";
 import { verifyAccessToken } from "../utils/jwt";
 import { AppError } from "../utils/errors";
+import { config } from "../config/env";
 
 export const authenticate =
   (options: { roles?: RoleName[] } = {}) =>
@@ -27,6 +28,12 @@ export const authenticate =
 
       if (!user) {
         throw AppError.unauthorized();
+      }
+
+      if (user.status === "SUSPENDED") {
+        throw AppError.forbidden(
+          `Your account is suspended. Please contact support at ${config.support.email}`,
+        );
       }
 
       const userRoles = user.roles.map((r) => r.role.name as RoleName);

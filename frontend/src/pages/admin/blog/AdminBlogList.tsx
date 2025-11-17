@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import api from "../../../lib/api";
 
 type AdminBlogPost = {
-  id: string;
+  id: number;
+  slug: string;
   title: string;
   lang: "ar" | "en";
   status: "draft" | "published";
   date: string;
   author?: string;
+  description?: string;
+  cover?: string;
 };
 
 export default function AdminBlogList() {
@@ -20,11 +24,12 @@ export default function AdminBlogList() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      // TODO: استبدل لاحقًا بنداء GET /api/admin/blog
-      setRows([
-        { id: "1", title: "مقدّمة في العطور النيش", lang: "ar", status: "published", date: "2025-01-10", author: "AO" },
-        { id: "2", title: "Intro to Niche Perfumes", lang: "en", status: "draft", date: "2025-01-08", author: "AO" },
-      ]);
+      try {
+        const res = await api.get("/admin/blog");
+        setRows(res.data);
+      } catch (error) {
+        console.error("Failed to load blog posts", error);
+      }
       setLoading(false);
     })();
   }, []);
@@ -83,10 +88,22 @@ export default function AdminBlogList() {
                       <Link to={`/admin/blog/${row.id}`} className="text-gold hover:text-gold-dark">
                         {t("common.edit","تعديل")}
                       </Link>
-                      <button className="text-red-500 hover:text-red-700" onClick={() => alert("TODO: delete")}>
+                      <button
+                        className="text-red-500 hover:text-red-700"
+                        onClick={async () => {
+                          const confirmDelete = window.confirm(t("common.confirmDelete", "هل أنت متأكد؟"));
+                          if (!confirmDelete) return;
+                          try {
+                            await api.delete(`/admin/blog/${row.id}`);
+                            setRows((prev) => prev.filter((r) => r.id !== row.id));
+                          } catch (error) {
+                            console.error("Failed to delete post", error);
+                            alert(t("common.error", "حدث خطأ"));
+                          }
+                        }}>
                         {t("common.delete","حذف")}
                       </button>
-                      <a href={`/blog/${encodeURIComponent(row.id)}?preview=1`} target="_blank" rel="noreferrer"
+                      <a href={`/blog/${encodeURIComponent(row.slug)}?preview=1`} target="_blank" rel="noreferrer"
                          className="text-charcoal hover:text-gold">
                         {t("common.preview","معاينة")}
                       </a>
