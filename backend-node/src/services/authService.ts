@@ -40,6 +40,11 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+export const changePasswordSchema = z.object({
+  oldPassword: z.string().min(6, "Old password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
+
 export const googleLoginSchema = z.object({
   idToken: z.string().min(10, "Invalid Google token"),
   role: z
@@ -221,4 +226,35 @@ export const authenticateUser = async (input: z.infer<typeof loginSchema>) => {
     token,
     user: serializeUser(user),
   };
+};
+
+export const changePassword = async (
+  userId: number,
+  payload: z.infer<typeof changePasswordSchema>,
+) => {
+  const data = changePasswordSchema.parse(payload);
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw AppError.unauthorized("User not found");
+  }
+
+  const valid = await verifyPassword(data.oldPassword, user.passwordHash);
+  if (!valid) {
+    throw AppError.unauthorized("Current password is incorrect");
+  }
+
+  const newHash = await hashPassword(data.newPassword);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: newHash,
+    },
+  });
+
+  return { success: true };
 };

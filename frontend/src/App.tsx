@@ -23,6 +23,8 @@ import OrdersPage from './pages/OrdersPage';
 import BidsPage from './pages/BidsPage';
 import FavoritesPage from './pages/FavoritesPage';
 import SupportPage from './pages/SupportPage';
+import AccountChangePassword from './pages/AccountChangePassword';
+import SellerChangePassword from './pages/SellerChangePassword';
 
 import SellerDashboardPage from './pages/SellerDashboardPage';
 import SellerProductsPage from './pages/SellerProductsPage';
@@ -44,6 +46,7 @@ import AdminReportsPage from './pages/AdminReportsPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import AdminAuditPage from './pages/AdminAuditPage';
 import AdminProductLibraryPage from './pages/AdminProductLibraryPage';
+import AdminChangePassword from './pages/admin/AdminChangePassword';
 
 // ✅ صفحات الفوتر الثابتة (صفحة واحدة تُستخدم لكل المسارات)
 import InfoPage from './pages/static/InfoPage';
@@ -65,6 +68,7 @@ import AdminBlogEdit from './pages/admin/blog/AdminBlogEdit';
 
 import { useAuthStore } from './store/authStore';
 import { useUIStore } from './store/uiStore';
+import { ScrollToTop } from './components/ScrollToTop';
 
 function App() {
   const { isAuthenticated, fetchUser, user } = useAuthStore();
@@ -81,6 +85,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Layout />}>
           {/* Public */}
@@ -133,6 +138,7 @@ function App() {
             <Route path="bids" element={<BidsPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
             <Route path="support" element={<SupportPage />} />
+            <Route path="change-password" element={<AccountChangePassword />} />
           </Route>
 
           {/* Seller */}
@@ -143,6 +149,7 @@ function App() {
             <Route path="orders" element={<SellerOrdersPage />} />
             <Route path="earnings" element={<SellerEarningsPage />} />
             <Route path="support" element={<SellerSupportPage />} />
+            <Route path="change-password" element={<SellerChangePassword />} />
           </Route>
 
           {/* Admin */}
@@ -160,6 +167,7 @@ function App() {
             <Route path="blog/new" element={<AdminBlogEdit mode="create" />} />
             <Route path="blog/:id" element={<AdminBlogEdit mode="edit" />} />
 
+            <Route path="change-password" element={<AdminChangePassword />} />
             <Route path="ads" element={<AdminAdsPage />} />
             <Route path="support" element={<AdminSupportPage />} />
             <Route path="reports" element={<AdminReportsPage />} />

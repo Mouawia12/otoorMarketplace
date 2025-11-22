@@ -326,7 +326,14 @@
     "activeBids": "المزايدات النشطة",
     "noOrders": "لا توجد طلبات",
     "noBids": "لا توجد مزايدات",
-    "noFavorites": "لا توجد منتجات مفضلة"
+    "noFavorites": "لا توجد منتجات مفضلة",
+    "updatePassword": "تغيير كلمة المرور",
+    "updatePasswordDesc": "حدّث كلمة مرورك بأمان",
+    "currentPassword": "كلمة المرور الحالية",
+    "newPassword": "كلمة المرور الجديدة",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "passwordChanged": "تم تحديث كلمة المرور بنجاح",
+    "passwordsDontMatch": "كلمتا المرور غير متطابقتين"
   },
   "orders": {
     "title": "طلباتي",

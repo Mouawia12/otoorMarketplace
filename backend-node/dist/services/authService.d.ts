@@ -17,6 +17,10 @@ export declare const loginSchema: z.ZodObject<{
     email: z.ZodString;
     password: z.ZodString;
 }, z.core.$strip>;
+export declare const changePasswordSchema: z.ZodObject<{
+    oldPassword: z.ZodString;
+    newPassword: z.ZodString;
+}, z.core.$strip>;
 export declare const googleLoginSchema: z.ZodObject<{
     idToken: z.ZodString;
     role: z.ZodOptional<z.ZodEnum<{
@@ -59,5 +63,8 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
         status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
     };
+}>;
+export declare const changePassword: (userId: number, payload: z.infer<typeof changePasswordSchema>) => Promise<{
+    success: boolean;
 }>;
 //# sourceMappingURL=authService.d.ts.map
