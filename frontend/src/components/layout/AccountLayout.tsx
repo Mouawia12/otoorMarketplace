@@ -17,6 +17,7 @@ export default function AccountLayout() {
     { path: '/account/orders', label: t('account.orders'), icon: '📦' },
     { path: '/account/bids', label: t('account.bids'), icon: '🔨' },
     { path: '/account/favorites', label: t('account.favorites'), icon: '❤️' },
+    { path: '/account/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
     { path: '/account/support', label: t('account.support'), icon: '💬' },
   ];
 

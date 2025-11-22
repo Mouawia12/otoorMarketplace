@@ -324,7 +324,14 @@
     "activeBids": "Active Bids",
     "noOrders": "No orders found",
     "noBids": "No bids found",
-    "noFavorites": "No favorite products"
+    "noFavorites": "No favorite products",
+    "updatePassword": "Change password",
+    "updatePasswordDesc": "Update your login password securely",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "passwordChanged": "Password updated successfully",
+    "passwordsDontMatch": "Passwords do not match"
   },
   "orders": {
     "title": "My Orders",

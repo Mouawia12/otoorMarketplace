@@ -6,10 +6,13 @@ import {
   registerUser,
   loginSchema,
   authenticateWithGoogle,
+  changePassword,
+  changePasswordSchema,
 } from "../services/authService";
 import { authenticate } from "../middleware/auth";
 import { getUserProfile } from "../services/userService";
 import { toPlainObject } from "../utils/serializer";
+import { AppError } from "../utils/errors";
 
 const router = Router();
 
@@ -45,6 +48,19 @@ router.post("/google", async (req, res, next) => {
       access_token: payload.token,
       user: payload.user,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/change-password", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const data = changePasswordSchema.parse(req.body);
+    await changePassword(req.user.id, data);
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }

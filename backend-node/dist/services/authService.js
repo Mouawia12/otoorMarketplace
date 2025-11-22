@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authenticateUser = exports.authenticateWithGoogle = exports.registerUser = exports.googleLoginSchema = exports.loginSchema = exports.registerSchema = void 0;
+exports.changePassword = exports.authenticateUser = exports.authenticateWithGoogle = exports.registerUser = exports.googleLoginSchema = exports.changePasswordSchema = exports.loginSchema = exports.registerSchema = void 0;
 const crypto_1 = __importDefault(require("crypto"));
 const google_auth_library_1 = require("google-auth-library");
 const client_1 = require("@prisma/client");
@@ -35,6 +35,10 @@ exports.registerSchema = zod_1.z.object({
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
     password: zod_1.z.string().min(6),
+});
+exports.changePasswordSchema = zod_1.z.object({
+    oldPassword: zod_1.z.string().min(6, "Old password is required"),
+    newPassword: zod_1.z.string().min(8, "New password must be at least 8 characters"),
 });
 exports.googleLoginSchema = zod_1.z.object({
     idToken: zod_1.z.string().min(10, "Invalid Google token"),
@@ -177,4 +181,26 @@ const authenticateUser = async (input) => {
     };
 };
 exports.authenticateUser = authenticateUser;
+const changePassword = async (userId, payload) => {
+    const data = exports.changePasswordSchema.parse(payload);
+    const user = await client_2.prisma.user.findUnique({
+        where: { id: userId },
+    });
+    if (!user) {
+        throw errors_1.AppError.unauthorized("User not found");
+    }
+    const valid = await (0, password_1.verifyPassword)(data.oldPassword, user.passwordHash);
+    if (!valid) {
+        throw errors_1.AppError.unauthorized("Current password is incorrect");
+    }
+    const newHash = await (0, password_1.hashPassword)(data.newPassword);
+    await client_2.prisma.user.update({
+        where: { id: userId },
+        data: {
+            passwordHash: newHash,
+        },
+    });
+    return { success: true };
+};
+exports.changePassword = changePassword;
 //# sourceMappingURL=authService.js.map
