@@ -52,7 +52,7 @@ const buildHeroSlideFromProduct = (product: Product, index: number): HeroSlide =
         ar: 'تسوق الآن',
         en: 'Shop Now',
       },
-      link: `/p/${product.id}`,
+      link: `/products?status=published`,
     },
     secondaryCta: {
       text: {

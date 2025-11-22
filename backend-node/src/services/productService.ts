@@ -47,6 +47,8 @@ export const normalizeProduct = (product: any) => {
     status: normalizeStatus(plain.status),
     created_at: plain.createdAt,
     updated_at: plain.updatedAt,
+    rating_avg: Number(plain.rating_avg ?? 0),
+    rating_count: typeof plain.rating_count === "number" ? plain.rating_count : 0,
     seller: plain.seller
       ? {
           id: plain.seller.id,
@@ -209,26 +211,37 @@ export const listProducts = async (query: unknown) => {
 };
 
 export const getProductById = async (id: number) => {
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: {
-      images: { orderBy: { sortOrder: "asc" } },
-      seller: {
-        select: {
-          id: true,
-          fullName: true,
-          verifiedSeller: true,
+  const [product, ratingStats] = await prisma.$transaction([
+    prisma.product.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        seller: {
+          select: {
+            id: true,
+            fullName: true,
+            verifiedSeller: true,
+          },
         },
+        auctions: true,
       },
-      auctions: true,
-    },
-  });
+    }),
+    prisma.productReview.aggregate({
+      where: { productId: id },
+      _avg: { rating: true },
+      _count: { rating: true },
+    }),
+  ]);
 
   if (!product) {
     throw AppError.notFound("Product not found");
   }
 
-  return normalizeProduct(product);
+  return normalizeProduct({
+    ...product,
+    rating_avg: ratingStats._avg.rating ?? 0,
+    rating_count: ratingStats._count.rating ?? 0,
+  });
 };
 
 export const getRelatedProducts = async (productId: number, limit = 4) => {

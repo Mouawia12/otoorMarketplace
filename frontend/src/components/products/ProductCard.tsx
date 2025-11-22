@@ -37,6 +37,14 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const displayPrice = type === 'auction' && currentBid ? currentBid : product.base_price;
+  const conditionLabel =
+    product.condition === 'used'
+      ? t('products.conditionUsed', 'Used')
+      : t('products.conditionNew', 'New');
+  const conditionTone =
+    product.condition === 'used'
+      ? 'bg-charcoal/85 text-ivory'
+      : 'bg-gold text-charcoal';
   
   const defaultAuctionEnd = auctionEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -92,16 +100,21 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </Link>
+        <div className="absolute top-2" style={{ insetInlineEnd: '8px' }}>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold shadow-md leading-none ${conditionTone}`}>
+            {conditionLabel}
+          </span>
+        </div>
 
         {/* المفضلة */}
         <button
           onClick={toggleWishlist}
           aria-label={hasInWishlist ? t('wishlist.remove') : 'Add to wishlist'}
-          className="absolute top-2 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center bg-white/85 hover:bg-white shadow-md"
+          className="absolute top-2 rounded-lg min-w-[34px] min-h-[34px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center bg-white/85 hover:bg-white shadow-md"
           style={{ insetInlineStart: '8px' }}
         >
           <svg
-            className="w-5 h-5"
+            className="w-4 h-4 sm:w-5 sm:h-5"
             viewBox="0 0 24 24"
             fill={hasInWishlist ? 'currentColor' : 'none'}
             stroke="currentColor"
@@ -117,15 +130,20 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
       </div>
 
       {/* المحتوى */}
-      <div className="p-4 flex-1 flex flex-col">
+      <div className="p-3 sm:p-4 flex-1 flex flex-col">
         {product.brand && (
-          <div className="text-xs text-taupe/90 mb-1">{product.brand}</div>
+          <Link
+            to={`/products?brand=${encodeURIComponent(product.brand)}&status=published`}
+            className="text-xs text-taupe/90 mb-1 hover:text-gold transition-colors"
+          >
+            {product.brand}
+          </Link>
         )}
 
         {/* عنوان بسطرين ثابتين لثبات الارتفاع */}
         <Link
           to={productLink(product)}
-          className="block text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2 min-h-[44px]"
+          className="block text-sm sm:text-base text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2 min-h-[40px] sm:min-h-[44px]"
         >
           {name}
         </Link>
@@ -136,13 +154,13 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
             <CountdownTimer endDate={defaultAuctionEnd} />
           )}
           
-          <div className="text-gold font-extrabold text-lg inline-flex items-center gap-1">
+          <div className="text-gold font-extrabold text-base sm:text-lg inline-flex items-center gap-1">
             {formatSAR(displayPrice, i18n.language === 'ar' ? 'ar-SA' : 'en-US')} <SARIcon />
           </div>
 
           <button
             onClick={handleAddToCart}
-            className="h-11 w-full rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition flex items-center justify-center gap-2 min-h-[44px]"
+            className="h-10 sm:h-11 w-full rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition flex items-center justify-center gap-2 min-h-[40px] sm:min-h-[44px] text-sm sm:text-base"
             aria-label={t('common.addToCart')}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">

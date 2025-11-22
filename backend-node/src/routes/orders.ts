@@ -8,6 +8,7 @@ import {
   listOrdersByUser,
   listOrdersForSeller,
   updateOrderStatus,
+  confirmOrderDelivery,
 } from "../services/orderService";
 import { AppError } from "../utils/errors";
 import { prisma } from "../prisma/client";
@@ -145,5 +146,23 @@ router.patch(
     }
   }
 );
+
+router.post("/:id/confirm-delivery", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+
+    const orderId = Number(req.params.id);
+    if (Number.isNaN(orderId)) {
+      throw AppError.badRequest("Invalid order id");
+    }
+
+    const order = await confirmOrderDelivery(orderId, req.user.id);
+    res.json(order);
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

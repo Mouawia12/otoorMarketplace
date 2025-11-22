@@ -5,7 +5,8 @@ import { useUIStore } from '../store/uiStore';
 import { fetchProductById, fetchRelatedProducts } from '../services/productService';
 import { fetchAuctionByProductId } from '../services/auctionService';
 import ProductCard from '../components/products/ProductCard';
-import { Product, Auction } from '../types';
+import { Product, Auction, ProductReview } from '../types';
+import { fetchProductReviews } from '../services/reviewService';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
 import Countdown from '../components/common/Countdown';
@@ -22,6 +23,11 @@ export default function ProductDetailPage() {
   const [activeAuction, setActiveAuction] = useState<Auction | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewStats, setReviewStats] = useState<{ average: number; count: number }>({
+    average: 0,
+    count: 0,
+  });
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -38,6 +44,14 @@ export default function ProductDetailPage() {
         
         const related = await fetchRelatedProducts(parseInt(id), 4);
         setRelatedProducts(related);
+
+        try {
+          const reviewData = await fetchProductReviews(parseInt(id));
+          setReviews(reviewData.reviews);
+          setReviewStats({ average: reviewData.average, count: reviewData.count });
+        } catch (reviewError) {
+          console.warn('Failed to load reviews', reviewError);
+        }
         
         try {
           const auction = await fetchAuctionByProductId(parseInt(id));
@@ -89,6 +103,31 @@ export default function ProductDetailPage() {
     .filter(Boolean);
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isInStock = product.stock_quantity > 0;
+  const ratingLabel = reviewStats.count > 0 ? reviewStats.average.toFixed(1) : t('reviews.noRatings');
+  const locale = language === 'ar' ? 'ar-EG' : 'en-US';
+  const renderStars = (value: number) => (
+    <div className="flex gap-1" aria-hidden>
+      {Array.from({ length: 5 }).map((_, index) => {
+        const filled = value >= index + 0.5;
+        return (
+          <svg
+            key={index}
+            className="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill={filled ? '#f6b300' : 'none'}
+            stroke="#f6b300"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 17.3l-5.2 3.1 1.5-5.8-4.5-3.9 5.9-.5L12 5l2.3 5.2 5.9.5-4.5 3.9 1.5 5.8z"
+            />
+          </svg>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="space-y-12">
@@ -168,7 +207,12 @@ export default function ProductDetailPage() {
         {/* Product Info */}
         <div className="space-y-6">
           <div>
-            <p className="text-taupe text-sm mb-2">{product.brand}</p>
+            <Link
+              to={`/products?brand=${encodeURIComponent(product.brand)}&status=published`}
+              className="text-taupe text-sm mb-2 inline-block hover:text-gold transition-colors"
+            >
+              {product.brand}
+            </Link>
             <h1 className="text-h1 text-charcoal mb-4">{name}</h1>
             <p className="text-charcoal-light leading-relaxed">{description}</p>
           </div>
@@ -202,23 +246,72 @@ export default function ProductDetailPage() {
             <div className="space-y-3">
               <button
                 disabled={!isInStock}
+                onClick={() => navigate('/products?status=published')}
                 className="w-full bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}
               </button>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <button className="bg-charcoal text-ivory px-4 py-2 rounded-luxury font-semibold hover:bg-charcoal-light transition">
-                  {t('productDetail.requestAuth')}
-                </button>
-                <button className="bg-white border-2 border-charcoal text-charcoal px-4 py-2 rounded-luxury font-semibold hover:bg-ivory transition">
-                  {t('productDetail.addFavorite')}
-                </button>
-              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Reviews */}
+      <section className="bg-white rounded-luxury shadow-luxury p-6">
+        <div className="flex flex-col md:flex-row gap-8">
+          <div className="md:w-1/3 bg-sand/50 rounded-luxury p-5 space-y-3">
+            <p className="text-sm text-charcoal-light">{t('reviews.overall')}</p>
+            <div className="text-4xl font-bold text-charcoal">{reviewStats.count ? reviewStats.average.toFixed(1) : '—'}</div>
+            <div className="flex items-center gap-2">
+              {renderStars(reviewStats.average || 0)}
+              <span className="text-sm text-charcoal-light">
+                {reviewStats.count} {t('reviews.count')}
+              </span>
+            </div>
+            <p className="text-sm text-charcoal mt-2">{t('reviews.tagline')}</p>
+            <p className="text-xs text-charcoal-light">{ratingLabel}</p>
+          </div>
+
+          <div className="flex-1 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-charcoal">{t('reviews.title')}</h3>
+              <span className="text-sm text-charcoal-light">{t('reviews.recent')}</span>
+            </div>
+
+            {reviews.length === 0 ? (
+              <div className="p-4 rounded-luxury bg-ivory text-charcoal-light">
+                {t('reviews.empty')}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {reviews.map((review) => (
+                  <div key={review.id} className="border border-sand/60 rounded-luxury p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-charcoal">
+                          {review.user?.full_name || t('reviews.anonymous')}
+                        </p>
+                        <p className="text-xs text-charcoal-light">
+                          {new Date(review.created_at).toLocaleDateString(locale)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {renderStars(review.rating)}
+                        <span className="text-sm font-semibold text-gold">{review.rating}/5</span>
+                      </div>
+                    </div>
+                    {review.comment && (
+                      <p className="mt-3 text-sm text-charcoal-light leading-relaxed">
+                        {review.comment}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (

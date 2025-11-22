@@ -167,19 +167,19 @@ export default function BlogIndex() {
         <script type="application/ld+json">{JSON.stringify(blogSchema)}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-sand py-16">
+      <div className="min-h-screen bg-sand py-12 sm:py-16">
         <div className="container mx-auto px-4">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-charcoal mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-charcoal mb-3 sm:mb-4">
               {t('blog.title')}
             </h1>
-            <p className="text-lg text-taupe max-w-2xl mx-auto">{t('blog.desc')}</p>
+            <p className="text-base sm:text-lg text-taupe max-w-2xl mx-auto">{t('blog.desc')}</p>
           </div>
 
           {/* Filters */}
           <div className="mb-8 space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4">
               {/* Search */}
               <input
                 type="text"
@@ -189,7 +189,7 @@ export default function BlogIndex() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="flex-1 px-4 py-3 border border-charcoal-light rounded-luxury focus:outline-none focus:border-gold"
+                className="flex-1 px-4 py-3 text-sm sm:text-base border border-charcoal-light rounded-luxury focus:outline-none focus:border-gold"
               />
 
               {/* Category Filter (مُترجم للعرض) */}
@@ -199,7 +199,7 @@ export default function BlogIndex() {
                   setSelectedCategory(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-4 py-3 border border-charcoal-light rounded-luxury focus:outline-none focus:border-gold bg-white"
+                className="px-4 py-3 text-sm sm:text-base border border-charcoal-light rounded-luxury focus:outline-none focus:border-gold bg-white"
               >
                 <option value="">{t('blog.allCategories')}</option>
                 {categories.map((cat) => (
@@ -218,7 +218,7 @@ export default function BlogIndex() {
                     setSelectedTag('');
                     setCurrentPage(1);
                   }}
-                  className={`px-4 py-2 rounded-full text-sm transition ${
+                  className={`px-3 py-2 rounded-full text-sm transition ${
                     !selectedTag
                       ? 'bg-gold text-charcoal'
                       : 'bg-ivory text-taupe hover:bg-charcoal-light'
@@ -233,7 +233,7 @@ export default function BlogIndex() {
                       setSelectedTag(tag);
                       setCurrentPage(1);
                     }}
-                    className={`px-4 py-2 rounded-full text-sm transition ${
+                    className={`px-3 py-2 rounded-full text-sm transition ${
                       normalizeSlug(selectedTag) === normalizeSlug(tag)
                         ? 'bg-gold text-charcoal'
                         : 'bg-ivory text-taupe hover:bg-charcoal-light'
@@ -247,21 +247,21 @@ export default function BlogIndex() {
           </div>
 
           {/* Results Count */}
-          <p className="text-taupe mb-6">
+          <p className="text-taupe mb-6 text-sm sm:text-base">
             {t('blog.showingResults', { count: filteredPosts.length })}
           </p>
 
           {/* Posts Grid */}
           {loading ? (
-            <div className="text-center py-16">
-              <p className="text-xl text-taupe">{t('common.loading')}</p>
+            <div className="text-center py-12 sm:py-16">
+              <p className="text-lg sm:text-xl text-taupe">{t('common.loading')}</p>
             </div>
           ) : paginatedPosts.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-xl text-taupe">{t('blog.noPosts')}</p>
+            <div className="text-center py-12 sm:py-16">
+              <p className="text-lg sm:text-xl text-taupe">{t('blog.noPosts')}</p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-10 sm:mb-12">
               {paginatedPosts.map((post) => (
                 <Link
                   key={`${post.slug}-${(post as any).lang || language}`}
@@ -282,8 +282,8 @@ export default function BlogIndex() {
                   </div>
 
                   {/* Content */}
-                  <div className="p-6">
-                    <div className="flex items-center gap-2 text-sm text-taupe mb-3">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-taupe mb-2.5 sm:mb-3">
                       <span>
                         {new Date(post.date).toLocaleDateString(
                           i18n.language === 'ar' ? 'ar-SA' : 'en-US',
@@ -292,18 +292,18 @@ export default function BlogIndex() {
                       </span>
                       <span>•</span>
                       <span>
-                        {post.readingTime || 2}{' '}
-                        {t('blog.minRead_other', {
-                          count: post.readingTime || 2,
-                        })}
+                        <span className="hidden sm:inline">{post.readingTime || 2} </span>
+                        {t('blog.minRead_other', { count: post.readingTime || 2 })}
                       </span>
                     </div>
 
-                    <h3 className="text-xl font-bold text-charcoal mb-2 group-hover:text-gold transition line-clamp-2">
+                    <h3 className="text-lg sm:text-xl font-bold text-charcoal mb-2 group-hover:text-gold transition line-clamp-2">
                       {post.title}
                     </h3>
 
-                    <p className="text-taupe line-clamp-3 mb-4">{post.description}</p>
+                    <p className="text-sm sm:text-base text-taupe line-clamp-3 mb-3 sm:mb-4">
+                      {post.description}
+                    </p>
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gold font-semibold">
@@ -325,7 +325,7 @@ export default function BlogIndex() {
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-4 py-2 border border-charcoal-light rounded-lg hover:bg-charcoal-light transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 py-2 text-sm sm:text-base border border-charcoal-light rounded-lg hover:bg-charcoal-light transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {i18n.language === 'ar' ? '→' : '←'}
               </button>
@@ -334,7 +334,7 @@ export default function BlogIndex() {
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`px-4 py-2 rounded-lg transition ${
+                  className={`px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg transition ${
                     currentPage === page
                       ? 'bg-gold text-charcoal'
                       : 'border border-charcoal-light hover:bg-charcoal-light'
@@ -347,7 +347,7 @@ export default function BlogIndex() {
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 border border-charcoal-light rounded-lg hover:bg-charcoal-light transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 py-2 text-sm sm:text-base border border-charcoal-light rounded-lg hover:bg-charcoal-light transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {i18n.language === 'ar' ? '←' : '→'}
               </button>

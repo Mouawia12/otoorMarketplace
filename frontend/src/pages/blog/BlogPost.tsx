@@ -189,10 +189,10 @@ export default function BlogPost() {
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-sand py-16">
+      <div className="min-h-screen bg-sand py-12 sm:py-16">
         <div className="container mx-auto px-4">
           {/* Breadcrumbs */}
-          <nav className="text-sm text-taupe mb-8 flex items-center gap-2">
+          <nav className="text-sm text-taupe mb-6 sm:mb-8 flex items-center gap-2">
             <Link to="/" className="hover:text-gold">{t('nav.home')}</Link>
             <span>{i18n.language === 'ar' ? '←' : '→'}</span>
             <Link to="/blog" className="hover:text-gold">{t('blog.title')}</Link>
@@ -200,12 +200,12 @@ export default function BlogPost() {
             <span className="text-charcoal">{post.title}</span>
           </nav>
 
-          <div className="grid lg:grid-cols-12 gap-8">
+          <div className="grid lg:grid-cols-12 gap-6 sm:gap-8">
             {/* Main Content */}
             <article className="lg:col-span-8">
               {/* Header */}
               <header className="mb-8">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-taupe mb-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-taupe mb-3 sm:mb-4">
                   <span className="bg-gold text-charcoal px-3 py-1 rounded-full font-semibold">
                     {post.category}
                   </span>
@@ -217,21 +217,21 @@ export default function BlogPost() {
                   <span>{post.readingTime || 2} {t('blog.minRead')}</span>
                 </div>
 
-                <h1 className="text-4xl md:text-5xl font-bold text-charcoal mb-4">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-charcoal mb-3 sm:mb-4 leading-tight">
                   {post.title}
                 </h1>
 
-                <p className="text-xl text-taupe mb-6">
+                <p className="text-base sm:text-lg text-taupe mb-5 sm:mb-6">
                   {post.description}
                 </p>
 
-                <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-3 text-sm">
                   <span className="text-taupe">{t('blog.by')} {post.author}</span>
                 </div>
               </header>
 
               {/* Cover Image */}
-              <div className="aspect-video rounded-luxury overflow-hidden mb-8 bg-ivory">
+              <div className="aspect-video rounded-luxury overflow-hidden mb-6 sm:mb-8 bg-ivory">
                 <img
                   src={post.cover}
                   alt={post.title}
@@ -245,7 +245,7 @@ export default function BlogPost() {
 
               {/* Content */}
               <div
-                className={`prose prose-lg max-w-none mb-12 ${i18n.language === 'ar' ? 'prose-rtl' : ''}`}
+                className={`prose prose-base sm:prose-lg max-w-none mb-10 sm:mb-12 ${i18n.language === 'ar' ? 'prose-rtl' : ''}`}
                 dangerouslySetInnerHTML={{ __html: post.html || '' }}
                 style={{
                   direction: i18n.language === 'ar' ? 'rtl' : 'ltr',
@@ -254,13 +254,13 @@ export default function BlogPost() {
 
               {/* Tags */}
               {post.tags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 mb-8">
+                <div className="flex flex-wrap items-center gap-2 mb-6 sm:mb-8">
                   <span className="text-taupe font-semibold">{t('blog.tags')}:</span>
                   {post.tags.map(tag => (
                     <Link
                       key={tag}
                       to={`/blog/tag/${tag}`}
-                      className="px-3 py-1 bg-ivory text-taupe rounded-full text-sm hover:bg-gold hover:text-charcoal transition"
+                      className="px-3 py-1 bg-ivory text-taupe rounded-full text-xs sm:text-sm hover:bg-gold hover:text-charcoal transition"
                     >
                       #{tag}
                     </Link>
@@ -269,12 +269,12 @@ export default function BlogPost() {
               )}
 
               {/* Share Buttons */}
-              <div className="border-t border-charcoal-light pt-8">
+              <div className="border-t border-charcoal-light pt-6 sm:pt-8">
                 <p className="text-taupe font-semibold mb-4">{t('blog.share')}:</p>
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-3 sm:gap-4">
                   <button
                     onClick={() => handleShare('copy')}
-                    className="px-6 py-3 bg-ivory hover:bg-charcoal-light transition rounded-lg flex items-center gap-2"
+                    className="px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base bg-ivory hover:bg-charcoal-light transition rounded-lg flex items-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -284,16 +284,22 @@ export default function BlogPost() {
 
                   <button
                     onClick={() => handleShare('whatsapp')}
-                    className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white transition rounded-lg"
+                    className="px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white transition rounded-lg flex items-center gap-2"
                   >
-                    WhatsApp
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12.05 2C6.53 2 2 6.25 2 11.72c0 1.7.45 3.3 1.32 4.75L2 22l5.43-1.42a9.95 9.95 0 0 0 4.62 1.14c5.52 0 10.05-4.25 10.05-9.72C22.1 6.25 17.57 2 12.05 2Zm0 17.26c-1.43 0-2.82-.38-4.05-1.12l-.29-.17-3.32.86.88-3.04-.19-.3a7.42 7.42 0 0 1-1.16-3.97c0-4.1 3.4-7.42 7.74-7.42 4.25 0 7.71 3.32 7.71 7.42 0 4.1-3.46 7.42-7.71 7.42Zm4.02-5.5c-.22-.11-1.35-.67-1.57-.75-.22-.08-.38-.11-.54.11-.16.22-.61.75-.75.91-.14.16-.28.18-.52.06-.24-.11-1-.37-1.9-1.21-.7-.62-1.18-1.38-1.32-1.62-.14-.24-.02-.37.1-.49.1-.1.24-.26.34-.39.12-.14.14-.24.22-.4.08-.16.04-.3 0-.42-.04-.12-.52-1.25-.72-1.72-.18-.45-.37-.39-.52-.4-.14-.01-.3-.02-.46-.02-.16 0-.42.06-.64.3-.22.24-.85.83-.85 2.03 0 1.2.87 2.36 1 .25.12.16 1.7 2.6 4.1 3.66.58.26 1.02.41 1.38.53.58.18 1.1.17 1.52.1.47-.07 1.43-.55 1.64-1.1.22-.55.22-1.02.14-1.12-.06-.1-.22-.16-.45-.28Z" />
+                    </svg>
+                    {t('blog.whatsapp')}
                   </button>
 
                   <button
                     onClick={() => handleShare('twitter')}
-                    className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white transition rounded-lg"
+                    className="px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base bg-black text-white hover:bg-charcoal transition rounded-lg flex items-center gap-2"
                   >
-                    Twitter
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <path d="M4 3h4.3l4 5.4L17.7 3H21l-6.6 7.4L21.5 21H17.2l-4.4-5.8L7.9 21H3.5l6.9-7.7L4 3Zm2.3 1.4 9.5 12.7h1.1L7.4 4.4H6.3Z" />
+                    </svg>
+                    {t('blog.twitterX')}
                   </button>
                 </div>
               </div>
@@ -303,12 +309,12 @@ export default function BlogPost() {
             <aside className="lg:col-span-4">
               {/* TOC */}
               {toc.length > 0 && (
-                <div className="bg-ivory rounded-luxury p-6 mb-8 sticky top-24">
-                  <h3 className="text-xl font-bold text-charcoal mb-4">
+                <div className="bg-ivory rounded-luxury p-5 sm:p-6 mb-8 sticky top-24">
+                  <h3 className="text-lg sm:text-xl font-bold text-charcoal mb-3 sm:mb-4">
                     {t('blog.toc')}
                   </h3>
                   <nav>
-                    <ul className="space-y-2">
+                    <ul className="space-y-2 text-sm sm:text-base">
                       {toc.map(item => (
                         <li
                           key={item.id}
@@ -331,11 +337,11 @@ export default function BlogPost() {
 
           {/* Related Posts */}
           {relatedPosts.length > 0 && (
-            <section className="mt-16">
-              <h2 className="text-3xl font-bold text-charcoal mb-8">
+            <section className="mt-14 sm:mt-16">
+              <h2 className="text-2xl sm:text-3xl font-bold text-charcoal mb-6 sm:mb-8">
                 {t('blog.related')}
               </h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
                 {relatedPosts.map(related => (
                   <Link
                     key={related.slug}
@@ -354,7 +360,7 @@ export default function BlogPost() {
                       />
                     </div>
                     <div className="p-4">
-                      <h3 className="font-bold text-charcoal mb-2 group-hover:text-gold transition line-clamp-2">
+                      <h3 className="font-bold text-charcoal mb-2 group-hover:text-gold transition line-clamp-2 text-base sm:text-lg">
                         {related.title}
                       </h3>
                       <p className="text-sm text-taupe line-clamp-2">
@@ -368,10 +374,10 @@ export default function BlogPost() {
           )}
 
           {/* Back to Blog */}
-          <div className="mt-12 text-center">
+          <div className="mt-10 sm:mt-12 text-center">
             <Link
               to="/blog"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gold text-charcoal rounded-luxury hover:bg-gold-hover transition font-semibold"
+              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-gold text-charcoal rounded-luxury hover:bg-gold-hover transition font-semibold text-sm sm:text-base"
             >
               <span>{i18n.language === 'ar' ? '→' : '←'}</span>
               {t('blog.back')}

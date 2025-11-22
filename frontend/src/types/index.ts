@@ -26,6 +26,8 @@ export interface Product {
   status: string;
   created_at: string;
   updated_at: string;
+  rating_avg?: number;
+  rating_count?: number;
 }
 
 export interface ProductTemplate {
@@ -101,6 +103,17 @@ export interface Order {
     total_price: number;
     product?: Product;
   }>;
+}
+
+export interface ProductReview {
+  id: number;
+  rating: number;
+  comment: string;
+  created_at: string;
+  user?: {
+    id: number;
+    full_name: string;
+  };
 }
 
 export interface ModerationQueueItem {
