@@ -7,6 +7,10 @@ import {
   createProduct,
   getProductFiltersMeta,
 } from "../services/productService";
+import {
+  createProductReview,
+  listProductReviews,
+} from "../services/reviewService";
 import { authenticate } from "../middleware/auth";
 import { AppError } from "../utils/errors";
 
@@ -52,6 +56,49 @@ router.get("/:id/related", async (req, res, next) => {
     const limit = req.query.limit ? Number(req.query.limit) : 4;
     const related = await getRelatedProducts(id, Number.isNaN(limit) ? 4 : limit);
     res.json({ products: related });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/reviews", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      throw AppError.badRequest("Invalid product id");
+    }
+
+    const reviews = await listProductReviews(id);
+    res.json(reviews);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/:id/reviews", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      throw AppError.badRequest("Invalid product id");
+    }
+
+    const rating = Number(req.body?.rating);
+    const orderId = Number(req.body?.order_id);
+    const comment = typeof req.body?.comment === "string" ? req.body.comment : undefined;
+
+    const review = await createProductReview({
+      userId: req.user.id,
+      productId: id,
+      orderId,
+      rating,
+      comment,
+    });
+
+    res.status(201).json(review);
   } catch (error) {
     next(error);
   }

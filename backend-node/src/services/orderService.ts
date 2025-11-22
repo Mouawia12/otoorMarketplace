@@ -320,6 +320,33 @@ export const listOrdersForSeller = async (sellerId: number, status?: string) => 
   });
 };
 
+export const confirmOrderDelivery = async (orderId: number, buyerId: number) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: orderInclude,
+  });
+
+  if (!order || order.buyerId !== buyerId) {
+    throw AppError.notFound("Order not found");
+  }
+
+  if (order.status === OrderStatus.DELIVERED) {
+    return mapOrderToDto(order);
+  }
+
+  if (order.status !== OrderStatus.SHIPPED) {
+    throw AppError.badRequest("Order is not ready to be confirmed");
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: { status: OrderStatus.DELIVERED },
+    include: orderInclude,
+  });
+
+  return mapOrderToDto(updated);
+};
+
 export const updateOrderStatus = async (
   orderId: number,
   status: string,

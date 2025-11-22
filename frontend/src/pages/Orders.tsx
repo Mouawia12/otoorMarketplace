@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
+import { submitProductReview } from '../services/reviewService';
 
 export default function Orders() {
   const { t, i18n } = useTranslation();
@@ -17,6 +18,8 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted?: boolean }>>({});
+  const [submittingReviewKey, setSubmittingReviewKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -93,6 +96,50 @@ export default function Orders() {
   };
 
   const isSeller = user?.roles?.includes('seller');
+
+  const updateReviewDraft = (key: string, patch: Partial<{ rating: number; comment: string; submitted?: boolean }>) => {
+    setReviewDrafts((prev) => ({
+      ...prev,
+      [key]: {
+        rating: 5,
+        comment: '',
+        ...(prev[key] || {}),
+        ...patch,
+      },
+    }));
+  };
+
+  const handleSubmitReview = async (orderId: number, productId: number, key: string) => {
+    const draft = reviewDrafts[key];
+    if (!draft?.rating) {
+      alert(t('reviews.validation'));
+      return;
+    }
+    try {
+      setSubmittingReviewKey(key);
+      await submitProductReview(productId, {
+        order_id: orderId,
+        rating: draft.rating,
+        comment: draft.comment,
+      });
+      updateReviewDraft(key, { submitted: true });
+      alert(t('reviews.thankYou'));
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || t('reviews.submitFailed'));
+    } finally {
+      setSubmittingReviewKey(null);
+    }
+  };
+
+  const handleConfirmDelivery = async (orderId: number) => {
+    try {
+      await api.post(`/orders/${orderId}/confirm-delivery`);
+      await fetchOrders();
+      alert(t('orders.deliveryConfirmed'));
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || t('orders.deliveryConfirmFailed'));
+    }
+  };
 
   return (
     <div>
@@ -282,6 +329,8 @@ export default function Orders() {
                             typeof item.total_price === 'number'
                               ? item.total_price
                               : item.unit_price * item.quantity;
+                          const reviewKey = `${order.id}-${item.product_id}`;
+                          const reviewDraft = reviewDrafts[reviewKey] || { rating: 5, comment: '', submitted: false };
 
                           return (
                             <div
@@ -309,10 +358,73 @@ export default function Orders() {
                                   {t('orders.amount')}: {formatPrice(totalPrice, language)}
                                 </p>
                               </div>
+                              {!isSeller && order.status === 'completed' && (
+                                <div className="w-full mt-3 border-t border-sand/60 pt-3">
+                                  <p className="text-sm font-semibold text-charcoal mb-2">{t('reviews.leaveReview')}</p>
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    <div className="flex items-center gap-1">
+                                      {Array.from({ length: 5 }).map((_, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => updateReviewDraft(reviewKey, { rating: idx + 1 })}
+                                          className={`p-1 rounded ${reviewDraft.rating >= idx + 1 ? 'text-gold' : 'text-sand hover:text-gold'}`}
+                                          disabled={reviewDraft.submitted}
+                                          aria-label={`${t('reviews.ratingStar')} ${idx + 1}`}
+                                        >
+                                          <svg
+                                            className="w-5 h-5"
+                                            viewBox="0 0 24 24"
+                                            fill={reviewDraft.rating >= idx + 1 ? 'currentColor' : 'none'}
+                                            stroke="currentColor"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth="2"
+                                              d="M12 17.3l-5.2 3.1 1.5-5.8-4.5-3.9 5.9-.5L12 5l2.3 5.2 5.9.5-4.5 3.9 1.5 5.8z"
+                                            />
+                                          </svg>
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <input
+                                      type="text"
+                                      className="flex-1 min-w-[200px] border border-sand/80 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
+                                      placeholder={t('reviews.commentPlaceholder')}
+                                      value={reviewDraft.comment}
+                                      onChange={(e) => updateReviewDraft(reviewKey, { comment: e.target.value })}
+                                      disabled={reviewDraft.submitted}
+                                    />
+                                    <button
+                                      onClick={() => handleSubmitReview(order.id, item.product_id, reviewKey)}
+                                      className="bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-hover transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                      disabled={reviewDraft.submitted || submittingReviewKey === reviewKey}
+                                    >
+                                      {reviewDraft.submitted ? t('reviews.submitted') : t('reviews.submit')}
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-charcoal-light mt-1">
+                                    {t('reviews.orderHint')}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
                       </div>
+
+                      {!isSeller && order.status === 'shipped' && (
+                        <div className="mt-4 space-y-1">
+                          <button
+                            onClick={() => handleConfirmDelivery(order.id)}
+                            className="bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-hover transition"
+                          >
+                            {t('orders.confirmDelivery')}
+                          </button>
+                          <p className="text-xs text-charcoal-light">{t('orders.confirmDeliveryHint')}</p>
+                        </div>
+                      )}
 
                       {isSeller && order.status === 'pending' && (
                         <div className="mt-4 flex gap-2">

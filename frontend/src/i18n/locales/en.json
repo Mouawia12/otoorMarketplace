@@ -262,7 +262,10 @@
     "type": "Type",
     "size": "Size",
     "concentration": "Concentration",
-    "unknownProduct": "Unknown Product"
+    "unknownProduct": "Unknown Product",
+    "conditionNew": "New",
+    "conditionUsed": "Used",
+    "countSuffix": "products"
   },
   "auctions": {
     "title": "Live Auctions",
@@ -383,7 +386,30 @@
       "completed": "Completed",
       "canceled": "Canceled",
       "refunded": "Refunded"
-    }
+    },
+    "confirmDelivery": "Confirm delivery",
+    "confirmDeliveryHint": "Tap after your package arrives to unlock reviewing.",
+    "deliveryConfirmed": "Delivery confirmed. Enjoy your purchase!",
+    "deliveryConfirmFailed": "Unable to confirm delivery right now"
+  },
+  "reviews": {
+    "title": "Customer reviews",
+    "overall": "Overall rating",
+    "count": "reviews",
+    "recent": "Most recent",
+    "empty": "No reviews yet. Be the first to share your experience after receiving the product.",
+    "noRatings": "Waiting for the first rating",
+    "tagline": "Only confirmed deliveries can leave a rating.",
+    "leaveReview": "Rate this product",
+    "ratingStar": "Star",
+    "commentPlaceholder": "How was the scent, longevity, or packaging?",
+    "submit": "Send review",
+    "submitted": "Submitted",
+    "thankYou": "Thank you for your review!",
+    "submitFailed": "Could not submit your review",
+    "validation": "Please pick a rating first",
+    "orderHint": "Your review is linked to this delivered order for authenticity.",
+    "anonymous": "Guest reviewer"
   },
   "bids": {
     "auction": "Auction",
@@ -732,7 +758,9 @@
     "copied": "Copied!",
     "browsing": "Browsing",
     "articlesFound": "articles found",
-    "articlesBy": "Articles by"
+    "articlesBy": "Articles by",
+    "whatsapp": "WhatsApp",
+    "twitterX": "Share on X"
   },
   "nav": {
     "home": "Home",

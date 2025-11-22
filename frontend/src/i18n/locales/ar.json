@@ -264,7 +264,10 @@
     "type": "النوع",
     "size": "الحجم",
     "concentration": "التركيز",
-    "unknownProduct": "منتج غير معروف"
+    "unknownProduct": "منتج غير معروف",
+    "conditionNew": "جديد",
+    "conditionUsed": "مستعمل",
+    "countSuffix": "منتج"
   },
   "auctions": {
     "title": "المزادات المباشرة",
@@ -385,7 +388,30 @@
       "completed": "مكتمل",
       "canceled": "ملغى",
       "refunded": "مسترد"
-    }
+    },
+    "confirmDelivery": "تأكيد الاستلام",
+    "confirmDeliveryHint": "اضغط بعد وصول الشحنة لتتمكن من التقييم.",
+    "deliveryConfirmed": "تم تأكيد الاستلام، نتمنى لك تجربة ممتعة!",
+    "deliveryConfirmFailed": "تعذر تأكيد الاستلام حالياً"
+  },
+  "reviews": {
+    "title": "آراء العملاء",
+    "overall": "التقييم العام",
+    "count": "تقييمات",
+    "recent": "الأحدث",
+    "empty": "لا توجد تقييمات بعد. كن أول من يشارك تجربته بعد الاستلام.",
+    "noRatings": "بانتظار أول تقييم",
+    "tagline": "التقييم متاح بعد تأكيد استلام الطلب لضمان المصداقية.",
+    "leaveReview": "قيّم هذا المنتج",
+    "ratingStar": "نجمة",
+    "commentPlaceholder": "أخبرنا عن الرائحة، الثبات، أو التغليف",
+    "submit": "إرسال التقييم",
+    "submitted": "تم الإرسال",
+    "thankYou": "شكراً لمشاركتك!",
+    "submitFailed": "تعذر إرسال التقييم",
+    "validation": "اختر التقييم أولاً",
+    "orderHint": "التقييم مرتبط بهذا الطلب المُستلم لضمان الموثوقية.",
+    "anonymous": "مستخدم"
   },
   "bids": {
     "auction": "المزاد",
@@ -736,7 +762,28 @@
     "care": "العناية بالعطور",
     "seasonal": "عطور موسمية",
     "storage": "تخزين",
-    "noPosts": "لا توجد مقالات متاحة حالياً."
+    "noPosts": "لا توجد مقالات متاحة حالياً.",
+    "related": "قد يعجبك أيضاً",
+    "notFound": "المقال غير موجود",
+    "back": "العودة للمدونة",
+    "toc": "جدول المحتويات",
+    "search": "ابحث في المقالات...",
+    "allCategories": "كل التصنيفات",
+    "allTags": "جميع الوسوم",
+    "showingResults": "عرض {{count}} مقالة",
+    "category": "التصنيف",
+    "tag": "الوسم",
+    "author": "الكاتب",
+    "by": "بقلم",
+    "tags": "الوسوم",
+    "share": "شارك المقال",
+    "copyLink": "نسخ الرابط",
+    "copied": "تم النسخ!",
+    "browsing": "تصفح",
+    "articlesFound": "مقالات",
+    "articlesBy": "مقالات بواسطة",
+    "whatsapp": "واتساب",
+    "twitterX": "المشاركة على X"
   },
   "pages": {
     "about": {

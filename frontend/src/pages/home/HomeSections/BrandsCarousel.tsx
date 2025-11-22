@@ -22,7 +22,7 @@ export default function BrandsCarousel({ brands }: BrandsCarouselProps) {
           {brands.map((brand) => (
             <Link
               key={brand.id}
-              to={`/search?brand=${encodeURIComponent(brand.name)}`}
+              to={`/products?brand=${encodeURIComponent(brand.name)}&status=published`}
               className="flex items-center justify-center bg-ivory rounded-lg p-6 hover:bg-sand transition-colors shadow-md hover:shadow-luxury w-40 h-24 md:w-auto flex-shrink-0"
             >
               {brand.logo ? (
