@@ -233,6 +233,20 @@
     "liveAuctions": "Live Auctions",
     "myOrders": "My Orders"
   },
+  "seller": {
+    "completeProfile": "Complete Seller Profile",
+    "profileHint": "Complete your details for review and approval.",
+    "profileSubmitted": "Your seller profile has been submitted for review.",
+    "phoneValidation": "Phone number must be at least 8 digits.",
+    "nationalIdValidation": "National ID must be at least 8 digits.",
+    "ibanValidation": "IBAN must be at least 10 characters.",
+    "becomeSeller": "Register as Seller",
+    "city": "City",
+    "address": "Address",
+    "nationalId": "National ID",
+    "bankName": "Bank",
+    "iban": "IBAN"
+  },
   "footer": {
     "tagline": "Your trusted source for authentic luxury perfumes",
     "about": "About",
@@ -248,6 +262,14 @@
     "terms": "Terms of Service",
     "contact": "Contact Us",
     "copyright": "© {{year}} Aalam Al-Otoor. All rights reserved."
+  },
+  "common": {
+    "all": "All",
+    "login": "Login",
+    "register": "Register",
+    "submit": "Submit",
+    "error": "An error occurred",
+    "loading": "Loading..."
   },
   "auth": {
     "email": "Email",
@@ -468,8 +490,18 @@
     "ticketId": "Ticket ID",
     "fillAllFields": "Please fill all fields",
     "open": "Open",
-    "in_progress": "In Progress",
-    "closed": "Closed"
+    "pending": "Pending",
+    "answered": "Answered",
+    "closed": "Closed",
+    "buyer": "Buyer",
+    "seller": "Seller",
+    "reply": "Reply",
+    "replyPlaceholder": "Type your reply here",
+    "sendReply": "Send Reply"
+  },
+  "common": {
+    "approve": "Approve",
+    "reject": "Reject"
   },
   "seller": {
     "sellerPanel": "Seller Panel",

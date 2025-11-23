@@ -235,6 +235,20 @@
     "liveAuctions": "المزادات المباشرة",
     "myOrders": "طلباتي"
   },
+  "seller": {
+    "completeProfile": "أكمل ملف البائع",
+    "profileHint": "أكمل البيانات للمراجعة والموافقة.",
+    "profileSubmitted": "تم إرسال ملفك للمراجعة.",
+    "phoneValidation": "رقم الهاتف يجب أن لا يقل عن 8 أرقام.",
+    "nationalIdValidation": "رقم الهوية يجب أن لا يقل عن 8 أرقام.",
+    "ibanValidation": "رقم الآيبان يجب أن لا يقل عن 10 خانات.",
+    "becomeSeller": "سجل كتاجر",
+    "city": "المدينة",
+    "address": "العنوان",
+    "nationalId": "الهوية الوطنية",
+    "bankName": "البنك",
+    "iban": "رقم الآيبان"
+  },
   "footer": {
     "tagline": "مصدرك الموثوق للعطور الفاخرة الأصلية",
     "about": "حول",
@@ -250,6 +264,14 @@
     "terms": "شروط الخدمة",
     "contact": "اتصل بنا",
     "copyright": "© {{year}} عالم العطور. جميع الحقوق محفوظة."
+  },
+  "common": {
+    "all": "الكل",
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب",
+    "submit": "إرسال",
+    "error": "حدث خطأ",
+    "loading": "جاري التحميل..."
   },
   "auth": {
     "email": "البريد الإلكتروني",
@@ -470,8 +492,18 @@
     "ticketId": "رقم التذكرة",
     "fillAllFields": "يرجى ملء جميع الحقول",
     "open": "مفتوحة",
-    "in_progress": "قيد المعالجة",
-    "closed": "مغلقة"
+    "pending": "قيد الانتظار",
+    "answered": "تم الرد",
+    "closed": "مغلقة",
+    "buyer": "زبون",
+    "seller": "بائع",
+    "reply": "الرد",
+    "replyPlaceholder": "اكتب ردك هنا",
+    "sendReply": "إرسال الرد"
+  },
+  "common": {
+    "approve": "قبول",
+    "reject": "رفض"
   },
   "seller": {
     "sellerPanel": "لوحة البائع",

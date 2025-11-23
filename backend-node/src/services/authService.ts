@@ -11,6 +11,7 @@ import { config } from "../config/env";
 
 const userWithRolesInclude = Prisma.validator<Prisma.UserInclude>()({
   roles: { include: { role: true } },
+  sellerProfile: true,
 });
 
 type UserWithRoles = Prisma.UserGetPayload<{
@@ -25,6 +26,8 @@ const serializeUser = (user: UserWithRoles) => ({
   created_at: user.createdAt,
   status: user.status,
   roles: user.roles.map((roleRelation) => roleRelation.role.name.toLowerCase()),
+  seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
+  verified_seller: user.verifiedSeller,
 });
 
 export const registerSchema = z.object({

@@ -1,122 +1,180 @@
-import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import api from "../lib/api";
+import { SupportTicket } from "../types";
+import { useAuthStore } from "../store/authStore";
 
-interface Ticket {
-  id: number;
-  user: string;
-  subject: string;
-  subjectAr: string;
-  status: 'open' | 'in_progress' | 'closed';
-  priority: 'low' | 'medium' | 'high';
-  created: string;
-}
-
-const CANNED_REPLIES = {
-  orderStatus: { en: 'Your order status has been updated. Please check your account for details.', ar: 'تم تحديث حالة طلبك. يرجى التحقق من حسابك للحصول على التفاصيل.' },
-  refundPolicy: { en: 'Our refund policy allows returns within 14 days of purchase. Please contact us with your order number.', ar: 'تسمح سياسة الاسترداد بالإرجاع خلال 14 يومًا من الشراء. يرجى الاتصال بنا مع رقم طلبك.' },
-  shippingDelay: { en: 'We apologize for the shipping delay. Your order is being processed and will be shipped soon.', ar: 'نعتذر عن تأخير الشحن. يتم معالجة طلبك وسيتم شحنه قريبًا.' },
-};
+type StatusKey = "open" | "pending" | "answered" | "closed";
+type RoleFilter = "all" | "buyer" | "seller";
 
 export default function AdminSupportPage() {
   const { t, i18n } = useTranslation();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const { user } = useAuthStore();
+
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showReply, setShowReply] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [reply, setReply] = useState('');
+  const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusKey | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const isAdmin = useMemo(
+    () => user?.roles?.some((r) => ["admin", "super_admin"].includes(r.toLowerCase())),
+    [user]
+  );
 
   useEffect(() => {
-    fetchTickets();
-  }, []);
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
+    const load = async () => {
+      try {
+        setLoading(true);
+        const params: any = {};
+        if (roleFilter !== "all") params.role = roleFilter === "buyer" ? "buyer" : "seller";
+        const res = await api.get("/support", { params });
+        setTickets(res.data.tickets ?? []);
+      } catch (err) {
+        console.error("Failed to load tickets", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [isAdmin, roleFilter]);
 
-  const fetchTickets = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setTickets([
-      { id: 1, user: 'Ahmed M.', subject: 'Payment Issue', subjectAr: 'مشكلة في الدفع', status: 'open', priority: 'high', created: '2024-10-05' },
-      { id: 2, user: 'Fatima A.', subject: 'Order Delay', subjectAr: 'تأخير في الطلب', status: 'in_progress', priority: 'medium', created: '2024-10-04' },
-      { id: 3, user: 'Omar H.', subject: 'Product Question', subjectAr: 'سؤال حول المنتج', status: 'open', priority: 'low', created: '2024-10-04' },
-      { id: 4, user: 'Sara I.', subject: 'Account Access', subjectAr: 'الوصول إلى الحساب', status: 'closed', priority: 'high', created: '2024-10-01' },
-    ]);
-    setLoading(false);
-  };
-
-  const handleReply = (ticket: Ticket) => {
-    setSelectedTicket(ticket);
-    setReply('');
-    setShowReply(true);
-  };
-
-  const handleUseCanned = (template: keyof typeof CANNED_REPLIES) => {
-    setReply(CANNED_REPLIES[template][i18n.language as 'en' | 'ar']);
-  };
-
-  const handleSubmit = () => {
-    if (!selectedTicket) return;
-    setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'closed' } : t));
-    setShowReply(false);
-  };
-
-  const handleStatusChange = (id: number, newStatus: Ticket['status']) => {
-    setTickets(tickets.map(t => t.id === id ? { ...t, status: newStatus } : t));
-  };
+  const filteredTickets = useMemo(() => {
+    if (statusFilter === "all") return tickets;
+    return tickets.filter((t) => t.status === statusFilter);
+  }, [tickets, statusFilter]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'open': return 'text-gold bg-gold bg-opacity-10';
-      case 'in_progress': return 'text-blue-600 bg-blue-100';
-      case 'closed': return 'text-gray-600 bg-gray-200';
-      default: return 'text-gray-600 bg-gray-100';
+      case "open":
+        return "bg-green-100 text-green-700";
+      case "pending":
+        return "bg-yellow-100 text-yellow-700";
+      case "answered":
+        return "bg-blue-100 text-blue-700";
+      case "closed":
+        return "bg-gray-200 text-charcoal";
+      default:
+        return "bg-gray-200 text-charcoal";
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-600 bg-red-100';
-      case 'medium': return 'text-gold bg-gold bg-opacity-10';
-      case 'low': return 'text-gray-600 bg-gray-200';
-      default: return 'text-gray-600 bg-gray-100';
+  const handleStatusUpdate = async (status: StatusKey) => {
+    if (!activeTicket) return;
+    try {
+      setUpdatingStatus(true);
+      const res = await api.patch(`/support/${activeTicket.id}/status`, { status });
+      setTickets((prev) => prev.map((t) => (t.id === activeTicket.id ? res.data : t)));
+      setActiveTicket(res.data);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || t("common.error"));
+    } finally {
+      setUpdatingStatus(false);
     }
   };
+
+  const handleReply = async () => {
+    if (!activeTicket || !replyMessage.trim()) return;
+    try {
+      const res = await api.post(`/support/${activeTicket.id}/replies`, { message: replyMessage });
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === activeTicket.id ? { ...t, replies: [...(t.replies ?? []), res.data] } : t
+        )
+      );
+      setActiveTicket((prev) =>
+        prev ? { ...prev, replies: [...(prev.replies ?? []), res.data] } : prev
+      );
+      setReplyMessage("");
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || t("common.error"));
+    }
+  };
+
+  if (!isAdmin) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t("orders.authRequired")}</p>
+      </div>
+    );
+  }
 
   if (loading) {
-    return <div className="text-center py-12"><p className="text-taupe">{t('common.loading')}</p></div>;
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t("common.loading")}</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
-        <h1 className="text-h2 text-charcoal mb-6">{t('admin.supportTickets')}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h1 className="text-h2 text-charcoal">{t("admin.supportTickets")}</h1>
+          <div className="flex flex-wrap gap-2">
+            {(["all", "open", "pending", "answered", "closed"] as Array<StatusKey | "all">).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-2 rounded-luxury text-sm font-semibold ${
+                  statusFilter === s ? "bg-gold text-charcoal" : "bg-sand/70 text-charcoal-light hover:bg-sand"
+                }`}
+              >
+                {s === "all" ? t("common.all") : t(`support.${s}`)}
+              </button>
+            ))}
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+              className="border border-sand/70 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="all">{t("common.all")}</option>
+              <option value="buyer">{t("support.buyer", "زبون")}</option>
+              <option value="seller">{t("support.seller", "بائع")}</option>
+            </select>
+          </div>
+        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.id')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.user')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.subject')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.priority')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.status')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.created')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('admin.actions')}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.id")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.user")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.subject")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.status")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.created")}</th>
               </tr>
             </thead>
             <tbody>
-              {tickets.map((ticket) => (
-                <tr key={ticket.id} className="border-b border-gray-100 hover:bg-sand">
+              {filteredTickets.map((ticket) => (
+                <tr
+                  key={ticket.id}
+                  className="border-b border-gray-100 hover:bg-sand cursor-pointer"
+                  onClick={() => setActiveTicket(ticket)}
+                >
                   <td className="px-4 py-4 text-charcoal-light">{ticket.id}</td>
-                  <td className="px-4 py-4 text-charcoal font-medium">{ticket.user}</td>
-                  <td className="px-4 py-4 text-charcoal">{i18n.language === 'ar' ? ticket.subjectAr : ticket.subject}</td>
-                  <td className="px-4 py-4"><span className={`px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(ticket.priority)}`}>{t(`admin.${ticket.priority}`)}</span></td>
-                  <td className="px-4 py-4">
-                    <select value={ticket.status} onChange={(e) => handleStatusChange(ticket.id, e.target.value as Ticket['status'])} className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(ticket.status)} border-none`}>
-                      <option value="open">{t('admin.open')}</option>
-                      <option value="in_progress">{t('admin.inProgress')}</option>
-                      <option value="closed">{t('admin.closed')}</option>
-                    </select>
+                  <td className="px-4 py-4 text-charcoal font-medium">
+                    {ticket.user?.full_name || t("reviews.anonymous")}
+                    {ticket.role ? ` • ${ticket.role}` : ""}
                   </td>
-                  <td className="px-4 py-4 text-charcoal-light">{new Date(ticket.created).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}</td>
+                  <td className="px-4 py-4 text-charcoal">{ticket.subject}</td>
                   <td className="px-4 py-4">
-                    <button onClick={() => handleReply(ticket)} className="text-blue-600 hover:text-blue-700 text-sm font-semibold">{t('admin.reply')}</button>
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(ticket.status)}`}
+                    >
+                      {t(`support.${ticket.status}`)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-charcoal-light">
+                    {new Date(ticket.created_at).toLocaleDateString(i18n.language === "ar" ? "ar-EG" : "en-US")}
                   </td>
                 </tr>
               ))}
@@ -125,26 +183,81 @@ export default function AdminSupportPage() {
         </div>
       </div>
 
-      {showReply && selectedTicket && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-luxury p-6 max-w-2xl w-full">
-            <h3 className="text-h3 text-charcoal mb-4">{t('admin.replyToTicket')} {selectedTicket.id}</h3>
-            <p className="text-charcoal mb-4"><strong>{t('admin.user')}:</strong> {selectedTicket.user} | <strong>{t('admin.subject')}:</strong> {i18n.language === 'ar' ? selectedTicket.subjectAr : selectedTicket.subject}</p>
-            
-            <div className="mb-4">
-              <p className="text-charcoal font-semibold mb-2">{t('admin.cannedReplies')}:</p>
-              <div className="flex gap-2 flex-wrap">
-                <button onClick={() => handleUseCanned('orderStatus')} className="bg-blue-100 text-blue-600 px-3 py-1 rounded-luxury text-sm font-semibold hover:bg-blue-200">{t('admin.orderStatus')}</button>
-                <button onClick={() => handleUseCanned('refundPolicy')} className="bg-blue-100 text-blue-600 px-3 py-1 rounded-luxury text-sm font-semibold hover:bg-blue-200">{t('admin.refundPolicy')}</button>
-                <button onClick={() => handleUseCanned('shippingDelay')} className="bg-blue-100 text-blue-600 px-3 py-1 rounded-luxury text-sm font-semibold hover:bg-blue-200">{t('admin.shippingDelay')}</button>
+      {activeTicket && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-sand/80">
+              <div>
+                <p className="text-xs text-taupe">
+                  {t("support.ticketId")}: {activeTicket.id} {activeTicket.role ? `• ${activeTicket.role}` : ""}
+                </p>
+                <h3 className="text-lg font-bold text-charcoal">{activeTicket.subject}</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={activeTicket.status}
+                  onChange={(e) => handleStatusUpdate(e.target.value as StatusKey)}
+                  disabled={updatingStatus}
+                  className="border border-sand/70 rounded-lg px-3 py-2 text-sm"
+                >
+                  {(["open", "pending", "answered", "closed"] as StatusKey[]).map((s) => (
+                    <option key={s} value={s}>
+                      {t(`support.${s}`)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setActiveTicket(null)}
+                  className="text-charcoal hover:text-alert text-sm font-semibold"
+                >
+                  {t("common.close")}
+                </button>
               </div>
             </div>
 
-            <textarea value={reply} onChange={(e) => setReply(e.target.value)} placeholder={t('admin.replyPlaceholder')} className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none mb-4" rows={6} />
-            
-            <div className="flex gap-3">
-              <button onClick={handleSubmit} className="flex-1 bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover">{t('admin.sendReply')}</button>
-              <button onClick={() => setShowReply(false)} className="flex-1 bg-sand text-charcoal px-6 py-3 rounded-luxury font-semibold">{t('common.cancel')}</button>
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="border border-sand/60 rounded-xl p-4">
+                <p className="text-sm text-charcoal mb-2">{activeTicket.message}</p>
+                <p className="text-[11px] text-taupe">
+                  {new Date(activeTicket.created_at).toLocaleString(i18n.language === "ar" ? "ar-EG" : "en-US")}
+                </p>
+              </div>
+
+              {activeTicket.replies && activeTicket.replies.length > 0 && (
+                <div className="space-y-3">
+                  {activeTicket.replies.map((reply) => (
+                    <div key={reply.id} className="border border-sand/60 rounded-xl p-3">
+                      <p className="text-sm text-charcoal mb-1">{reply.message}</p>
+                      <p className="text-[11px] text-taupe flex justify-between">
+                        <span>{reply.user?.full_name || t("reviews.anonymous")}</span>
+                        <span>
+                          {new Date(reply.created_at).toLocaleString(
+                            i18n.language === "ar" ? "ar-EG" : "en-US"
+                          )}
+                        </span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="border-t border-sand/60 pt-3">
+                <label className="block text-sm font-semibold text-charcoal mb-2">{t("support.reply", "الرد")}</label>
+                <textarea
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-sand focus:border-gold focus:outline-none"
+                  placeholder={t("support.replyPlaceholder", "اكتب ردك هنا")}
+                />
+                <button
+                  onClick={handleReply}
+                  disabled={!replyMessage.trim()}
+                  className="mt-2 bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-hover transition disabled:opacity-60"
+                >
+                  {t("support.sendReply", "إرسال الرد")}
+                </button>
+              </div>
             </div>
           </div>
         </div>
