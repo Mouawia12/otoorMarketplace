@@ -9,6 +9,8 @@ export interface User {
   created_at?: string;
   avatar_url?: string | null;
   roles: string[];
+  seller_status?: string;
+  verified_seller?: boolean;
 }
 
 interface AuthState {

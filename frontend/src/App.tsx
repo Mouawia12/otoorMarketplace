@@ -25,6 +25,8 @@ import FavoritesPage from './pages/FavoritesPage';
 import SupportPage from './pages/SupportPage';
 import AccountChangePassword from './pages/AccountChangePassword';
 import AccountProfilePage from './pages/AccountProfilePage';
+import SellerProfileComplete from './pages/SellerProfileComplete';
+import SellerProfileStatus from './pages/SellerProfileStatus';
 import SellerChangePassword from './pages/SellerChangePassword';
 
 import SellerDashboardPage from './pages/SellerDashboardPage';
@@ -46,6 +48,7 @@ import AdminSupportPage from './pages/AdminSupportPage';
 import AdminReportsPage from './pages/AdminReportsPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import AdminAuditPage from './pages/AdminAuditPage';
+import AdminSellerProfilesPage from './pages/AdminSellerProfilesPage';
 import AdminProductLibraryPage from './pages/AdminProductLibraryPage';
 import AdminChangePassword from './pages/admin/AdminChangePassword';
 
@@ -143,6 +146,10 @@ function App() {
             <Route path="change-password" element={<AccountChangePassword />} />
           </Route>
 
+          {/* Seller profile completion */}
+          <Route path="seller/profile-complete" element={<SellerProfileComplete />} />
+          <Route path="seller/profile-status" element={<SellerProfileStatus />} />
+
           {/* Seller */}
           <Route path="seller" element={<SellerLayout />}>
             <Route path="dashboard" element={<SellerDashboardPage />} />
@@ -163,6 +170,7 @@ function App() {
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="auth-requests" element={<AdminAuthRequestsPage />} />
+            <Route path="seller-profiles" element={<AdminSellerProfilesPage />} />
 
             {/* Blog (Admin) */}
             <Route path="blog" element={<AdminBlogList />} />

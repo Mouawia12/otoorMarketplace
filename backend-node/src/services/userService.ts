@@ -9,6 +9,7 @@ export const getUserProfile = async (userId: number) => {
       roles: {
         include: { role: true },
       },
+      sellerProfile: true,
     },
   });
 
@@ -26,6 +27,19 @@ export const getUserProfile = async (userId: number) => {
     verified_seller: user.verifiedSeller,
     status: user.status,
     roles: user.roles.map((r) => r.role.name.toLowerCase()),
+    seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
+    seller_profile: user.sellerProfile
+      ? {
+          full_name: user.sellerProfile.fullName,
+          phone: user.sellerProfile.phone,
+          city: user.sellerProfile.city,
+          address: user.sellerProfile.address,
+          national_id: user.sellerProfile.nationalId,
+          iban: user.sellerProfile.iban,
+          bank_name: user.sellerProfile.bankName,
+          status: user.sellerProfile.status?.toLowerCase?.() ?? user.sellerProfile.status,
+        }
+      : null,
   });
 };
 

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 
 export default function SellerLayout() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user } = useAuthStore();
 
@@ -23,6 +24,14 @@ export default function SellerLayout() {
 
   if (!hasSellerAccess) {
     return <Navigate to="/account" replace />;
+  }
+
+  const sellerStatus = user?.seller_status ?? 'pending';
+  const isProfileFlow =
+    location.pathname.includes('/seller/profile-complete') ||
+    location.pathname.includes('/seller/profile-status');
+  if (sellerStatus !== 'approved' && !isProfileFlow) {
+    navigate('/seller/profile-status', { replace: true });
   }
 
   const menuItems = [

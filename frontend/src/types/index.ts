@@ -116,6 +116,36 @@ export interface ProductReview {
   };
 }
 
+export interface SupportReply {
+  id: number;
+  ticket_id: number;
+  user_id: number;
+  message: string;
+  created_at: string;
+  user?: {
+    id: number;
+    full_name: string;
+    email?: string;
+  };
+}
+
+export interface SupportTicket {
+  id: number;
+  user_id: number;
+  subject: string;
+  message: string;
+  status: string;
+  role?: string;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    id: number;
+    full_name: string;
+    email?: string;
+  };
+  replies?: SupportReply[];
+}
+
 export interface ModerationQueueItem {
   id: string;
   item_id: number;
