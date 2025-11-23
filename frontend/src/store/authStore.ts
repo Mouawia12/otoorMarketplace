@@ -18,6 +18,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<User>;
   loginWithGoogle: (idToken: string, role?: 'buyer' | 'seller') => Promise<User>;
   register: (data: { email: string; password: string; full_name: string; phone?: string; roles?: string[] }) => Promise<User>;
+  updateProfile: (data: { full_name?: string; phone?: string; avatar_url?: string }) => Promise<User>;
   logout: () => void;
   fetchUser: () => Promise<void>;
 }
@@ -51,6 +52,13 @@ export const useAuthStore = create<AuthState>()(
         const { access_token, user } = response.data;
         localStorage.setItem('auth_token', access_token);
         set({ token: access_token, user, isAuthenticated: true });
+        return user;
+      },
+
+      updateProfile: async (data) => {
+        const response = await api.patch('/auth/me', data);
+        const user = response.data;
+        set({ user });
         return user;
       },
 

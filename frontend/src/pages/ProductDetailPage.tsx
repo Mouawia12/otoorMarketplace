@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../store/uiStore';
+import { useAuthStore } from '../store/authStore';
+import { useWishlistStore } from '../store/wishlistStore';
 import { fetchProductById, fetchRelatedProducts } from '../services/productService';
 import { fetchAuctionByProductId } from '../services/auctionService';
 import ProductCard from '../components/products/ProductCard';
@@ -17,6 +19,10 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language } = useUIStore();
+  const { isAuthenticated } = useAuthStore();
+  const addToWishlist = useWishlistStore((s) => s.add);
+  const removeFromWishlist = useWishlistStore((s) => s.remove);
+  const wishlistHas = useWishlistStore((s) => s.has);
   
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -28,6 +34,7 @@ export default function ProductDetailPage() {
     average: 0,
     count: 0,
   });
+  const [wishlistLoading, setWishlistLoading] = useState(false);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -72,7 +79,7 @@ export default function ProductDetailPage() {
     };
     
     loadProduct();
-  }, [id]);
+  }, [id, isAuthenticated]);
 
   if (loading) {
     return (
@@ -95,6 +102,45 @@ export default function ProductDetailPage() {
       </div>
     );
   }
+  const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+  const hasInWishlist = product ? wishlistHas(String(product.id)) : false;
+  const toggleWishlist = async () => {
+    if (!product) return;
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    try {
+      setWishlistLoading(true);
+      if (hasInWishlist) {
+        removeFromWishlist(String(product.id));
+        await fetch(`${import.meta.env.VITE_API_URL || '/api'}/wishlist/${product.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+      } else {
+        addToWishlist({
+          id: String(product.id),
+          name,
+          price: product.base_price,
+          image: resolvedImage,
+          brand: product.brand,
+        });
+        await fetch(`${import.meta.env.VITE_API_URL || '/api'}/wishlist`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ productId: product.id }),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to toggle wishlist from detail page', error);
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
@@ -235,6 +281,21 @@ export default function ProductDetailPage() {
               <span className={`font-semibold ${isInStock ? 'text-success' : 'text-alert'}`}>
                 {isInStock ? `${product.stock_quantity} ${t('productDetail.available')}` : t('products.outOfStock')}
               </span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-sand/60">
+              <button
+                onClick={toggleWishlist}
+                disabled={wishlistLoading}
+                className={`flex items-center gap-2 text-sm font-semibold ${
+                  hasInWishlist ? 'text-gold' : 'text-charcoal'
+                }`}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill={hasInWishlist ? 'currentColor' : 'none'} stroke="currentColor">
+                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M20.8 4.6a5 5 0 0 0-7.1 0L12 6.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 22l8.8-10.3a5 5 0 0 0 0-7.1z" />
+                </svg>
+                <span>{hasInWishlist ? t('wishlist.remove') : t('wishlist.add', 'أضف للمفضلة')}</span>
+              </button>
+              {wishlistLoading && <span className="text-xs text-taupe">{t('common.loading')}</span>}
             </div>
           </div>
 

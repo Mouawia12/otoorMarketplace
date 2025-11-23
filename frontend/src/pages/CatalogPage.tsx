@@ -200,27 +200,24 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-charcoal">{getTitle()}</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="lg:col-span-1">
-          <ProductFilters
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            meta={filterMeta ?? undefined}
-            lockedCondition={lockedCondition}
-          />
-        </div>
+      <ProductFilters
+        className="w-full"
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        meta={filterMeta ?? undefined}
+        lockedCondition={lockedCondition}
+      />
 
-        <div className="lg:col-span-3">
-          {loading ? (
-            <div className="text-center py-12">
-              <p className="text-taupe">{t('common.loading')}</p>
-            </div>
-          ) : (catalogType === 'auctions' ? auctionItems.length === 0 : products.length === 0) ? (
-            <div className="text-center py-12">
-              <p className="text-taupe">{t('catalog.noProducts')}</p>
-            </div>
-          ) : (
-            <>
+      {loading ? (
+        <div className="text-center py-12">
+          <p className="text-taupe">{t('common.loading')}</p>
+        </div>
+      ) : (catalogType === 'auctions' ? auctionItems.length === 0 : products.length === 0) ? (
+        <div className="text-center py-12">
+          <p className="text-taupe">{t('catalog.noProducts')}</p>
+        </div>
+      ) : (
+        <>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
                 {catalogType === 'auctions'
                   ? auctionItems.map(({ auction, product }) => (
@@ -228,30 +225,29 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
                         key={auction.id}
                         product={product}
                         type="auction"
+                        auctionId={auction.id}
                         currentBid={Number(auction.current_price)}
                         auctionEndDate={auction.end_time}
                       />
                     ))
                   : products.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        type={catalogType}
-                      />
-                    ))}
-              </div>
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    type={catalogType}
+                  />
+                ))}
+          </div>
 
-              <div className="mt-6 sm:mt-8">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+          <div className="mt-6 sm:mt-8">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

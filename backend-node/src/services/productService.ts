@@ -272,7 +272,7 @@ export const getRelatedProducts = async (productId: number, limit = 4) => {
 };
 
 export const getProductFiltersMeta = async () => {
-  const [brandRows, categoryRows] = await prisma.$transaction([
+  const [brandRows, categoryRows, priceAgg] = await prisma.$transaction([
     prisma.product.findMany({
       where: { status: ProductStatus.PUBLISHED },
       distinct: ["brand"],
@@ -285,6 +285,11 @@ export const getProductFiltersMeta = async () => {
       select: { category: true },
       orderBy: { category: "asc" },
     }),
+    prisma.product.aggregate({
+      where: { status: ProductStatus.PUBLISHED },
+      _min: { basePrice: true },
+      _max: { basePrice: true },
+    }),
   ]);
 
   const brands = brandRows
@@ -295,12 +300,21 @@ export const getProductFiltersMeta = async () => {
     .map((row) => row.category)
     .filter((value): value is string => Boolean(value));
 
+  const min_price = priceAgg._min.basePrice
+    ? Number(priceAgg._min.basePrice)
+    : undefined;
+  const max_price = priceAgg._max.basePrice
+    ? Number(priceAgg._max.basePrice)
+    : undefined;
+
   return {
     brands,
     categories,
     conditions: Object.values(ProductCondition).map((condition) =>
       condition.toLowerCase()
     ),
+    ...(min_price !== undefined ? { min_price } : {}),
+    ...(max_price !== undefined ? { max_price } : {}),
   };
 };
 

@@ -73,12 +73,12 @@ export default function AccountOverviewPage() {
             <h1 className="text-h2 text-charcoal mb-2">{t('account.overview')}</h1>
             <p className="text-taupe">{t('account.welcomeBack')}, {profile.name}</p>
           </div>
-          <button
-            onClick={() => setShowEditModal(true)}
+          <Link
+            to="/account/profile"
             className="bg-gold text-charcoal px-6 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
           >
             {t('account.editProfile')}
-          </button>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-gray-200">
@@ -151,21 +151,7 @@ export default function AccountOverviewPage() {
         </Link>
       </div>
 
-      {/* Edit Profile Modal (Placeholder) */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-luxury p-6 max-w-md w-full">
-            <h3 className="text-h3 text-charcoal mb-4">{t('account.editProfile')}</h3>
-            <p className="text-taupe mb-6">{t('account.editProfileComingSoon')}</p>
-            <button
-              onClick={() => setShowEditModal(false)}
-              className="w-full bg-charcoal text-ivory px-6 py-3 rounded-luxury font-semibold hover:bg-charcoal-light transition"
-            >
-              {t('common.close')}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Removed placeholder modal */}
     </div>
   );
 }

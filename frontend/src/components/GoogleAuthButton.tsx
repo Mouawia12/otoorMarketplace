@@ -38,7 +38,7 @@ export function GoogleAuthButton({ onLoggedIn, role }: Props) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 flex flex-col items-center">
       <GoogleLogin
         onSuccess={handleSuccess}
         onError={handleError}
@@ -48,7 +48,7 @@ export function GoogleAuthButton({ onLoggedIn, role }: Props) {
         logo_alignment="left"
         type="standard"
         locale={t('lang', 'ar') === 'ar' ? 'ar' : 'en'}
-        width="100%"
+        width="320"
       />
       {loading && <p className="text-sm text-charcoal-light">{t('common.loading')}</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}

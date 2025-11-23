@@ -25,7 +25,8 @@ export const createProductReview = async (input: z.infer<typeof createReviewSche
     throw AppError.notFound("Order not found");
   }
 
-  if (order.status !== OrderStatus.DELIVERED) {
+  const allowedStatuses = [OrderStatus.DELIVERED, OrderStatus.SHIPPED, OrderStatus.PROCESSING];
+  if (!allowedStatuses.includes(order.status)) {
     throw AppError.badRequest("Order must be delivered before leaving a review");
   }
 

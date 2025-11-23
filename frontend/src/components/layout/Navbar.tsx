@@ -108,9 +108,13 @@ export default function Navbar() {
 
               {isAuthenticated ? (
                 <>
-                  <Link to="/orders" className="hover:text-gold transition whitespace-nowrap">{t('nav.orders')}</Link>
+              {user?.roles?.includes('seller') ? (
+                <Link to="/seller/dashboard" className="hover:text-gold transition whitespace-nowrap">{t('nav.sellerDashboard')}</Link>
+              ) : (
+                <Link to="/account" className="hover:text-gold transition whitespace-nowrap">{t('nav.dashboard')}</Link>
+              )}
                   {(user?.roles?.includes('admin') || user?.roles?.includes('super_admin')) && (
-                    <Link to="/admin/dashboard" className="hover:text-gold transition whitespace-nowrap">{t('nav.admin')}</Link>
+                    <Link to="/admin/dashboard" className="hover:text-gold transition whitespace-nowrap">{t('nav.adminDashboard')}</Link>
                   )}
                   <button onClick={logout} className="hover:text-gold transition whitespace-nowrap min-h-[44px]">
                     {t('common.logout')}
@@ -248,20 +252,21 @@ export default function Navbar() {
               {isAuthenticated ? (
                 <>
                   <div className="border-t border-charcoal-light my-2 pt-2">
-                    <Link to="/orders" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
-                      {t('nav.orders')}
-                    </Link>
+                    {user?.roles?.includes('seller') ? (
+                      <Link to="/seller/dashboard" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
+                        {t('nav.sellerDashboard')}
+                      </Link>
+                    ) : (
+                      <Link to="/account" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
+                        {t('nav.dashboard')}
+                      </Link>
+                    )}
                     <Link to="/account" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
                       {t('nav.account')}
                     </Link>
-                    {user?.roles?.includes('seller') && (
-                      <Link to="/seller/dashboard" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
-                        {t('nav.seller')}
-                      </Link>
-                    )}
                     {(user?.roles?.includes('admin') || user?.roles?.includes('super_admin')) && (
                       <Link to="/admin/dashboard" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
-                        {t('nav.admin')}
+                        {t('nav.adminDashboard')}
                       </Link>
                     )}
                   </div>

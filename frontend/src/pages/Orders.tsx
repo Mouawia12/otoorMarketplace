@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import api from '../lib/api';
 import { Order } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
@@ -9,17 +8,25 @@ import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import { submitProductReview } from '../services/reviewService';
+import api from '../lib/api';
 
 export default function Orders() {
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
   const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted?: boolean }>>({});
   const [submittingReviewKey, setSubmittingReviewKey] = useState<string | null>(null);
+
+  const isSeller = useMemo(() => user?.roles?.includes('seller'), [user]);
+  const isAdmin = useMemo(() => user?.roles?.some((r) => ['admin', 'super_admin'].includes(r)), [user]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -27,52 +34,35 @@ export default function Orders() {
       return;
     }
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, isAuthenticated]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       const params: any = {};
-      if (filter !== 'all') {
-        params.status = filter;
-      }
-      
-      const isSeller = user?.roles?.includes('seller');
-      const isAdmin = user?.roles?.some(role => ['admin', 'super_admin'].includes(role));
-      
+      if (filter !== 'all') params.status = filter;
+
       const endpoint = isAdmin || isSeller ? '/orders' : '/orders/mine';
-      
       const response = await api.get(endpoint, { params });
-      let fetchedOrders = response.data;
-      
+      let fetched = response.data;
+
       if (isSeller && !isAdmin) {
-        fetchedOrders = fetchedOrders
+        fetched = fetched
           .map((order: Order) => {
-            const sellerItems =
-              order.items?.filter((item) => item.product?.seller_id === user?.id) ?? [];
-            if (!sellerItems.length) {
-              return null;
-            }
-            const primary = sellerItems[0];
-            return {
-              ...order,
-              items: sellerItems,
-              product: primary.product ?? order.product,
-              product_id: primary.product_id,
-              quantity: primary.quantity,
-              unit_price: primary.unit_price,
-            };
+            const sellerItems = order.items?.filter((item) => item.product?.seller_id === user?.id) ?? [];
+            if (!sellerItems.length) return null;
+            return { ...order, items: sellerItems };
           })
           .filter(Boolean);
       }
-      
-      setOrders(fetchedOrders);
+
+      setOrders(fetched);
     } catch (error: any) {
       if (error.response?.status === 403 || error.response?.status === 401) {
-        alert(t('orders.authRequired'));
         navigate('/login');
       } else {
-        console.error('Failed to fetch orders:', error);
+        console.error('Failed to fetch orders', error);
       }
     } finally {
       setLoading(false);
@@ -85,17 +75,49 @@ export default function Orders() {
       seller_confirmed: 'bg-blue-100 text-blue-700',
       shipped: 'bg-purple-100 text-purple-700',
       completed: 'bg-green-100 text-green-700',
-      canceled: 'bg-red-100 text-red-700'
+      canceled: 'bg-red-100 text-red-700',
     };
     return colors[status] || 'bg-gray-100 text-gray-700';
   };
 
   const getShippingLabel = (method?: string) => {
-    if (method === 'express') return t('orders.expressShipping');
-    return t('orders.standardShipping');
+    if (!method) return t('orders.standardShipping');
+    const key = method.toLowerCase();
+    if (key.includes('express')) return t('orders.expressShipping');
+    if (key.includes('standard')) return t('orders.standardShipping');
+    return method;
   };
 
-  const isSeller = user?.roles?.includes('seller');
+  const itemListFromOrder = (order: Order) => {
+    if (order.items && order.items.length) return order.items;
+    if (order.product) {
+      return [
+        {
+          id: order.product_id ?? order.id,
+          product_id: order.product_id ?? order.id,
+          quantity: order.quantity,
+          unit_price: order.unit_price,
+          total_price: order.total_amount,
+          product: order.product,
+        },
+      ];
+    }
+    return [];
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!activeOrder || !selectedStatus) return;
+    try {
+      setUpdatingStatus(true);
+      await api.patch(`/orders/${activeOrder.id}/status`, { status: selectedStatus });
+      await fetchOrders();
+      setActiveOrder((prev) => (prev ? { ...prev, status: selectedStatus } : prev));
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || t('orders.updateFailed', 'تعذر تحديث الحالة'));
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   const updateReviewDraft = (key: string, patch: Partial<{ rating: number; comment: string; submitted?: boolean }>) => {
     setReviewDrafts((prev) => ({
@@ -131,360 +153,279 @@ export default function Orders() {
     }
   };
 
-  const handleConfirmDelivery = async (orderId: number) => {
-    try {
-      await api.post(`/orders/${orderId}/confirm-delivery`);
-      await fetchOrders();
-      alert(t('orders.deliveryConfirmed'));
-    } catch (error: any) {
-      alert(error?.response?.data?.detail || t('orders.deliveryConfirmFailed'));
-    }
-  };
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-charcoal">{t('orders.title')}</h1>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-charcoal">{t('orders.title')}</h1>
       </div>
 
-      <div className="bg-white rounded-luxury shadow-luxury p-4 mb-6">
+      <div className="bg-white rounded-luxury shadow-sm border border-sand/60 p-3 sm:p-4">
         <div className="flex gap-2 overflow-x-auto">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-luxury whitespace-nowrap transition ${
-              filter === 'all' ? 'bg-gold text-charcoal' : 'bg-gray-100 text-charcoal-light hover:bg-gray-200'
-            }`}
-          >
-            {t('orders.allOrders')}
-          </button>
-          <button
-            onClick={() => setFilter('pending')}
-            className={`px-4 py-2 rounded-luxury whitespace-nowrap transition ${
-              filter === 'pending' ? 'bg-gold text-charcoal' : 'bg-gray-100 text-charcoal-light hover:bg-gray-200'
-            }`}
-          >
-            {t('orders.statuses.pending')}
-          </button>
-          <button
-            onClick={() => setFilter('seller_confirmed')}
-            className={`px-4 py-2 rounded-luxury whitespace-nowrap transition ${
-              filter === 'seller_confirmed' ? 'bg-gold text-charcoal' : 'bg-gray-100 text-charcoal-light hover:bg-gray-200'
-            }`}
-          >
-            {t('orders.statuses.seller_confirmed')}
-          </button>
-          <button
-            onClick={() => setFilter('shipped')}
-            className={`px-4 py-2 rounded-luxury whitespace-nowrap transition ${
-              filter === 'shipped' ? 'bg-gold text-charcoal' : 'bg-gray-100 text-charcoal-light hover:bg-gray-200'
-            }`}
-          >
-            {t('orders.statuses.shipped')}
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`px-4 py-2 rounded-luxury whitespace-nowrap transition ${
-              filter === 'completed' ? 'bg-gold text-charcoal' : 'bg-gray-100 text-charcoal-light hover:bg-gray-200'
-            }`}
-          >
-            {t('orders.statuses.completed')}
-          </button>
+          {[
+            { key: 'all', label: t('orders.allOrders') },
+            { key: 'pending', label: t('orders.statuses.pending') },
+            { key: 'seller_confirmed', label: t('orders.statuses.seller_confirmed') },
+            { key: 'shipped', label: t('orders.statuses.shipped') },
+            { key: 'completed', label: t('orders.statuses.completed') },
+          ].map((btn) => (
+            <button
+              key={btn.key}
+              onClick={() => setFilter(btn.key)}
+              className={`px-4 py-2 rounded-luxury whitespace-nowrap text-sm font-semibold transition ${
+                filter === btn.key ? 'bg-gold text-charcoal' : 'bg-sand/50 text-charcoal-light hover:bg-sand'
+              }`}
+            >
+              {btn.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-12">
-          <p className="text-charcoal-light">{t('common.loading')}</p>
-        </div>
+        <div className="text-center py-12 text-charcoal-light">{t('common.loading')}</div>
       ) : !isAuthenticated ? (
-        <div className="bg-white p-12 rounded-luxury shadow-luxury text-center">
+        <div className="bg-white p-10 rounded-luxury shadow-sm text-center">
           <p className="text-charcoal-light mb-4">{t('orders.authRequired')}</p>
           <button
             onClick={() => navigate('/login')}
-            className="bg-gold text-charcoal px-6 py-2 rounded-luxury font-semibold hover:bg-gold-light transition"
+            className="bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition"
           >
             {t('common.login')}
           </button>
         </div>
       ) : orders.length === 0 ? (
-        <div className="bg-white p-12 rounded-luxury shadow-luxury text-center">
+        <div className="bg-white p-10 rounded-luxury shadow-sm text-center">
           <p className="text-charcoal-light">{t('orders.noOrders')}</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {orders.map(order => {
-            const itemList =
-              order.items && order.items.length > 0
-                ? order.items
-                : order.product
-                ? [
-                    {
-                      id: order.product_id ?? order.id,
-                      product_id: order.product_id ?? order.id,
-                      quantity: order.quantity,
-                      unit_price: order.unit_price,
-                      total_price: order.total_amount,
-                      product: order.product,
-                    },
-                  ]
-                : [];
-
-            const primaryProduct = itemList[0]?.product ?? order.product;
-            const productName = primaryProduct
-              ? (language === 'ar' ? primaryProduct.name_ar : primaryProduct.name_en)
-              : t('products.unknownProduct');
-            const imageUrl = resolveImageUrl(primaryProduct?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
-
+        <div className="space-y-3">
+          {orders.map((order) => {
+            const items = itemListFromOrder(order);
+            const primary = items[0]?.product ?? order.product;
+            const name = primary ? (language === 'ar' ? primary.name_ar : primary.name_en) : t('products.unknownProduct');
+            const image = resolveImageUrl(primary?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+            const qty = order.quantity || items.reduce((sum, i) => sum + (i.quantity || 0), 0);
             return (
-              <div key={order.id} className="bg-white rounded-luxury shadow-luxury overflow-hidden">
-                <div className="p-6">
-                  <div className="flex items-start gap-4">
-                    <img
-                      src={imageUrl}
-                      alt={productName}
-                      className="w-20 h-20 object-cover rounded-luxury"
-                      onError={(e) => {
-                        e.currentTarget.src = PLACEHOLDER_PERFUME;
-                      }}
-                    />
-                    
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="text-lg font-semibold text-charcoal">{productName}</h3>
-                          <p className="text-sm text-charcoal-light">
-                            {t('orders.orderNumber')}: {order.id}
-                          </p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(order.status)}`}>
-                          {t(`orders.statuses.${order.status}`)}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.quantity')}</p>
-                          <p className="font-semibold text-charcoal">{order.quantity}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.total')}</p>
-                          <p className="font-semibold text-gold">{formatPrice(order.total_amount, language)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.paymentMethod')}</p>
-                          <p className="font-semibold text-charcoal">{order.payment_method}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.date')}</p>
-                          <p className="font-semibold text-charcoal">
-                            {new Date(order.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-sand/40 pt-4">
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.shippingName')}</p>
-                          <p className="font-semibold text-charcoal">{order.shipping_name || t('orders.unknown')}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.shippingPhone')}</p>
-                          <p className="font-semibold text-charcoal">{order.shipping_phone || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.shippingCity')}</p>
-                          <p className="font-semibold text-charcoal">{order.shipping_city || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.shippingRegion')}</p>
-                          <p className="font-semibold text-charcoal">{order.shipping_region || '-'}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-xs text-charcoal-light">{t('orders.shippingAddress')}</p>
-                          <p className="font-semibold text-charcoal">{order.shipping_address}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.shippingMethod')}</p>
-                          <p className="font-semibold text-charcoal">{getShippingLabel(order.shipping_method)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-charcoal-light">{t('orders.shippingFee')}</p>
-                          <p className="font-semibold text-charcoal">
-                            {formatPrice(order.shipping_fee ?? 0, language)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 space-y-3">
-                        <p className="text-sm font-semibold text-charcoal">
-                          {t('orders.items')}
+              <button
+                key={order.id}
+                onClick={() => {
+                  setActiveOrder(order);
+                  setSelectedStatus(order.status);
+                }}
+                className="w-full text-left bg-white rounded-xl border border-sand/60 shadow-sm hover:shadow-md transition p-4 sm:p-5"
+              >
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <img
+                    src={image}
+                    alt={name}
+                    className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-sand/60"
+                    onError={(e) => {
+                      e.currentTarget.src = PLACEHOLDER_PERFUME;
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <p className="text-sm sm:text-base font-semibold text-charcoal line-clamp-1">{name}</p>
+                        <p className="text-xs text-charcoal-light">
+                          {t('orders.orderNumber')}: {order.id} ·{' '}
+                          {new Date(order.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
                         </p>
-                        {itemList.map((item) => {
-                          const itemProduct = item.product;
-                          const itemName = itemProduct
-                            ? (language === 'ar' ? itemProduct.name_ar : itemProduct.name_en)
-                            : t('products.unknownProduct');
-                          const itemImage = resolveImageUrl(itemProduct?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
-                          const totalPrice =
-                            typeof item.total_price === 'number'
-                              ? item.total_price
-                              : item.unit_price * item.quantity;
-                          const reviewKey = `${order.id}-${item.product_id}`;
-                          const reviewDraft = reviewDrafts[reviewKey] || { rating: 5, comment: '', submitted: false };
-
-                          return (
-                            <div
-                              key={`${order.id}-${item.id}`}
-                              className="flex items-start justify-between gap-4 rounded-lg border border-sand/50 p-3"
-                            >
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={itemImage}
-                                  alt={itemName}
-                                  className="w-14 h-14 object-cover rounded-md"
-                                    onError={(e) => {
-                                      e.currentTarget.src = PLACEHOLDER_PERFUME;
-                                    }}
-                                />
-                                <div>
-                                  <p className="text-sm font-semibold text-charcoal">{itemName}</p>
-                                  <p className="text-xs text-taupe">{itemProduct?.brand}</p>
-                                </div>
-                              </div>
-                              <div className="text-right text-sm text-charcoal">
-                                <p>{t('orders.quantity')}: <span className="font-semibold">{item.quantity}</span></p>
-                                <p>{t('orders.unitPrice')}: <span className="font-semibold">{formatPrice(item.unit_price, language)}</span></p>
-                                <p className="font-semibold text-gold">
-                                  {t('orders.amount')}: {formatPrice(totalPrice, language)}
-                                </p>
-                              </div>
-                              {!isSeller && order.status === 'completed' && (
-                                <div className="w-full mt-3 border-t border-sand/60 pt-3">
-                                  <p className="text-sm font-semibold text-charcoal mb-2">{t('reviews.leaveReview')}</p>
-                                  <div className="flex flex-wrap items-center gap-3">
-                                    <div className="flex items-center gap-1">
-                                      {Array.from({ length: 5 }).map((_, idx) => (
-                                        <button
-                                          key={idx}
-                                          type="button"
-                                          onClick={() => updateReviewDraft(reviewKey, { rating: idx + 1 })}
-                                          className={`p-1 rounded ${reviewDraft.rating >= idx + 1 ? 'text-gold' : 'text-sand hover:text-gold'}`}
-                                          disabled={reviewDraft.submitted}
-                                          aria-label={`${t('reviews.ratingStar')} ${idx + 1}`}
-                                        >
-                                          <svg
-                                            className="w-5 h-5"
-                                            viewBox="0 0 24 24"
-                                            fill={reviewDraft.rating >= idx + 1 ? 'currentColor' : 'none'}
-                                            stroke="currentColor"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth="2"
-                                              d="M12 17.3l-5.2 3.1 1.5-5.8-4.5-3.9 5.9-.5L12 5l2.3 5.2 5.9.5-4.5 3.9 1.5 5.8z"
-                                            />
-                                          </svg>
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <input
-                                      type="text"
-                                      className="flex-1 min-w-[200px] border border-sand/80 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold/40"
-                                      placeholder={t('reviews.commentPlaceholder')}
-                                      value={reviewDraft.comment}
-                                      onChange={(e) => updateReviewDraft(reviewKey, { comment: e.target.value })}
-                                      disabled={reviewDraft.submitted}
-                                    />
-                                    <button
-                                      onClick={() => handleSubmitReview(order.id, item.product_id, reviewKey)}
-                                      className="bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-hover transition disabled:opacity-60 disabled:cursor-not-allowed"
-                                      disabled={reviewDraft.submitted || submittingReviewKey === reviewKey}
-                                    >
-                                      {reviewDraft.submitted ? t('reviews.submitted') : t('reviews.submit')}
-                                    </button>
-                                  </div>
-                                  <p className="text-xs text-charcoal-light mt-1">
-                                    {t('reviews.orderHint')}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
                       </div>
-
-                      {!isSeller && order.status === 'shipped' && (
-                        <div className="mt-4 space-y-1">
-                          <button
-                            onClick={() => handleConfirmDelivery(order.id)}
-                            className="bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-hover transition"
-                          >
-                            {t('orders.confirmDelivery')}
-                          </button>
-                          <p className="text-xs text-charcoal-light">{t('orders.confirmDeliveryHint')}</p>
-                        </div>
-                      )}
-
-                      {isSeller && order.status === 'pending' && (
-                        <div className="mt-4 flex gap-2">
-                          <button
-                            onClick={async () => {
-                              try {
-                                await api.patch(`/orders/${order.id}/status`, { status: 'seller_confirmed' });
-                                fetchOrders();
-                              } catch (error: any) {
-                                alert(error.response?.data?.detail || t('orders.confirmFailed'));
-                              }
-                            }}
-                            className="bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-light transition"
-                          >
-                            {t('orders.confirmOrder')}
-                          </button>
-                        </div>
-                      )}
-
-                      {isSeller && order.status === 'seller_confirmed' && (
-                        <div className="mt-4 flex gap-2">
-                          <button
-                            onClick={async () => {
-                              try {
-                                await api.patch(`/orders/${order.id}/status`, { status: 'shipped' });
-                                fetchOrders();
-                              } catch (error: any) {
-                                alert(error.response?.data?.detail || t('orders.shipFailed'));
-                              }
-                            }}
-                            className="bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-light transition"
-                          >
-                            {t('orders.markAsShipped')}
-                          </button>
-                        </div>
-                      )}
-
-                      {isSeller && order.status === 'shipped' && (
-                        <div className="mt-4 flex gap-2">
-                          <button
-                            onClick={async () => {
-                              try {
-                                await api.patch(`/orders/${order.id}/status`, { status: 'completed' });
-                                fetchOrders();
-                              } catch (error: any) {
-                                alert(error.response?.data?.detail || t('orders.completeFailed'));
-                              }
-                            }}
-                            className="bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-light transition"
-                          >
-                            {t('orders.markAsCompleted')}
-                          </button>
-                        </div>
-                      )}
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatusColor(order.status)}`}>
+                        {t(`orders.statuses.${order.status}`)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs sm:text-sm text-charcoal-light">
+                      <span>{t('orders.quantity')}: {qty}</span>
+                      <span>{t('orders.total')}: {formatPrice(order.total_amount, language)}</span>
+                      <span>{t('orders.shippingMethod')}: {getShippingLabel(order.shipping_method)}</span>
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
+        </div>
+      )}
+
+      {activeOrder && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-sand/80">
+              <div>
+                <p className="text-xs text-taupe">{t('orders.orderNumber')}: {activeOrder.id}</p>
+                <h3 className="text-lg font-bold text-charcoal">{t(`orders.statuses.${activeOrder.status}`)}</h3>
+              </div>
+              {(isSeller || isAdmin) && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="border border-sand/70 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {['pending', 'seller_confirmed', 'shipped', 'completed', 'canceled'].map((s) => (
+                      <option key={s} value={s}>
+                        {t(`orders.statuses.${s}`)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleStatusUpdate}
+                    disabled={updatingStatus || selectedStatus === activeOrder.status}
+                    className="bg-gold text-charcoal px-3 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-hover transition disabled:opacity-50"
+                  >
+                    {updatingStatus ? t('common.loading') : t('common.save', 'حفظ')}
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={() => setActiveOrder(null)}
+                className="text-charcoal hover:text-alert text-sm font-semibold"
+              >
+                {t('common.close')}
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-charcoal">
+                <div>
+                  <p className="text-taupe text-xs mb-1">{t('orders.total')}</p>
+                  <p className="font-semibold">{formatPrice(activeOrder.total_amount, language)}</p>
+                </div>
+                <div>
+                  <p className="text-taupe text-xs mb-1">{t('orders.shippingMethod')}</p>
+                  <p className="font-semibold">{getShippingLabel(activeOrder.shipping_method)}</p>
+                </div>
+                <div>
+                  <p className="text-taupe text-xs mb-1">{t('orders.status')}</p>
+                  <p className="font-semibold">{t(`orders.statuses.${activeOrder.status}`)}</p>
+                </div>
+                <div>
+                  <p className="text-taupe text-xs mb-1">{t('orders.date')}</p>
+                  <p className="font-semibold">
+                    {new Date(activeOrder.created_at).toLocaleString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border rounded-xl border-sand/70">
+                <div className="px-4 py-3 border-b border-sand/70 flex items-center justify-between">
+                  <h4 className="font-semibold text-charcoal">{t('orders.items')}</h4>
+                  <span className="text-xs text-taupe">
+                    {(activeOrder.items?.length ?? itemListFromOrder(activeOrder).length)} {t('orders.itemsCount', 'عنصر')}
+                  </span>
+                </div>
+                <div className="divide-y divide-sand/60">
+              {(activeOrder.items && activeOrder.items.length ? activeOrder.items : itemListFromOrder(activeOrder)).map((item, idx) => {
+                const p = item.product;
+                const name = p ? (language === 'ar' ? p.name_ar : p.name_en) : t('products.unknownProduct');
+                const img = resolveImageUrl(p?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+                const reviewKey = `${activeOrder.id}-${item.product_id}`;
+                const reviewDraft = reviewDrafts[reviewKey] || { rating: 5, comment: '', submitted: false };
+                return (
+                  <div key={`${item.id}-${idx}`} className="px-4 py-3 flex items-start gap-3">
+                    <img
+                      src={img}
+                      alt={name}
+                          className="w-14 h-14 object-cover rounded-lg border border-sand/60"
+                          onError={(e) => {
+                            e.currentTarget.src = PLACEHOLDER_PERFUME;
+                          }}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-charcoal line-clamp-1">{name}</p>
+                          <p className="text-xs text-taupe">
+                            {t('orders.quantity')}: {item.quantity} · {formatPrice(item.unit_price, language)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="text-sm font-semibold text-charcoal">
+                            {formatPrice(item.total_price ?? item.unit_price * (item.quantity ?? 1), language)}
+                          </div>
+                          {!isSeller && activeOrder.status === 'completed' && (
+                            <div className="w-full border-t border-sand/60 pt-2">
+                              <p className="text-xs font-semibold text-charcoal mb-2">{t('reviews.leaveReview')}</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }).map((_, starIdx) => (
+                                    <button
+                                      key={starIdx}
+                                      type="button"
+                                      onClick={() => updateReviewDraft(reviewKey, { rating: starIdx + 1 })}
+                                      className={`p-1 rounded ${reviewDraft.rating >= starIdx + 1 ? 'text-gold' : 'text-sand hover:text-gold'}`}
+                                      disabled={reviewDraft.submitted}
+                                      aria-label={`${t('reviews.ratingStar')} ${starIdx + 1}`}
+                                    >
+                                      <svg
+                                        className="w-4 h-4"
+                                        viewBox="0 0 24 24"
+                                        fill={reviewDraft.rating >= starIdx + 1 ? 'currentColor' : 'none'}
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth="2"
+                                          d="M12 17.3l-5.2 3.1 1.5-5.8-4.5-3.9 5.9-.5L12 5l2.3 5.2 5.9.5-4.5 3.9 1.5 5.8z"
+                                        />
+                                      </svg>
+                                    </button>
+                                  ))}
+                                </div>
+                                <input
+                                  type="text"
+                                  className="flex-1 min-w-[180px] border border-sand/80 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-gold/40"
+                                  placeholder={t('reviews.commentPlaceholder')}
+                                  value={reviewDraft.comment}
+                                  onChange={(e) => updateReviewDraft(reviewKey, { comment: e.target.value })}
+                                  disabled={reviewDraft.submitted}
+                                />
+                                <button
+                                  onClick={() => handleSubmitReview(activeOrder.id, item.product_id, reviewKey)}
+                                  className="bg-gold text-charcoal px-3 py-1.5 rounded-luxury text-xs font-semibold hover:bg-gold-hover transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                  disabled={reviewDraft.submitted || submittingReviewKey === reviewKey}
+                                >
+                                  {reviewDraft.submitted ? t('reviews.submitted') : t('reviews.submit')}
+                                </button>
+                              </div>
+                              <p className="text-[11px] text-charcoal-light mt-1">
+                                {t('reviews.orderHint')}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {activeOrder.shipping_address && (
+                <div className="border border-sand/70 rounded-xl p-4">
+                  <h4 className="font-semibold text-charcoal mb-2">{t('orders.shippingAddress')}</h4>
+                  <p className="text-sm text-charcoal-light whitespace-pre-line">{activeOrder.shipping_address}</p>
+                </div>
+              )}
+
+              {!isSeller && activeOrder.status === 'shipped' && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="text-sm text-charcoal">{t('orders.confirmDeliveryNote')}</div>
+                  <button
+                    onClick={async () => {
+                      await api.post(`/orders/${activeOrder.id}/confirm-delivery`);
+                      await fetchOrders();
+                      setActiveOrder(null);
+                      alert(t('orders.deliveryConfirmed'));
+                    }}
+                    className="bg-charcoal text-ivory px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-charcoal-light transition"
+                  >
+                    {t('orders.confirmDelivery')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

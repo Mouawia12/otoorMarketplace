@@ -10,7 +10,7 @@ import {
   changePasswordSchema,
 } from "../services/authService";
 import { authenticate } from "../middleware/auth";
-import { getUserProfile } from "../services/userService";
+import { getUserProfile, updateUserProfile } from "../services/userService";
 import { toPlainObject } from "../utils/serializer";
 import { AppError } from "../utils/errors";
 
@@ -73,6 +73,26 @@ router.get("/me", authenticate(), async (req, res, next) => {
     }
 
     const profile = await getUserProfile(req.user.id);
+    res.json(toPlainObject(profile));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/me", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+
+    const schema = z.object({
+      full_name: z.string().min(2).optional(),
+      phone: z.string().optional(),
+      avatar_url: z.string().url().optional(),
+    });
+
+    const data = schema.parse(req.body);
+    const profile = await updateUserProfile(req.user.id, data);
     res.json(toPlainObject(profile));
   } catch (error) {
     next(error);
