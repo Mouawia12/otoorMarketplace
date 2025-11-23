@@ -26,6 +26,8 @@ export interface ProductFiltersMeta {
   brands: string[];
   categories: string[];
   conditions: string[];
+  min_price?: number;
+  max_price?: number;
 }
 
 export const fetchProducts = async (params: FetchProductsParams = {}): Promise<ProductsResponse> => {

@@ -14,6 +14,7 @@ export default function AccountLayout() {
 
   const navItems = [
     { path: '/account', label: t('account.overview'), icon: '👤' },
+    { path: '/account/profile', label: t('account.editProfile'), icon: '✏️' },
     { path: '/account/orders', label: t('account.orders'), icon: '📦' },
     { path: '/account/bids', label: t('account.bids'), icon: '🔨' },
     { path: '/account/favorites', label: t('account.favorites'), icon: '❤️' },

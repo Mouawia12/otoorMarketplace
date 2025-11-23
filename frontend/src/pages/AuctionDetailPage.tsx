@@ -9,6 +9,7 @@ import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import Countdown from '../components/common/Countdown';
+import { useMemo } from 'react';
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,27 @@ export default function AuctionDetailPage() {
   const [bidError, setBidError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+
+  const obfuscateName = useCallback(
+    (fullName?: string, email?: string, fallbackId?: number) => {
+      const safeName = fullName?.trim();
+      if (safeName && safeName.length >= 2) {
+        const first = safeName[0];
+        const last = safeName[safeName.length - 1];
+        return `${first}***${last}`;
+      }
+
+      if (email && email.includes('@')) {
+        const [user, domain] = email.split('@');
+        const safeUser = user ? `${user[0]}***` : '***';
+        const safeDomain = domain ? `${domain[0]}***` : '***';
+        return `${safeUser}@${safeDomain}`;
+      }
+
+      return t('auction.participantLabel', { id: fallbackId ?? '***' });
+    },
+    [t]
+  );
 
   const loadAuction = useCallback(async () => {
     if (!id) return null;
@@ -65,6 +87,34 @@ export default function AuctionDetailPage() {
 
     return () => clearInterval(pollInterval);
   }, [id]);
+
+  const participants = useMemo(() => {
+    const map = new Map<number, { label: string; highest: number; count: number }>();
+    bids.forEach((bid) => {
+      if (!bid.bidder_id) return;
+      const prev = map.get(bid.bidder_id);
+      const label = prev?.label ?? obfuscateName(bid.bidder?.full_name, bid.bidder?.email, bid.bidder_id);
+      const highest = prev ? Math.max(prev.highest, bid.amount) : bid.amount;
+      const count = prev ? prev.count + 1 : 1;
+      map.set(bid.bidder_id, { label, highest, count });
+    });
+    return Array.from(map.entries())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => b.highest - a.highest);
+  }, [bids, obfuscateName]);
+
+  const winner = useMemo(() => {
+    if (!bids.length) return null;
+    const topBid = [...bids].sort(
+      (a, b) => b.amount - a.amount || new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )[0];
+    return topBid
+      ? {
+          bid: topBid,
+          label: obfuscateName(topBid.bidder?.full_name, topBid.bidder?.email, topBid.bidder_id),
+        }
+      : null;
+  }, [bids, obfuscateName]);
 
   const handleBidSubmit = async () => {
     if (!isAuthenticated) {
@@ -153,7 +203,6 @@ export default function AuctionDetailPage() {
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isEnded = new Date(auction.end_time).getTime() < new Date().getTime();
   const seller = auction.seller || { id: 0, full_name: 'Unknown', verified_seller: false };
-
   return (
     <div className="space-y-12">
       {/* Status Badge */}
@@ -318,11 +367,13 @@ export default function AuctionDetailPage() {
       </div>
 
       {/* Bid History */}
-      {bids.length > 0 && (
-        <div className="border-t border-gray-200 pt-12">
-          <h2 className="text-h2 text-charcoal mb-6">{t('auction.bidHistory')}</h2>
-          
-          <div className="bg-white rounded-luxury shadow-luxury overflow-hidden">
+      <div className="border-t border-gray-200 pt-12">
+        <h2 className="text-h2 text-charcoal mb-6">{t('auction.bidHistory')}</h2>
+        
+        <div className="bg-white rounded-luxury shadow-luxury overflow-hidden">
+          {bids.length === 0 ? (
+            <div className="py-8 text-center text-taupe text-sm">{t('auction.noBids')}</div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-sand">
@@ -333,17 +384,16 @@ export default function AuctionDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bids.map((bid, index) => {
-                    const bidderName = bid.bidder?.full_name || 'Anonymous';
-                    const maskedName = bidderName.charAt(0) + '***' + bidderName.charAt(bidderName.length - 1);
-                    
+                  {bids.map((bid) => {
+                    const maskedName = obfuscateName(bid.bidder?.full_name, bid.bidder?.email, bid.bidder_id);
+                    const isWinnerRow = winner?.bid.id === bid.id;
                     return (
-                      <tr key={bid.id} className={`border-b border-gray-100 ${index === 0 ? 'bg-gold bg-opacity-10' : ''}`}>
+                      <tr key={bid.id} className={`border-b border-gray-100 ${isWinnerRow ? 'bg-gold/10' : ''}`}>
                         <td className="py-3 px-4 text-charcoal">
                           {maskedName}
-                          {index === 0 && (
+                          {isWinnerRow && (
                             <span className="ms-2 text-xs bg-gold text-charcoal px-2 py-1 rounded-full font-semibold">
-                              {t('home.live')}
+                              {isEnded ? t('auction.winner') : t('auction.leadingBidder')}
                             </span>
                           )}
                         </td>
@@ -362,6 +412,48 @@ export default function AuctionDetailPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Participants & Winner */}
+      {bids.length > 0 && (
+        <div className="bg-white rounded-luxury shadow-luxury p-5 space-y-4">
+          {winner && (
+            <div className="p-4 rounded-xl border border-gold/60 bg-gold/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-xs text-taupe uppercase tracking-wide">
+                  {isEnded ? t('auction.winner') : t('auction.leadingBidder')}
+                </p>
+                <p className="text-lg font-bold text-charcoal">{winner.label}</p>
+              </div>
+              <div className="text-xl font-extrabold text-gold">
+                {formatPrice(winner.bid.amount, language)}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-charcoal">{t('auction.participants')}</h3>
+            <span className="text-xs text-taupe">{t('auction.privacyNote')}</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {participants.map((participant) => (
+              <div key={participant.id} className="border border-sand/60 rounded-xl p-3 bg-ivory/40">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-charcoal">{participant.label}</p>
+                    <p className="text-xs text-taupe">
+                      {t('auction.bidsCount', { count: participant.count })}
+                    </p>
+                  </div>
+                  <span className="text-gold font-bold">
+                    {formatPrice(participant.highest, language)}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

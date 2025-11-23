@@ -24,6 +24,7 @@ import BidsPage from './pages/BidsPage';
 import FavoritesPage from './pages/FavoritesPage';
 import SupportPage from './pages/SupportPage';
 import AccountChangePassword from './pages/AccountChangePassword';
+import AccountProfilePage from './pages/AccountProfilePage';
 import SellerChangePassword from './pages/SellerChangePassword';
 
 import SellerDashboardPage from './pages/SellerDashboardPage';
@@ -134,6 +135,7 @@ function App() {
           {/* Account */}
           <Route path="account" element={<AccountLayout />}>
             <Route index element={<AccountOverviewPage />} />
+            <Route path="profile" element={<AccountProfilePage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="bids" element={<BidsPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
