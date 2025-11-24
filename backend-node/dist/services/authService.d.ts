@@ -38,6 +38,8 @@ export declare const registerUser: (input: z.infer<typeof registerSchema>) => Pr
         created_at: Date;
         status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
+        seller_status: string;
+        verified_seller: boolean;
     };
 }>;
 export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginSchema>) => Promise<{
@@ -50,6 +52,8 @@ export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginS
         created_at: Date;
         status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
+        seller_status: string;
+        verified_seller: boolean;
     };
 }>;
 export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => Promise<{
@@ -62,6 +66,8 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
         created_at: Date;
         status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
+        seller_status: string;
+        verified_seller: boolean;
     };
 }>;
 export declare const changePassword: (userId: number, payload: z.infer<typeof changePasswordSchema>) => Promise<{

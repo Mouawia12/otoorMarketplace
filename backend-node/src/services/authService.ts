@@ -196,14 +196,10 @@ export const authenticateWithGoogle = async (
 export const authenticateUser = async (input: z.infer<typeof loginSchema>) => {
   const data = loginSchema.parse(input);
 
-  const user = await prisma.user.findUnique({
+  const user = (await prisma.user.findUnique({
     where: { email: data.email },
-    include: {
-      roles: {
-        include: { role: true },
-      },
-    },
-  });
+    include: userWithRolesInclude,
+  })) as UserWithRoles | null;
 
   if (!user) {
     throw AppError.unauthorized("Invalid credentials");

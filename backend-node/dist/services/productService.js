@@ -52,6 +52,8 @@ const normalizeProduct = (product) => {
         status: normalizeStatus(plain.status),
         created_at: plain.createdAt,
         updated_at: plain.updatedAt,
+        rating_avg: Number(plain.rating_avg ?? 0),
+        rating_count: typeof plain.rating_count === "number" ? plain.rating_count : 0,
         seller: plain.seller
             ? {
                 id: plain.seller.id,
@@ -190,24 +192,35 @@ const listProducts = async (query) => {
 };
 exports.listProducts = listProducts;
 const getProductById = async (id) => {
-    const product = await client_2.prisma.product.findUnique({
-        where: { id },
-        include: {
-            images: { orderBy: { sortOrder: "asc" } },
-            seller: {
-                select: {
-                    id: true,
-                    fullName: true,
-                    verifiedSeller: true,
+    const [product, ratingStats] = await client_2.prisma.$transaction([
+        client_2.prisma.product.findUnique({
+            where: { id },
+            include: {
+                images: { orderBy: { sortOrder: "asc" } },
+                seller: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        verifiedSeller: true,
+                    },
                 },
+                auctions: true,
             },
-            auctions: true,
-        },
-    });
+        }),
+        client_2.prisma.productReview.aggregate({
+            where: { productId: id },
+            _avg: { rating: true },
+            _count: { rating: true },
+        }),
+    ]);
     if (!product) {
         throw errors_1.AppError.notFound("Product not found");
     }
-    return (0, exports.normalizeProduct)(product);
+    return (0, exports.normalizeProduct)({
+        ...product,
+        rating_avg: ratingStats._avg.rating ?? 0,
+        rating_count: ratingStats._count.rating ?? 0,
+    });
 };
 exports.getProductById = getProductById;
 const getRelatedProducts = async (productId, limit = 4) => {
@@ -235,7 +248,7 @@ const getRelatedProducts = async (productId, limit = 4) => {
 };
 exports.getRelatedProducts = getRelatedProducts;
 const getProductFiltersMeta = async () => {
-    const [brandRows, categoryRows] = await client_2.prisma.$transaction([
+    const [brandRows, categoryRows, priceAgg] = await client_2.prisma.$transaction([
         client_2.prisma.product.findMany({
             where: { status: client_1.ProductStatus.PUBLISHED },
             distinct: ["brand"],
@@ -248,6 +261,11 @@ const getProductFiltersMeta = async () => {
             select: { category: true },
             orderBy: { category: "asc" },
         }),
+        client_2.prisma.product.aggregate({
+            where: { status: client_1.ProductStatus.PUBLISHED },
+            _min: { basePrice: true },
+            _max: { basePrice: true },
+        }),
     ]);
     const brands = brandRows
         .map((row) => row.brand)
@@ -255,10 +273,18 @@ const getProductFiltersMeta = async () => {
     const categories = categoryRows
         .map((row) => row.category)
         .filter((value) => Boolean(value));
+    const min_price = priceAgg._min.basePrice
+        ? Number(priceAgg._min.basePrice)
+        : undefined;
+    const max_price = priceAgg._max.basePrice
+        ? Number(priceAgg._max.basePrice)
+        : undefined;
     return {
         brands,
         categories,
         conditions: Object.values(client_1.ProductCondition).map((condition) => condition.toLowerCase()),
+        ...(min_price !== undefined ? { min_price } : {}),
+        ...(max_price !== undefined ? { max_price } : {}),
     };
 };
 exports.getProductFiltersMeta = getProductFiltersMeta;
@@ -389,7 +415,7 @@ const updateProduct = async (productId, sellerId, payload) => {
     if (data.stockQuantity !== undefined)
         updateData.stockQuantity = data.stockQuantity;
     if (data.status !== undefined) {
-        if (typeof data.status === "string" && data.status === "pending") {
+        if (typeof data.status === "string" && (data.status === "pending" || data.status === "published")) {
             updateData.status = client_1.ProductStatus.PENDING_REVIEW;
         }
         else if (typeof data.status === "string") {

@@ -15,6 +15,7 @@ const jwt_1 = require("../utils/jwt");
 const env_1 = require("../config/env");
 const userWithRolesInclude = client_1.Prisma.validator()({
     roles: { include: { role: true } },
+    sellerProfile: true,
 });
 const serializeUser = (user) => ({
     id: user.id,
@@ -24,6 +25,8 @@ const serializeUser = (user) => ({
     created_at: user.createdAt,
     status: user.status,
     roles: user.roles.map((roleRelation) => roleRelation.role.name.toLowerCase()),
+    seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
+    verified_seller: user.verifiedSeller,
 });
 exports.registerSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
@@ -153,14 +156,10 @@ const authenticateWithGoogle = async (input) => {
 exports.authenticateWithGoogle = authenticateWithGoogle;
 const authenticateUser = async (input) => {
     const data = exports.loginSchema.parse(input);
-    const user = await client_2.prisma.user.findUnique({
+    const user = (await client_2.prisma.user.findUnique({
         where: { email: data.email },
-        include: {
-            roles: {
-                include: { role: true },
-            },
-        },
-    });
+        include: userWithRolesInclude,
+    }));
     if (!user) {
         throw errors_1.AppError.unauthorized("Invalid credentials");
     }

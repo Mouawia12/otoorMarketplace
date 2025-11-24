@@ -36,6 +36,9 @@ const listUsersForAdmin = async () => {
             roles: {
                 include: { role: true },
             },
+            sellerProfile: {
+                select: { status: true },
+            },
         },
         orderBy: { createdAt: "desc" },
     }));
@@ -46,6 +49,9 @@ const listUsersForAdmin = async () => {
         status: user.status,
         roles: user.roles.map((relation) => relation.role.name.toLowerCase()),
         created_at: user.createdAt.toISOString(),
+        seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
+        seller_profile_status: user.sellerProfile?.status?.toLowerCase?.(),
+        verified_seller: user.verifiedSeller,
     }));
 };
 exports.listUsersForAdmin = listUsersForAdmin;

@@ -27,6 +27,8 @@ export declare const listSellerProductsWithFilters: (sellerId: number, filters?:
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -70,6 +72,8 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -101,6 +105,8 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
             status: string;
             created_at: any;
             updated_at: any;
+            rating_avg: number;
+            rating_count: any;
             seller: {
                 id: any;
                 full_name: any;
@@ -109,4 +115,22 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
         } | undefined;
     }[];
 }[]>;
+export declare const listSellerEarnings: (sellerId: number) => Promise<{
+    records: {
+        id: number;
+        orderId: number;
+        date: Date;
+        productName: string;
+        productNameAr: string;
+        amount: number;
+        commission: number;
+        netEarnings: number;
+    }[];
+    summary: {
+        totalEarnings: number;
+        totalCommission: number;
+        netEarnings: number;
+        averageOrder: number;
+    };
+}>;
 //# sourceMappingURL=sellerService.d.ts.map

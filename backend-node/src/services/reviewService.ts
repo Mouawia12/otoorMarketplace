@@ -25,7 +25,11 @@ export const createProductReview = async (input: z.infer<typeof createReviewSche
     throw AppError.notFound("Order not found");
   }
 
-  const allowedStatuses = [OrderStatus.DELIVERED, OrderStatus.SHIPPED, OrderStatus.PROCESSING];
+  const allowedStatuses: OrderStatus[] = [
+    OrderStatus.DELIVERED,
+    OrderStatus.SHIPPED,
+    OrderStatus.PROCESSING,
+  ];
   if (!allowedStatuses.includes(order.status)) {
     throw AppError.badRequest("Order must be delivered before leaving a review");
   }
@@ -53,7 +57,7 @@ export const createProductReview = async (input: z.infer<typeof createReviewSche
       productId: data.productId,
       orderId: data.orderId,
       rating: data.rating,
-      comment: data.comment,
+      comment: data.comment ?? null,
     },
     include: {
       user: { select: { id: true, fullName: true } },
@@ -104,11 +108,7 @@ export const getProductRatingSummary = async (productId: number) => {
   };
 };
 
-const mapReview = (
-  review: Prisma.ProductReviewGetPayload<{
-    include: { user: { select: { id: true; fullName: true } } };
-  }>
-) => {
+const mapReview = (review: any) => {
   const plain = toPlainObject(review);
   return {
     id: plain.id,

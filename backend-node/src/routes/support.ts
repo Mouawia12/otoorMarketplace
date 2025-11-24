@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { RoleName } from "@prisma/client";
 import { authenticate } from "../middleware/auth";
 import {
   createSupportTicket,
@@ -17,11 +18,14 @@ router.get("/", authenticate(), async (req, res, next) => {
     const roleFilter = req.user.roles.some((r) => ["ADMIN", "SUPER_ADMIN"].includes(r))
       ? req.query.role?.toString()
       : undefined;
-    const tickets = await listSupportTickets({
+    const payload: { userId?: number; all?: boolean; role?: string | undefined } = {
       userId: req.user.id,
       all: req.user.roles.some((r) => ["ADMIN", "SUPER_ADMIN"].includes(r)),
-      role: roleFilter,
-    });
+    };
+    if (roleFilter) {
+      payload.role = roleFilter;
+    }
+    const tickets = await listSupportTickets(payload);
     res.json({ tickets });
   } catch (error) {
     next(error);
@@ -44,7 +48,8 @@ router.get("/:id", authenticate(), async (req, res, next) => {
 router.post("/", authenticate(), async (req, res, next) => {
   try {
     if (!req.user) throw AppError.unauthorized();
-    const role = req.user.roles.includes("seller") || req.user.roles.includes("SELLER") ? "seller" : "buyer";
+    const role =
+      req.user.roles.includes(RoleName.SELLER) || req.user.roles.includes("SELLER") ? "seller" : "buyer";
     const ticket = await createSupportTicket({
       userId: req.user.id,
       subject: req.body?.subject,
