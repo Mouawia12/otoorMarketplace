@@ -80,7 +80,7 @@ export default function SellerProfileComplete() {
       await api.post("/seller/profile/me", form);
       await fetchUser();
       setMessage(t("seller.profileSubmitted", "تم إرسال طلبك للمراجعة"));
-      navigate("/seller/dashboard", { replace: true });
+      navigate("/seller/profile-status", { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.detail || t("common.error"));
     } finally {

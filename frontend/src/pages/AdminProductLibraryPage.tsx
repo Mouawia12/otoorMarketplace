@@ -92,14 +92,20 @@ export default function AdminProductLibraryPage() {
   const handleDelete = async (id: number) => {
     if (confirmingId !== id) {
       setConfirmingId(id);
-      setTimeout(() => setConfirmingId(null), 3000);
+      setTimeout(() => setConfirmingId(null), 3500);
       return;
     }
     try {
+      const confirmed = window.confirm(t('admin.confirmDeleteTemplate', 'تأكيد حذف القالب؟'));
+      if (!confirmed) {
+        setConfirmingId(null);
+        return;
+      }
       await adminDeleteTemplate(id);
       setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
     } catch (error) {
       console.error('Failed to delete template', error);
+      alert(t('common.error'));
     } finally {
       setConfirmingId(null);
     }

@@ -15,6 +15,7 @@ type WishlistState = {
   remove: (id: string) => void;
   has: (id: string) => boolean;
   count: () => number;
+  clear: () => void;
 };
 
 export const useWishlistStore = create<WishlistState>()(
@@ -29,6 +30,7 @@ export const useWishlistStore = create<WishlistState>()(
       remove: (id) => set({ items: get().items.filter((i) => i.id !== id) }),
       has: (id) => get().items.some((i) => i.id === id),
       count: () => get().items.length,
+      clear: () => set({ items: [] }),
     }),
     { name: "wishlist" }
   )

@@ -39,7 +39,8 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
-  const displayPrice = type === 'auction' && currentBid ? currentBid : product.base_price;
+  const displayPriceRaw = type === 'auction' && currentBid ? currentBid : product.base_price;
+  const displayPrice = typeof displayPriceRaw === 'number' && !Number.isNaN(displayPriceRaw) ? displayPriceRaw : 0;
   const isAuction = type === 'auction';
   const isAuctionEnded =
     isAuction && auctionEndDate ? new Date(auctionEndDate).getTime() <= Date.now() : false;
@@ -165,7 +166,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
         {/* عنوان بسطرين ثابتين لثبات الارتفاع */}
         <Link
           to={targetLink}
-          className="block text-sm sm:text-base text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2 min-h-[40px] sm:min-h-[44px]"
+          className="block text-sm sm:text-base text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2 min-h-[36px] sm:min-h-[44px]"
         >
           {name}
         </Link>

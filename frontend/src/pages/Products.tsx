@@ -101,7 +101,7 @@ export default function Products() {
       </div>
 
       {/* شبكة المنتجات — بدون aside، تملأ العرض */}
-      <div className="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 md:gap-6">
+      <div className="grid [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))] gap-3 md:gap-6">
         {loading &&
           Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={`sk-${i}`} />)}
 

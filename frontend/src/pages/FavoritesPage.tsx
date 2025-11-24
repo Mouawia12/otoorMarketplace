@@ -11,6 +11,7 @@ export default function FavoritesPage() {
   const { isAuthenticated } = useAuthStore();
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchFavorites = async () => {
@@ -22,14 +23,24 @@ export default function FavoritesPage() {
 
       try {
         setLoading(true);
+        setError(null);
         const response = await api.get('/wishlist');
         const items = response.data.items ?? [];
         const products: Product[] = items
-          .map((item: any) => item.product)
-          .filter(Boolean);
+          .map((item: any) => {
+            const p = item.product;
+            if (!p) return null;
+            return {
+              ...p,
+              base_price: typeof p.base_price === 'number' ? p.base_price : Number(p.base_price ?? 0),
+              image_urls: Array.isArray(p.image_urls) ? p.image_urls : [],
+            } as Product;
+          })
+          .filter(Boolean) as Product[];
         setFavorites(products);
       } catch (error) {
         console.error('Failed to load wishlist', error);
+        setError(t('common.errorLoading'));
       } finally {
         setLoading(false);
       }
@@ -57,9 +68,29 @@ export default function FavoritesPage() {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="bg-white rounded-luxury p-6 shadow-luxury text-center">
+        <p className="text-charcoal mb-4">{t('wishlist.loginRequired', 'يجب تسجيل الدخول لرؤية المفضلة')}</p>
+        <a
+          href="/login"
+          className="inline-block bg-gold text-charcoal px-6 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
+        >
+          {t('common.login')}
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-luxury p-6 shadow-luxury">
       <h1 className="text-h2 text-charcoal mb-6">{t('account.favorites')}</h1>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-luxury mb-4">
+          {error}
+        </div>
+      )}
 
       {favorites.length === 0 ? (
         <div className="text-center py-12">

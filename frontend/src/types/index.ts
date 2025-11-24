@@ -4,6 +4,9 @@ export interface User {
   full_name: string;
   roles: string[];
   status: string;
+  seller_status?: string;
+  seller_profile_status?: string;
+  verified_seller?: boolean;
 }
 
 export interface Product {

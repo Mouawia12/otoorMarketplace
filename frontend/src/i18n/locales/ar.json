@@ -39,7 +39,9 @@
     "retry": "إعادة المحاولة",
     "errorLoading": "تعذر تحميل المحتوى. يرجى المحاولة مرة أخرى.",
     "notFound": "عذرًا، لم نعثر على ما تبحث عنه.",
-    "noResults": "لا توجد نتائج مطابقة حاليًا."
+    "noResults": "لا توجد نتائج مطابقة حاليًا.",
+    "approve": "قبول",
+    "reject": "رفض"
   },
   "cart": {
     "title": "سلة المشتريات",
@@ -264,14 +266,6 @@
     "terms": "شروط الخدمة",
     "contact": "اتصل بنا",
     "copyright": "© {{year}} عالم العطور. جميع الحقوق محفوظة."
-  },
-  "common": {
-    "all": "الكل",
-    "login": "تسجيل الدخول",
-    "register": "إنشاء حساب",
-    "submit": "إرسال",
-    "error": "حدث خطأ",
-    "loading": "جاري التحميل..."
   },
   "auth": {
     "email": "البريد الإلكتروني",
@@ -501,10 +495,6 @@
     "replyPlaceholder": "اكتب ردك هنا",
     "sendReply": "إرسال الرد"
   },
-  "common": {
-    "approve": "قبول",
-    "reject": "رفض"
-  },
   "seller": {
     "sellerPanel": "لوحة البائع",
     "dashboard": "لوحة التحكم",
@@ -512,6 +502,7 @@
     "auctions": "المزادات",
     "orders": "الطلبات",
     "earnings": "الأرباح",
+    "exportCsv": "تصدير CSV / Excel",
     "support": "الدعم",
     "welcomeMessage": "إدارة منتجاتك وطلباتك",
     "totalSales": "إجمالي المبيعات",
@@ -541,6 +532,8 @@
     "status": "الحالة",
     "createdAt": "تاريخ الإنشاء",
     "actions": "الإجراءات",
+    "saveDraft": "حفظ كمسودة",
+    "submitForReview": "إرسال للمراجعة",
     "duplicate": "نسخ",
     "delete": "حذف",
     "confirmDelete": "هل أنت متأكد من الحذف؟",
@@ -626,6 +619,7 @@
     "productLibrary": "مكتبة المنتجات",
     "productLibrarySubtitle": "أنشئ قوالب احترافية ليستفيد منها التجار عند إضافة منتجاتهم.",
     "addTemplate": "إضافة قالب",
+    "confirmDeleteTemplate": "تأكيد حذف القالب؟",
     "editTemplate": "تعديل القالب",
     "templateSearchPlaceholder": "ابحث بالاسم أو العلامة التجارية أو الفئة",
     "templateSaveFailed": "تعذر حفظ القالب",

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
+import api from '../lib/api';
 
 interface EarningsRecord {
   id: number;
@@ -19,6 +20,7 @@ export default function SellerEarningsPage() {
   const { language } = useUIStore();
   const [earnings, setEarnings] = useState<EarningsRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState({
     totalEarnings: 0,
     totalCommission: 0,
@@ -31,27 +33,39 @@ export default function SellerEarningsPage() {
   }, []);
 
   const fetchEarnings = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const mockEarnings: EarningsRecord[] = [
-      { id: 1, date: '2024-10-05', orderId: 1001, productName: 'Chanel No 5', productNameAr: 'شانيل رقم 5', amount: 150.00, commission: 15.00, netEarnings: 135.00 },
-      { id: 2, date: '2024-10-04', orderId: 1002, productName: 'Dior Sauvage', productNameAr: 'ديور سوفاج', amount: 120.00, commission: 12.00, netEarnings: 108.00 },
-      { id: 3, date: '2024-10-03', orderId: 1003, productName: 'Tom Ford Oud Wood', productNameAr: 'توم فورد أود وود', amount: 280.00, commission: 28.00, netEarnings: 252.00 },
-      { id: 4, date: '2024-10-01', orderId: 1004, productName: 'Creed Aventus', productNameAr: 'كريد أفينتوس', amount: 350.00, commission: 35.00, netEarnings: 315.00 },
-      { id: 5, date: '2024-09-30', orderId: 1005, productName: 'Versace Eros', productNameAr: 'فيرساتشي إيروس', amount: 95.00, commission: 9.50, netEarnings: 85.50 },
-      { id: 6, date: '2024-09-28', orderId: 1006, productName: 'YSL Y', productNameAr: 'إيف سان لوران واي', amount: 110.00, commission: 11.00, netEarnings: 99.00 },
-      { id: 7, date: '2024-09-25', orderId: 1007, productName: 'Paco Rabanne Invictus', productNameAr: 'باكو رابان إنفيكتوس', amount: 75.00, commission: 7.50, netEarnings: 67.50 },
-      { id: 8, date: '2024-09-20', orderId: 1008, productName: 'Giorgio Armani Code', productNameAr: 'جورجيو أرماني كود', amount: 85.00, commission: 8.50, netEarnings: 76.50 },
-    ];
-
-    const totalEarnings = mockEarnings.reduce((sum, e) => sum + e.amount, 0);
-    const totalCommission = mockEarnings.reduce((sum, e) => sum + e.commission, 0);
-    const netEarnings = mockEarnings.reduce((sum, e) => sum + e.netEarnings, 0);
-    const averageOrder = totalEarnings / mockEarnings.length;
-
-    setEarnings(mockEarnings);
-    setSummary({ totalEarnings, totalCommission, netEarnings, averageOrder });
-    setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await api.get('/seller/earnings');
+      const records: EarningsRecord[] = (res.data?.records ?? []).map((r: any) => ({
+        id: r.id,
+        date: r.date,
+        orderId: r.orderId,
+        productName: r.productName,
+        productNameAr: r.productNameAr,
+        amount: Number(r.amount ?? 0),
+        commission: Number(r.commission ?? 0),
+        netEarnings: Number(r.netEarnings ?? 0),
+      }));
+      const summaryData = res.data?.summary ?? {
+        totalEarnings: 0,
+        totalCommission: 0,
+        netEarnings: 0,
+        averageOrder: 0,
+      };
+      setEarnings(records);
+      setSummary({
+        totalEarnings: Number(summaryData.totalEarnings ?? 0),
+        totalCommission: Number(summaryData.totalCommission ?? 0),
+        netEarnings: Number(summaryData.netEarnings ?? 0),
+        averageOrder: Number(summaryData.averageOrder ?? 0),
+      });
+    } catch (err: any) {
+      console.error('Failed to load earnings', err);
+      setError(err?.response?.data?.detail || err?.response?.data?.message || t('common.error'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -62,8 +76,29 @@ export default function SellerEarningsPage() {
     );
   }
 
+  const downloadCsv = () => {
+    window.open('/seller/earnings?export=csv', '_blank');
+  };
+
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-luxury">
+          {error}
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <div className="flex gap-2">
+          <button
+            onClick={downloadCsv}
+            className="px-3 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition text-sm"
+          >
+            {t('seller.exportCsv', 'تصدير CSV / Excel')}
+          </button>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-luxury p-6 shadow-luxury">

@@ -92,17 +92,26 @@ const roleNames = [
 
 async function resetDatabase() {
   console.log("🧹 Clearing existing data...");
-  await prisma.bid.deleteMany();
-  await prisma.auction.deleteMany();
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.wishlistItem.deleteMany();
-  await prisma.productImage.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.address.deleteMany();
-  await prisma.userRole.deleteMany();
-  await prisma.role.deleteMany();
-  await prisma.user.deleteMany();
+  await prisma.$transaction([
+    prisma.bid.deleteMany(),
+    prisma.auction.deleteMany(),
+    prisma.orderItem.deleteMany(),
+    prisma.order.deleteMany(),
+    prisma.productReview.deleteMany(),
+    prisma.wishlistItem.deleteMany(),
+    prisma.productImage.deleteMany(),
+    prisma.productTemplateImage.deleteMany(),
+    prisma.productTemplate.deleteMany(),
+    prisma.product.deleteMany(),
+    prisma.address.deleteMany(),
+    prisma.supportReply.deleteMany(),
+    prisma.supportTicket.deleteMany(),
+    prisma.sellerProfile.deleteMany(),
+    prisma.userRole.deleteMany(),
+    prisma.post.deleteMany(),
+    prisma.role.deleteMany(),
+    prisma.user.deleteMany(),
+  ]);
 }
 
 async function ensureSchema() {

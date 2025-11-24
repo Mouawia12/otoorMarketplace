@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '../lib/api';
+import { useWishlistStore } from './wishlistStore';
 
 export interface User {
   id: number;
@@ -66,6 +67,8 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem('auth_token');
+        // Clear sensitive client state
+        useWishlistStore.getState().clear();
         set({ user: null, token: null, isAuthenticated: false });
       },
 

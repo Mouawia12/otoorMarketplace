@@ -89,11 +89,11 @@ export default function SellerDashboardPage() {
             <span className="text-3xl">💰</span>
             <h3 className="text-h3">{t('seller.totalEarnings')}</h3>
           </div>
-          <p className="text-4xl font-bold">{formatPrice(stats.totalEarnings, language)}</p>
-          <Link to="/seller/earnings" className="text-sm underline mt-2 inline-block hover:text-charcoal-light">
-            {t('seller.viewDetails')}
-          </Link>
-        </div>
+        <p className="text-4xl font-bold">{formatPrice(stats.totalEarnings, language)}</p>
+        <Link to="/seller/earnings" className="text-sm underline mt-2 inline-block hover:text-charcoal-light">
+          {t('seller.viewDetails')}
+        </Link>
+      </div>
 
         <div className="bg-white rounded-luxury p-6 shadow-luxury">
           <div className="flex items-center gap-3 mb-2">

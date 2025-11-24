@@ -6,10 +6,22 @@ import { useAuthStore } from '../../store/authStore';
 export default function AccountLayout() {
   const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  const isSeller = user?.roles?.some((r) => r.toLowerCase() === 'seller');
+  const sellerStatus = user?.seller_status ?? 'pending';
+
+  // إذا تمت الموافقة على التاجر، اجعل لوحة البائع هي الافتراضية
+  if (isSeller) {
+    if (sellerStatus === 'approved') {
+      return <Navigate to="/seller/dashboard" replace />;
+    }
+    // لو كان تحت المراجعة أو مرفوض، وجهه لشاشة الحالة
+    return <Navigate to="/seller/profile-status" replace />;
   }
 
   const navItems = [
