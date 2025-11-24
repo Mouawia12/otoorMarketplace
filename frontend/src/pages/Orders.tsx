@@ -122,12 +122,16 @@ export default function Orders() {
   const updateReviewDraft = (key: string, patch: Partial<{ rating: number; comment: string; submitted?: boolean }>) => {
     setReviewDrafts((prev) => ({
       ...prev,
-      [key]: {
-        rating: 5,
-        comment: '',
-        ...(prev[key] || {}),
-        ...patch,
-      },
+      [key]: (() => {
+        const existing = prev[key] || {};
+        const next: any = {
+          ...existing,
+          ...patch,
+        };
+        next.rating = patch.rating ?? existing.rating ?? 5;
+        next.comment = patch.comment ?? existing.comment ?? '';
+        return next;
+      })(),
     }));
   };
 

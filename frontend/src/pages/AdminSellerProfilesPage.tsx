@@ -21,7 +21,7 @@ type Profile = {
 const STATUS_OPTIONS = ["pending", "approved", "rejected"] as const;
 
 export default function AdminSellerProfilesPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);

@@ -9,6 +9,7 @@ export interface User {
   full_name: string;
   created_at?: string;
   avatar_url?: string | null;
+  phone?: string | null;
   roles: string[];
   seller_status?: string;
   verified_seller?: boolean;
