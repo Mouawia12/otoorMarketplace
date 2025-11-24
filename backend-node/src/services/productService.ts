@@ -453,7 +453,7 @@ export const updateProduct = async (
   if (data.condition !== undefined) updateData.condition = data.condition;
   if (data.stockQuantity !== undefined) updateData.stockQuantity = data.stockQuantity;
   if (data.status !== undefined) {
-    if (typeof data.status === "string" && data.status === "pending") {
+    if (typeof data.status === "string" && (data.status === "pending" || data.status === "published")) {
       updateData.status = ProductStatus.PENDING_REVIEW;
     } else if (typeof data.status === "string") {
       updateData.status = data.status.toUpperCase() as ProductStatus;

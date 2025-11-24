@@ -7,6 +7,7 @@ import {
   getSellerDashboardStats,
   listSellerProductsWithFilters,
   listSellerOrders,
+  listSellerEarnings,
 } from "../services/sellerService";
 import { createAuction, listAuctions } from "../services/auctionService";
 import { AppError } from "../utils/errors";
@@ -86,6 +87,47 @@ router.get("/orders", sellerOnly, async (req, res, next) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const orders = await listSellerOrders(req.user.id, status);
     res.json(orders);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/earnings", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) throw AppError.unauthorized();
+    const { records, summary } = await listSellerEarnings(req.user.id);
+
+    const exportFormat = typeof req.query.export === "string" ? req.query.export.toLowerCase() : "";
+    if (exportFormat === "csv" || exportFormat === "excel") {
+      const header = [
+        "id",
+        "order_id",
+        "date",
+        "product_name",
+        "product_name_ar",
+        "amount",
+        "commission",
+        "net_earnings",
+      ];
+      const rows = records.map((r) =>
+        [
+          r.id,
+          r.orderId,
+          r.date.toISOString(),
+          `"${r.productName.replace(/"/g, '""')}"`,
+          `"${r.productNameAr.replace(/"/g, '""')}"`,
+          r.amount.toFixed(2),
+          r.commission.toFixed(2),
+          r.netEarnings.toFixed(2),
+        ].join(",")
+      );
+      const csv = [header.join(","), ...rows].join("\n");
+      res.header("Content-Type", "text/csv");
+      res.header("Content-Disposition", "attachment; filename=earnings.csv");
+      return res.send(csv);
+    }
+
+    res.json({ records, summary });
   } catch (error) {
     next(error);
   }

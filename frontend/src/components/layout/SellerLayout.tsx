@@ -31,7 +31,7 @@ export default function SellerLayout() {
     location.pathname.includes('/seller/profile-complete') ||
     location.pathname.includes('/seller/profile-status');
   if (sellerStatus !== 'approved' && !isProfileFlow) {
-    navigate('/seller/profile-status', { replace: true });
+    return <Navigate to="/seller/profile-status" replace />;
   }
 
   const menuItems = [
@@ -39,7 +39,7 @@ export default function SellerLayout() {
     { path: '/seller/products', label: t('seller.products'), icon: '🛍️' },
     { path: '/seller/auctions', label: t('seller.auctions'), icon: '🔨' },
     { path: '/seller/orders', label: t('seller.orders'), icon: '📦' },
-    { path: '/account/profile', label: t('account.editProfile'), icon: '✏️' },
+    { path: '/seller/profile-status', label: t('seller.status', 'حالة الطلب'), icon: '📄' },
     { path: '/seller/earnings', label: t('seller.earnings'), icon: '💰' },
     { path: '/seller/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
     { path: '/seller/support', label: t('seller.support'), icon: '💬' },

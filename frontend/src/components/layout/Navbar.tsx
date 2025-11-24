@@ -117,7 +117,7 @@ export default function Navbar() {
                     <Link to="/admin/dashboard" className="hover:text-gold transition whitespace-nowrap">{t('nav.adminDashboard')}</Link>
                   )}
                   <button onClick={logout} className="hover:text-gold transition whitespace-nowrap min-h-[44px]">
-                    {t('common.logout')}
+                    {t('common.logout', 'تسجيل الخروج')}
                   </button>
                 </>
               ) : (
@@ -274,7 +274,7 @@ export default function Navbar() {
                     onClick={() => { logout(); closeMobileMenu(); }}
                     className="w-full text-left py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px]"
                   >
-                    {t('common.logout')}
+                    {t('common.logout', 'تسجيل الخروج')}
                   </button>
                 </>
               ) : (

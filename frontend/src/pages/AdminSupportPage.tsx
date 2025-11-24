@@ -13,11 +13,15 @@ export default function AdminSupportPage() {
 
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
   const [replyMessage, setReplyMessage] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusKey | "all">("all");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showNewTicketForm, setShowNewTicketForm] = useState(false);
+  const [newTicket, setNewTicket] = useState({ subject: "", message: "" });
+  const [submitting, setSubmitting] = useState(false);
 
   const isAdmin = useMemo(
     () => user?.roles?.some((r) => ["admin", "super_admin"].includes(r.toLowerCase())),
@@ -32,12 +36,14 @@ export default function AdminSupportPage() {
     const load = async () => {
       try {
         setLoading(true);
+        setError(null);
         const params: any = {};
         if (roleFilter !== "all") params.role = roleFilter === "buyer" ? "buyer" : "seller";
         const res = await api.get("/support", { params });
         setTickets(res.data.tickets ?? []);
       } catch (err) {
         console.error("Failed to load tickets", err);
+        setError(t("common.error"));
       } finally {
         setLoading(false);
       }
@@ -97,6 +103,28 @@ export default function AdminSupportPage() {
     }
   };
 
+  const handleSubmitTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTicket.subject.trim() || !newTicket.message.trim()) {
+      alert(t("support.fillAllFields"));
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const res = await api.post("/support", {
+        subject: newTicket.subject,
+        message: newTicket.message,
+      });
+      setTickets((prev) => [res.data, ...prev]);
+      setNewTicket({ subject: "", message: "" });
+      setShowNewTicketForm(false);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="text-center py-12">
@@ -116,6 +144,12 @@ export default function AdminSupportPage() {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-luxury mb-4">
+            {error}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h1 className="text-h2 text-charcoal">{t("admin.supportTickets")}</h1>
           <div className="flex flex-wrap gap-2">
@@ -139,8 +173,57 @@ export default function AdminSupportPage() {
               <option value="buyer">{t("support.buyer", "زبون")}</option>
               <option value="seller">{t("support.seller", "بائع")}</option>
             </select>
+            <button
+              onClick={() => setShowNewTicketForm((v) => !v)}
+              className="bg-gold text-charcoal px-4 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
+            >
+              {showNewTicketForm ? t("common.cancel") : t("support.newTicket")}
+            </button>
           </div>
         </div>
+
+        {showNewTicketForm && (
+          <form onSubmit={handleSubmitTicket} className="mb-6 p-5 bg-sand rounded-luxury space-y-4">
+            <div>
+              <label className="block text-charcoal font-semibold mb-2">{t("support.subject")}</label>
+              <input
+                type="text"
+                value={newTicket.subject}
+                onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
+                className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                placeholder={t("support.subjectPlaceholder")}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-charcoal font-semibold mb-2">{t("support.message")}</label>
+              <textarea
+                value={newTicket.message}
+                onChange={(e) => setNewTicket({ ...newTicket, message: e.target.value })}
+                rows={5}
+                className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none resize-none"
+                placeholder={t("support.messagePlaceholder")}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowNewTicketForm(false)}
+                className="px-4 py-2 rounded-luxury border border-sand text-charcoal hover:bg-sand transition"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition disabled:opacity-60"
+              >
+                {submitting ? t("common.loading") : t("support.createTicket")}
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full">

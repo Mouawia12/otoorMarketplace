@@ -38,7 +38,9 @@
     "retry": "Retry",
     "errorLoading": "Failed to load content. Please try again.",
     "notFound": "We couldn't find what you were looking for.",
-    "noResults": "No results match right now."
+    "noResults": "No results match right now.",
+    "approve": "Approve",
+    "reject": "Reject"
   },
   "cart": {
     "title": "Shopping Cart",
@@ -262,14 +264,6 @@
     "terms": "Terms of Service",
     "contact": "Contact Us",
     "copyright": "© {{year}} Aalam Al-Otoor. All rights reserved."
-  },
-  "common": {
-    "all": "All",
-    "login": "Login",
-    "register": "Register",
-    "submit": "Submit",
-    "error": "An error occurred",
-    "loading": "Loading..."
   },
   "auth": {
     "email": "Email",
@@ -499,10 +493,6 @@
     "replyPlaceholder": "Type your reply here",
     "sendReply": "Send Reply"
   },
-  "common": {
-    "approve": "Approve",
-    "reject": "Reject"
-  },
   "seller": {
     "sellerPanel": "Seller Panel",
     "dashboard": "Dashboard",
@@ -510,6 +500,7 @@
     "auctions": "Auctions",
     "orders": "Orders",
     "earnings": "Earnings",
+    "exportCsv": "Export CSV / Excel",
     "support": "Support",
     "welcomeMessage": "Manage your products and orders",
     "totalSales": "Total Sales",
@@ -539,6 +530,8 @@
     "status": "Status",
     "createdAt": "Created At",
     "actions": "Actions",
+    "saveDraft": "Save as draft",
+    "submitForReview": "Submit for review",
     "duplicate": "Duplicate",
     "delete": "Delete",
     "confirmDelete": "Are you sure you want to delete?",
@@ -624,6 +617,7 @@
     "productLibrary": "Product Library",
     "productLibrarySubtitle": "Create curated templates for sellers to reuse.",
     "addTemplate": "Add Template",
+    "confirmDeleteTemplate": "Delete this template?",
     "editTemplate": "Edit Template",
     "templateSearchPlaceholder": "Search by name, brand or category",
     "templateSaveFailed": "Failed to save template",

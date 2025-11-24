@@ -97,7 +97,25 @@ export const updateSellerProfileStatus = async (userId: number, status: SellerSt
 
   await prisma.user.update({
     where: { id: userId },
-    data: { sellerStatus: status, verifiedSeller: status === SellerStatus.APPROVED },
+    data: {
+      sellerStatus: status,
+      verifiedSeller: status === SellerStatus.APPROVED,
+      roles: status === SellerStatus.APPROVED
+        ? {
+            connectOrCreate: {
+              where: {
+                userId_roleId: {
+                  userId,
+                  roleId: (await ensureSellerRole()).id,
+                },
+              },
+              create: {
+                role: { connect: { name: RoleName.SELLER } },
+              },
+            },
+          }
+        : undefined,
+    },
   });
 
   return mapProfile(profile);

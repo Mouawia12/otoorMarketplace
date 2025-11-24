@@ -89,7 +89,9 @@ export default function SellerProductsPage() {
 
   const handleStatusChange = async (productId: number, newStatus: string) => {
     try {
-      await api.patch(`/seller/products/${productId}`, { status: newStatus });
+      const normalized =
+        newStatus === 'published' ? 'pending' : newStatus; // البائع يطلب المراجعة بدلاً من النشر المباشر
+      await api.patch(`/seller/products/${productId}`, { status: normalized });
       fetchProducts();
     } catch (error: any) {
       console.error('Failed to update status', error);
@@ -218,14 +220,13 @@ export default function SellerProductsPage() {
                   </td>
                   <td className="px-4 py-4">
                     <select
-                      value={product.status}
+                      value={product.status === 'published' ? 'pending' : product.status}
                       onChange={(e) => handleStatusChange(product.id, e.target.value)}
                       className={`px-3 py-1 rounded-full text-sm font-semibold ${statusBadgeClass(product.status)} border-none`}
                     >
-                    <option value="published">{t('seller.published', 'Published')}</option>
-                    <option value="draft">{t('seller.draft', 'Draft')}</option>
-                    <option value="pending">{t('seller.pending', 'Pending')}</option>
-                    <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
+                      <option value="pending">{t('seller.pending', 'Pending review')}</option>
+                      <option value="draft">{t('seller.draft', 'Draft')}</option>
+                      <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
                     </select>
                   </td>
                   <td className="px-4 py-4 text-charcoal-light">
@@ -398,7 +399,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent, intent: 'draft' | 'publish' = 'draft') => {
     event.preventDefault();
     try {
       setLoading(true);
@@ -422,6 +423,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         descriptionAr: formData.description_ar,
         condition: formData.condition || 'NEW',
         imageUrls,
+        status: intent === 'draft' ? 'DRAFT' : 'PENDING_REVIEW',
       };
 
       if (mode === 'add') {
@@ -521,7 +523,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         <h3 className="text-h3 text-charcoal mb-6">
           {mode === 'add' ? t('seller.addProduct') : t('seller.editProduct', 'Edit product')}
         </h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => handleSubmit(e, 'draft')} className="space-y-4">
           {mode === 'add' && (
             <div className="space-y-3 rounded-luxury border border-gray-200 bg-sand/30 p-4">
               <div className="flex flex-col md:flex-row md:items-center gap-3">
@@ -572,7 +574,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                             isActive ? 'border-gold bg-white' : 'border-gray-200 bg-white'
                           }`}
                         >
-                          <img src={preview} alt={title} className="w-16 h-16 rounded-lg object-cover" />
+                          <img src={preview} alt={title} className="w-20 h-20 rounded-lg object-cover" />
                           <div className="flex-1">
                             <p className="font-semibold text-charcoal">{title}</p>
                             <p className="text-sm text-taupe">{template.brand}</p>
@@ -767,7 +769,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex justify-end gap-3 mt-6 flex-wrap">
             <button
               type="button"
               onClick={onClose}
@@ -778,10 +780,18 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
             </button>
             <button
               type="submit"
+              className="px-4 py-2 rounded-luxury bg-sand text-charcoal font-semibold hover:bg-sand/80 disabled:opacity-50"
+              disabled={loading || uploadingImages}
+            >
+              {loading || uploadingImages ? t('common.loading') : t('seller.saveDraft', 'حفظ كمسودة')}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => handleSubmit(e, 'publish')}
               className="px-4 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover disabled:opacity-50"
               disabled={loading || uploadingImages}
             >
-              {loading || uploadingImages ? t('common.loading') : t('common.save')}
+              {loading || uploadingImages ? t('common.loading') : t('seller.submitForReview', 'إرسال للمراجعة')}
             </button>
           </div>
         </form>

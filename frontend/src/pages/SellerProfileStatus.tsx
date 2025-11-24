@@ -36,51 +36,64 @@ export default function SellerProfileStatus() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto bg-white rounded-luxury shadow-luxury p-6 sm:p-8">
-      <h1 className="text-2xl sm:text-3xl font-bold text-charcoal mb-2">
-        {t("seller.completeProfile", "أكمل ملف البائع")}
-      </h1>
-      <p className="text-taupe mb-6">{t("seller.profileHint", "أكمل البيانات للمراجعة والموافقة.")}</p>
-
-      <div className="border border-sand/70 rounded-xl p-4 mb-6">
-        <p className="text-sm text-charcoal-light mb-1">{t("seller.status", "الحالة الحالية")}</p>
-        <p className="text-lg font-semibold text-charcoal">
-          {status === "approved"
-            ? t("seller.statusApproved", "مقبول")
-            : status === "rejected"
-            ? t("seller.statusRejected", "مرفوض")
-            : t("seller.statusPending", "قيد المراجعة")}
+    <div className="flex items-center justify-center min-h-[70vh] px-4">
+      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-luxury p-6 sm:p-10 text-center space-y-4">
+        <div className="flex justify-center">
+          <div className="w-14 h-14 rounded-full bg-gold/20 text-gold flex items-center justify-center text-2xl">
+            {status === "approved" ? "✅" : status === "rejected" ? "⚠️" : "⏳"}
+          </div>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-charcoal">
+          {t("seller.completeProfile", "أكمل ملف البائع")}
+        </h1>
+        <p className="text-taupe">
+          {t("seller.profileHint", "أكمل البيانات للمراجعة والموافقة.")}
         </p>
-      </div>
 
-      {status === "approved" ? (
-        <Link
-          to="/seller/dashboard"
-          className="inline-flex items-center justify-center px-5 py-3 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition"
-        >
-          {t("seller.goToDashboard", "انتقل للوحة البائع")}
-        </Link>
-      ) : status === "rejected" ? (
-        <div className="space-y-3">
-          <p className="text-sm text-alert">{t("seller.rejectedHint", "تم رفض ملفك، يمكنك إعادة الإرسال بعد التعديل.")}</p>
-          <Link
-            to="/seller/profile-complete"
-            className="inline-flex items-center justify-center px-5 py-3 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition"
-          >
-            {t("seller.resubmitProfile", "إعادة إرسال الملف")}
-          </Link>
+        <div className="bg-sand/60 rounded-xl p-4 sm:p-5 flex flex-col gap-1 items-center">
+          <p className="text-sm text-charcoal-light">{t("seller.status", "الحالة الحالية")}</p>
+          <p className="text-xl font-semibold text-charcoal flex items-center gap-2">
+            {status === "approved" ? "✅" : status === "rejected" ? "⚠️" : "⏳"}
+            {status === "approved"
+              ? t("seller.statusApproved", "مقبول")
+              : status === "rejected"
+              ? t("seller.statusRejected", "مرفوض")
+              : t("seller.statusPending", "قيد المراجعة")}
+          </p>
         </div>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-charcoal">{t("seller.pendingHint", "طلبك قيد المراجعة من قبل الإدارة.")}</p>
+
+        {status === "approved" ? (
           <Link
-            to="/seller/profile-complete"
-            className="inline-flex items-center justify-center px-5 py-3 rounded-luxury bg-sand text-charcoal font-semibold hover:bg-sand/80 transition"
+            to="/seller/dashboard"
+            className="inline-flex items-center justify-center px-5 py-3 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition gap-2"
           >
-            {t("seller.editProfile", "تعديل الملف")}
+            <span>🚀</span>
+            <span>{t("seller.goToDashboard", "انتقل للوحة البائع")}</span>
           </Link>
-        </div>
-      )}
+        ) : status === "rejected" ? (
+          <div className="space-y-3">
+            <p className="text-sm text-alert">{t("seller.rejectedHint", "تم رفض ملفك، يمكنك إعادة الإرسال بعد التعديل.")}</p>
+            <Link
+              to="/seller/profile-complete"
+              className="inline-flex items-center justify-center px-5 py-3 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition gap-2"
+            >
+              <span>📝</span>
+              <span>{t("seller.resubmitProfile", "إعادة إرسال الملف")}</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-charcoal">{t("seller.pendingHint", "طلبك قيد المراجعة من قبل الإدارة.")}</p>
+            <Link
+              to="/seller/profile-complete"
+              className="inline-flex items-center justify-center px-5 py-3 rounded-luxury bg-sand text-charcoal font-semibold hover:bg-sand/80 transition gap-2"
+            >
+              <span>✏️</span>
+              <span>{t("seller.editProfile", "تعديل الملف")}</span>
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
