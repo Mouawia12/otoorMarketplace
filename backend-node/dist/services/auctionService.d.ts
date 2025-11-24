@@ -31,6 +31,8 @@ export declare const listAuctions: (query: unknown) => Promise<{
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -87,6 +89,8 @@ export declare const getAuctionById: (id: number) => Promise<{
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -131,6 +135,8 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -212,6 +218,8 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -256,6 +264,8 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;

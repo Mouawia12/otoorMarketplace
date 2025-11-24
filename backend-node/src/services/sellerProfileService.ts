@@ -100,21 +100,23 @@ export const updateSellerProfileStatus = async (userId: number, status: SellerSt
     data: {
       sellerStatus: status,
       verifiedSeller: status === SellerStatus.APPROVED,
-      roles: status === SellerStatus.APPROVED
+      ...(status === SellerStatus.APPROVED
         ? {
-            connectOrCreate: {
-              where: {
-                userId_roleId: {
-                  userId,
-                  roleId: (await ensureSellerRole()).id,
+            roles: {
+              connectOrCreate: {
+                where: {
+                  userId_roleId: {
+                    userId,
+                    roleId: (await ensureSellerRole()).id,
+                  },
                 },
-              },
-              create: {
-                role: { connect: { name: RoleName.SELLER } },
+                create: {
+                  role: { connect: { name: RoleName.SELLER } },
+                },
               },
             },
           }
-        : undefined,
+        : {}),
     },
   });
 

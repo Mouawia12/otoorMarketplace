@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateOrderStatus = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersByUser = exports.createOrder = void 0;
+exports.updateOrderStatus = exports.confirmOrderDelivery = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersByUser = exports.createOrder = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
@@ -278,6 +278,28 @@ const listOrdersForSeller = async (sellerId, status) => {
     });
 };
 exports.listOrdersForSeller = listOrdersForSeller;
+const confirmOrderDelivery = async (orderId, buyerId) => {
+    const order = await client_2.prisma.order.findUnique({
+        where: { id: orderId },
+        include: orderInclude,
+    });
+    if (!order || order.buyerId !== buyerId) {
+        throw errors_1.AppError.notFound("Order not found");
+    }
+    if (order.status === client_1.OrderStatus.DELIVERED) {
+        return mapOrderToDto(order);
+    }
+    if (order.status !== client_1.OrderStatus.SHIPPED) {
+        throw errors_1.AppError.badRequest("Order is not ready to be confirmed");
+    }
+    const updated = await client_2.prisma.order.update({
+        where: { id: orderId },
+        data: { status: client_1.OrderStatus.DELIVERED },
+        include: orderInclude,
+    });
+    return mapOrderToDto(updated);
+};
+exports.confirmOrderDelivery = confirmOrderDelivery;
 const updateOrderStatus = async (orderId, status, actorRoles) => {
     const allowedStatuses = [
         { from: [client_1.OrderStatus.PENDING], to: client_1.OrderStatus.PROCESSING },

@@ -83,17 +83,26 @@ const roleNames = [
 ];
 async function resetDatabase() {
     console.log("🧹 Clearing existing data...");
-    await client_2.prisma.bid.deleteMany();
-    await client_2.prisma.auction.deleteMany();
-    await client_2.prisma.orderItem.deleteMany();
-    await client_2.prisma.order.deleteMany();
-    await client_2.prisma.wishlistItem.deleteMany();
-    await client_2.prisma.productImage.deleteMany();
-    await client_2.prisma.product.deleteMany();
-    await client_2.prisma.address.deleteMany();
-    await client_2.prisma.userRole.deleteMany();
-    await client_2.prisma.role.deleteMany();
-    await client_2.prisma.user.deleteMany();
+    await client_2.prisma.$transaction([
+        client_2.prisma.bid.deleteMany(),
+        client_2.prisma.auction.deleteMany(),
+        client_2.prisma.orderItem.deleteMany(),
+        client_2.prisma.order.deleteMany(),
+        client_2.prisma.productReview.deleteMany(),
+        client_2.prisma.wishlistItem.deleteMany(),
+        client_2.prisma.productImage.deleteMany(),
+        client_2.prisma.productTemplateImage.deleteMany(),
+        client_2.prisma.productTemplate.deleteMany(),
+        client_2.prisma.product.deleteMany(),
+        client_2.prisma.address.deleteMany(),
+        client_2.prisma.supportReply.deleteMany(),
+        client_2.prisma.supportTicket.deleteMany(),
+        client_2.prisma.sellerProfile.deleteMany(),
+        client_2.prisma.userRole.deleteMany(),
+        client_2.prisma.post.deleteMany(),
+        client_2.prisma.role.deleteMany(),
+        client_2.prisma.user.deleteMany(),
+    ]);
 }
 async function ensureSchema() {
     const columnCheck = await client_2.prisma.$queryRaw `SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'Order' AND column_name = 'platform_fee'`;

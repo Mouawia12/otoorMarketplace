@@ -1,11 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listSellerOrders = exports.listSellerProductsWithFilters = exports.getSellerDashboardStats = void 0;
+exports.listSellerEarnings = exports.listSellerOrders = exports.listSellerProductsWithFilters = exports.getSellerDashboardStats = void 0;
 const client_1 = require("@prisma/client");
 const client_2 = require("../prisma/client");
 const productService_1 = require("./productService");
 const orderService_1 = require("./orderService");
+const env_1 = require("../config/env");
 const getSellerDashboardStats = async (sellerId) => {
+    const commissionRate = env_1.config.platformCommissionRate ?? 0;
     const [activeProducts, activeAuctions, pendingOrdersCount, totals] = await client_2.prisma.$transaction([
         client_2.prisma.product.count({
             where: { sellerId, status: "PUBLISHED" },
@@ -45,13 +47,17 @@ const getSellerDashboardStats = async (sellerId) => {
             totalPrice: true,
         },
     });
+    const grossTotal = Number(totals._sum.totalPrice ?? 0);
+    const grossMonthly = Number(monthlyEarnings._sum.totalPrice ?? 0);
+    const netTotal = grossTotal - grossTotal * commissionRate;
+    const netMonthly = grossMonthly - grossMonthly * commissionRate;
     return {
         totalSales: activeProducts + activeAuctions,
         activeProducts,
         activeAuctions,
         pendingOrders: pendingOrdersCount,
-        totalEarnings: Number(totals._sum.totalPrice ?? 0),
-        monthlyEarnings: Number(monthlyEarnings._sum.totalPrice ?? 0),
+        totalEarnings: netTotal,
+        monthlyEarnings: netMonthly,
     };
 };
 exports.getSellerDashboardStats = getSellerDashboardStats;
@@ -85,4 +91,58 @@ const listSellerOrders = async (sellerId, status) => {
     return (0, orderService_1.listOrdersForSeller)(sellerId, status);
 };
 exports.listSellerOrders = listSellerOrders;
+const listSellerEarnings = async (sellerId) => {
+    const orders = await client_2.prisma.order.findMany({
+        where: {
+            items: {
+                some: {
+                    product: { sellerId },
+                },
+            },
+        },
+        include: {
+            items: {
+                include: {
+                    product: true,
+                },
+            },
+        },
+        orderBy: { createdAt: "desc" },
+    });
+    const platformRate = env_1.config.platformCommissionRate ?? 0;
+    const records = orders.flatMap((order) => order.items
+        .filter((item) => item.product?.sellerId === sellerId)
+        .map((item) => {
+        const amount = Number(item.totalPrice);
+        const commission = Number((amount * platformRate).toFixed(2));
+        const netEarnings = amount - commission;
+        return {
+            id: item.id,
+            orderId: order.id,
+            date: order.createdAt,
+            productName: item.product?.nameEn ?? "Unknown",
+            productNameAr: item.product?.nameAr ?? "غير معروف",
+            amount,
+            commission,
+            netEarnings,
+        };
+    }));
+    const totals = records.reduce((acc, r) => {
+        acc.totalEarnings += r.amount;
+        acc.totalCommission += r.commission;
+        acc.netEarnings += r.netEarnings;
+        return acc;
+    }, { totalEarnings: 0, totalCommission: 0, netEarnings: 0 });
+    const averageOrder = records.length > 0 ? totals.totalEarnings / records.length : 0;
+    return {
+        records,
+        summary: {
+            totalEarnings: totals.totalEarnings,
+            totalCommission: totals.totalCommission,
+            netEarnings: totals.netEarnings,
+            averageOrder,
+        },
+    };
+};
+exports.listSellerEarnings = listSellerEarnings;
 //# sourceMappingURL=sellerService.js.map

@@ -14,6 +14,9 @@ export declare const listUsersForAdmin: () => Promise<{
     status: import(".prisma/client").$Enums.UserStatus;
     roles: string[];
     created_at: string;
+    seller_status: string;
+    seller_profile_status: string | undefined;
+    verified_seller: boolean;
 }[]>;
 export declare const updateUserStatus: (userId: number, status: string, allowedRoles: RoleName[]) => Promise<{
     id: number;
@@ -44,6 +47,8 @@ export declare const listPendingProducts: () => Promise<{
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -69,6 +74,8 @@ export declare const listProductsForAdmin: (status?: string) => Promise<{
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -94,6 +101,8 @@ export declare const updateProductStatusAsAdmin: (productId: number, status: str
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;

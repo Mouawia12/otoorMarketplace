@@ -92,7 +92,11 @@ router.patch("/me", authenticate(), async (req, res, next) => {
     });
 
     const data = schema.parse(req.body);
-    const profile = await updateUserProfile(req.user.id, data);
+    const profile = await updateUserProfile(req.user.id, {
+      full_name: data.full_name ?? undefined,
+      phone: data.phone ?? undefined,
+      avatar_url: data.avatar_url ?? undefined,
+    });
     res.json(toPlainObject(profile));
   } catch (error) {
     next(error);

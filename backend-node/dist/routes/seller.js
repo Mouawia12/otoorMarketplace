@@ -81,6 +81,44 @@ router.get("/orders", sellerOnly, async (req, res, next) => {
         next(error);
     }
 });
+router.get("/earnings", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user)
+            throw errors_1.AppError.unauthorized();
+        const { records, summary } = await (0, sellerService_1.listSellerEarnings)(req.user.id);
+        const exportFormat = typeof req.query.export === "string" ? req.query.export.toLowerCase() : "";
+        if (exportFormat === "csv" || exportFormat === "excel") {
+            const header = [
+                "id",
+                "order_id",
+                "date",
+                "product_name",
+                "product_name_ar",
+                "amount",
+                "commission",
+                "net_earnings",
+            ];
+            const rows = records.map((r) => [
+                r.id,
+                r.orderId,
+                r.date.toISOString(),
+                `"${r.productName.replace(/"/g, '""')}"`,
+                `"${r.productNameAr.replace(/"/g, '""')}"`,
+                r.amount.toFixed(2),
+                r.commission.toFixed(2),
+                r.netEarnings.toFixed(2),
+            ].join(","));
+            const csv = [header.join(","), ...rows].join("\n");
+            res.header("Content-Type", "text/csv");
+            res.header("Content-Disposition", "attachment; filename=earnings.csv");
+            return res.send(csv);
+        }
+        res.json({ records, summary });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.get("/auctions", sellerOnly, async (req, res, next) => {
     try {
         if (!req.user) {

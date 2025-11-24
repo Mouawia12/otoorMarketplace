@@ -18,6 +18,8 @@ export declare const normalizeProduct: (product: any) => {
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -44,6 +46,8 @@ export declare const listProducts: (query: unknown) => Promise<{
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -74,6 +78,8 @@ export declare const getProductById: (id: number) => Promise<{
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -99,6 +105,8 @@ export declare const getRelatedProducts: (productId: number, limit?: number) => 
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -106,6 +114,8 @@ export declare const getRelatedProducts: (productId: number, limit?: number) => 
     } | undefined;
 }[]>;
 export declare const getProductFiltersMeta: () => Promise<{
+    max_price?: number;
+    min_price?: number;
     brands: string[];
     categories: string[];
     conditions: string[];
@@ -155,6 +165,8 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>) 
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -180,6 +192,8 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;
@@ -205,6 +219,8 @@ export declare const moderateProduct: (productId: number, action: "approve" | "r
     status: string;
     created_at: any;
     updated_at: any;
+    rating_avg: number;
+    rating_count: any;
     seller: {
         id: any;
         full_name: any;

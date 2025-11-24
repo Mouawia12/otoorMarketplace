@@ -1,9 +1,10 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { toPlainObject } from "../utils/serializer";
 
 export const getUserProfile = async (userId: number) => {
-  const user = await prisma.user.findUnique({
+  const user = (await prisma.user.findUnique({
     where: { id: userId },
     include: {
       roles: {
@@ -11,7 +12,12 @@ export const getUserProfile = async (userId: number) => {
       },
       sellerProfile: true,
     },
-  });
+  })) as Prisma.UserGetPayload<{
+    include: {
+      roles: { include: { role: true } };
+      sellerProfile: true;
+    };
+  }>;
 
   if (!user) {
     throw AppError.notFound("User not found");
@@ -26,7 +32,7 @@ export const getUserProfile = async (userId: number) => {
     avatar_url: user.avatarUrl,
     verified_seller: user.verifiedSeller,
     status: user.status,
-    roles: user.roles.map((r) => r.role.name.toLowerCase()),
+    roles: user.roles.map((r: any) => r.role.name.toLowerCase()),
     seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
     seller_profile: user.sellerProfile
       ? {
@@ -45,21 +51,24 @@ export const getUserProfile = async (userId: number) => {
 
 export const updateUserProfile = async (
   userId: number,
-  data: { full_name?: string; phone?: string; avatar_url?: string }
+  data: { full_name?: string | undefined; phone?: string | undefined; avatar_url?: string | undefined }
 ) => {
-  const user = await prisma.user.update({
+  const updateData: Prisma.UserUpdateInput = {};
+  if (data.full_name !== undefined) updateData.fullName = data.full_name;
+  if (data.phone !== undefined) updateData.phone = data.phone;
+  if (data.avatar_url !== undefined) updateData.avatarUrl = data.avatar_url;
+
+  const user = (await prisma.user.update({
     where: { id: userId },
-    data: {
-      fullName: data.full_name ?? undefined,
-      phone: data.phone ?? undefined,
-      avatarUrl: data.avatar_url ?? undefined,
-    },
+    data: updateData,
     include: {
       roles: {
         include: { role: true },
       },
     },
-  });
+  })) as Prisma.UserGetPayload<{
+    include: { roles: { include: { role: true } } };
+  }>;
 
   return toPlainObject({
     id: user.id,
@@ -70,6 +79,6 @@ export const updateUserProfile = async (
     avatar_url: user.avatarUrl,
     verified_seller: user.verifiedSeller,
     status: user.status,
-    roles: user.roles.map((r) => r.role.name.toLowerCase()),
+    roles: user.roles.map((r: any) => r.role.name.toLowerCase()),
   });
 };

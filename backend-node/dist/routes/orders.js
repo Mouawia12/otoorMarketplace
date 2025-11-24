@@ -114,5 +114,21 @@ router.patch("/:id/status", (0, auth_1.authenticate)({ roles: [client_1.RoleName
         next(error);
     }
 });
+router.post("/:id/confirm-delivery", (0, auth_1.authenticate)(), async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const orderId = Number(req.params.id);
+        if (Number.isNaN(orderId)) {
+            throw errors_1.AppError.badRequest("Invalid order id");
+        }
+        const order = await (0, orderService_1.confirmOrderDelivery)(orderId, req.user.id);
+        res.json(order);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 exports.default = router;
 //# sourceMappingURL=orders.js.map

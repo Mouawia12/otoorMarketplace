@@ -31,7 +31,7 @@ export const createSupportTicket = async (input: z.infer<typeof createTicketSche
   return mapTicket(ticket);
 };
 
-export const listSupportTickets = async (opts: { userId?: number; role?: string; all?: boolean }) => {
+export const listSupportTickets = async (opts: { userId?: number; role?: string | undefined; all?: boolean }) => {
   const where: Prisma.SupportTicketWhereInput = {};
   if (!opts.all && opts.userId) {
     where.userId = opts.userId;

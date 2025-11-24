@@ -58,6 +58,8 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -89,6 +91,8 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
             status: string;
             created_at: any;
             updated_at: any;
+            rating_avg: number;
+            rating_count: any;
             seller: {
                 id: any;
                 full_name: any;
@@ -134,6 +138,8 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -165,6 +171,8 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
             status: string;
             created_at: any;
             updated_at: any;
+            rating_avg: number;
+            rating_count: any;
             seller: {
                 id: any;
                 full_name: any;
@@ -210,6 +218,8 @@ export declare const listAllOrders: (status?: string) => Promise<{
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -241,6 +251,8 @@ export declare const listAllOrders: (status?: string) => Promise<{
             status: string;
             created_at: any;
             updated_at: any;
+            rating_avg: number;
+            rating_count: any;
             seller: {
                 id: any;
                 full_name: any;
@@ -286,6 +298,8 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -317,6 +331,8 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
             status: string;
             created_at: any;
             updated_at: any;
+            rating_avg: number;
+            rating_count: any;
             seller: {
                 id: any;
                 full_name: any;
@@ -325,6 +341,86 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
         } | undefined;
     }[];
 }[]>;
+export declare const confirmOrderDelivery: (orderId: number, buyerId: number) => Promise<{
+    id: number;
+    buyer_id: number;
+    product_id: number | null;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    payment_method: string;
+    shipping_address: string;
+    shipping_name: string;
+    shipping_phone: string;
+    shipping_city: string;
+    shipping_region: string;
+    shipping_method: string;
+    shipping_fee: number;
+    status: string;
+    created_at: string;
+    platform_fee: number;
+    product: {
+        id: any;
+        seller_id: any;
+        name_ar: any;
+        name_en: any;
+        description_ar: any;
+        description_en: any;
+        product_type: any;
+        brand: any;
+        category: any;
+        base_price: any;
+        size_ml: any;
+        concentration: any;
+        condition: any;
+        stock_quantity: any;
+        image_urls: string[];
+        status: string;
+        created_at: any;
+        updated_at: any;
+        rating_avg: number;
+        rating_count: any;
+        seller: {
+            id: any;
+            full_name: any;
+            verified_seller: any;
+        } | undefined;
+    } | undefined;
+    items: {
+        id: number;
+        product_id: number;
+        quantity: number;
+        unit_price: number;
+        total_price: number;
+        product: {
+            id: any;
+            seller_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            image_urls: string[];
+            status: string;
+            created_at: any;
+            updated_at: any;
+            rating_avg: number;
+            rating_count: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+        } | undefined;
+    }[];
+}>;
 export declare const updateOrderStatus: (orderId: number, status: string, actorRoles: string[]) => Promise<{
     id: number;
     buyer_id: number;
@@ -362,6 +458,8 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
         status: string;
         created_at: any;
         updated_at: any;
+        rating_avg: number;
+        rating_count: any;
         seller: {
             id: any;
             full_name: any;
@@ -393,6 +491,8 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
             status: string;
             created_at: any;
             updated_at: any;
+            rating_avg: number;
+            rating_count: any;
             seller: {
                 id: any;
                 full_name: any;
