@@ -25,8 +25,9 @@ export default function AccountOverviewPage() {
   useEffect(() => {
     const load = async () => {
       await fetchUser();
+      const enableCounts = import.meta.env.VITE_ENABLE_ACCOUNT_COUNTS === 'true';
+      if (!enableCounts) return;
       try {
-        // TODO: replace with real stats endpoint when available
         const [ordersRes, bidsRes, favoritesRes] = await Promise.allSettled([
           api.get('/orders/count'),
           api.get('/auctions/active/count'),
