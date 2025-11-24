@@ -21,7 +21,6 @@ export default function AccountOverviewPage() {
   const { user, fetchUser } = useAuthStore();
   const [stats, setStats] = useState<AccountStats>({ totalOrders: 0, activeBids: 0, favoritesCount: 0 });
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     const load = async () => {

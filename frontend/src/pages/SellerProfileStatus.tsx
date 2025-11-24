@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { useAuthStore } from "../store/authStore";
 
 export default function SellerProfileStatus() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { user, fetchUser } = useAuthStore();
   const [status, setStatus] = useState<string>(user?.seller_status ?? "pending");
   const [loading, setLoading] = useState(true);

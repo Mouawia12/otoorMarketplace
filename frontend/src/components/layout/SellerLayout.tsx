@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Outlet, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 
 export default function SellerLayout() {
   const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user } = useAuthStore();
 
