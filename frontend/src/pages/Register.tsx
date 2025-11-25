@@ -3,9 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore, User } from '../store/authStore';
 import { useState } from 'react';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
+import { resolvePostAuthRoute } from '../utils/authNavigation';
 
 // نُبقي فقط البريد وكلمة المرور
 const registerSchema = z.object({
@@ -32,17 +33,9 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
   });
 
-  const redirectAfterSignup = (roles: string[]) => {
-    const upper = roles.map((r) => r.toUpperCase());
-    if (upper.includes('SUPER_ADMIN') || upper.includes('ADMIN')) {
-      navigate('/admin/dashboard', { replace: true });
-      return;
-    }
-    if (upper.includes('SELLER')) {
-      navigate('/seller/dashboard', { replace: true });
-      return;
-    }
-    navigate('/account', { replace: true });
+  const redirectAfterSignup = (user: User) => {
+    const target = resolvePostAuthRoute(user);
+    navigate(target, { replace: true });
   };
 
   const onSubmit = async (data: RegisterForm) => {
@@ -55,7 +48,7 @@ export default function Register() {
         password: data.password,
         roles: accountType === 'seller' ? ['SELLER'] : ['BUYER'],
       } as any);
-      redirectAfterSignup(user.roles ?? []);
+      redirectAfterSignup(user);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (Array.isArray(detail)) {
@@ -169,7 +162,7 @@ export default function Register() {
             </div>
             <GoogleAuthButton
               role={accountType}
-              onLoggedIn={(user) => redirectAfterSignup(user.roles ?? [])}
+              onLoggedIn={redirectAfterSignup}
             />
           </div>
         )}

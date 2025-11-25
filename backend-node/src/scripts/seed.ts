@@ -1,6 +1,7 @@
 import {
   Prisma,
   RoleName,
+  SellerStatus,
   ProductCondition,
   ProductStatus,
   AuctionStatus,

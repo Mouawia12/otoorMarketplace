@@ -9,6 +9,7 @@ export declare const getUserProfile: (userId: number) => Promise<{
     status: import(".prisma/client").$Enums.UserStatus;
     roles: any[];
     seller_status: string;
+    seller_profile_status: string | undefined;
     seller_profile: {
         full_name: string;
         phone: string;
@@ -19,6 +20,7 @@ export declare const getUserProfile: (userId: number) => Promise<{
         bank_name: string;
         status: string;
     } | null;
+    seller_profile_submitted: boolean;
 }>;
 export declare const updateUserProfile: (userId: number, data: {
     full_name?: string | undefined;

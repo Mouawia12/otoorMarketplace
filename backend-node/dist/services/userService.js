@@ -28,6 +28,7 @@ const getUserProfile = async (userId) => {
         status: user.status,
         roles: user.roles.map((r) => r.role.name.toLowerCase()),
         seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
+        seller_profile_status: user.sellerProfile?.status?.toLowerCase?.(),
         seller_profile: user.sellerProfile
             ? {
                 full_name: user.sellerProfile.fullName,
@@ -40,6 +41,7 @@ const getUserProfile = async (userId) => {
                 status: user.sellerProfile.status?.toLowerCase?.() ?? user.sellerProfile.status,
             }
             : null,
+        seller_profile_submitted: Boolean(user.sellerProfile),
     });
 };
 exports.getUserProfile = getUserProfile;

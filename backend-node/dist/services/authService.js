@@ -17,17 +17,41 @@ const userWithRolesInclude = client_1.Prisma.validator()({
     roles: { include: { role: true } },
     sellerProfile: true,
 });
-const serializeUser = (user) => ({
-    id: user.id,
-    email: user.email,
-    full_name: user.fullName,
-    avatar_url: user.avatarUrl,
-    created_at: user.createdAt,
-    status: user.status,
-    roles: user.roles.map((roleRelation) => roleRelation.role.name.toLowerCase()),
-    seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
-    verified_seller: user.verifiedSeller,
-});
+const mapSellerProfile = (profile) => {
+    if (!profile) {
+        return null;
+    }
+    return {
+        id: profile.id,
+        full_name: profile.fullName,
+        phone: profile.phone,
+        city: profile.city,
+        address: profile.address,
+        national_id: profile.nationalId,
+        iban: profile.iban,
+        bank_name: profile.bankName,
+        status: profile.status?.toLowerCase?.() ?? profile.status,
+        created_at: profile.createdAt,
+        updated_at: profile.updatedAt,
+    };
+};
+const serializeUser = (user) => {
+    const sellerProfile = mapSellerProfile(user.sellerProfile);
+    return {
+        id: user.id,
+        email: user.email,
+        full_name: user.fullName,
+        avatar_url: user.avatarUrl,
+        created_at: user.createdAt,
+        status: user.status,
+        roles: user.roles.map((roleRelation) => roleRelation.role.name.toLowerCase()),
+        seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
+        seller_profile_status: sellerProfile?.status,
+        seller_profile: sellerProfile,
+        seller_profile_submitted: Boolean(sellerProfile),
+        verified_seller: user.verifiedSeller,
+    };
+};
 exports.registerSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
     password: zod_1.z.string().min(8),

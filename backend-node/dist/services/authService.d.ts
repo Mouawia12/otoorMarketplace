@@ -39,6 +39,21 @@ export declare const registerUser: (input: z.infer<typeof registerSchema>) => Pr
         status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
         seller_status: string;
+        seller_profile_status: string | undefined;
+        seller_profile: {
+            id: number;
+            full_name: string;
+            phone: string;
+            city: string;
+            address: string;
+            national_id: string;
+            iban: string;
+            bank_name: string;
+            status: string;
+            created_at: Date;
+            updated_at: Date;
+        } | null;
+        seller_profile_submitted: boolean;
         verified_seller: boolean;
     };
 }>;
@@ -53,6 +68,21 @@ export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginS
         status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
         seller_status: string;
+        seller_profile_status: string | undefined;
+        seller_profile: {
+            id: number;
+            full_name: string;
+            phone: string;
+            city: string;
+            address: string;
+            national_id: string;
+            iban: string;
+            bank_name: string;
+            status: string;
+            created_at: Date;
+            updated_at: Date;
+        } | null;
+        seller_profile_submitted: boolean;
         verified_seller: boolean;
     };
 }>;
@@ -67,6 +97,21 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
         status: import(".prisma/client").$Enums.UserStatus;
         roles: string[];
         seller_status: string;
+        seller_profile_status: string | undefined;
+        seller_profile: {
+            id: number;
+            full_name: string;
+            phone: string;
+            city: string;
+            address: string;
+            national_id: string;
+            iban: string;
+            bank_name: string;
+            status: string;
+            created_at: Date;
+            updated_at: Date;
+        } | null;
+        seller_profile_submitted: boolean;
         verified_seller: boolean;
     };
 }>;

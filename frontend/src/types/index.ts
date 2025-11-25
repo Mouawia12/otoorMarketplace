@@ -6,6 +6,17 @@ export interface User {
   status: string;
   seller_status?: string;
   seller_profile_status?: string;
+  seller_profile?: {
+    status?: string;
+    full_name?: string;
+    phone?: string;
+    city?: string;
+    address?: string;
+    national_id?: string;
+    iban?: string;
+    bank_name?: string;
+  } | null;
+  seller_profile_submitted?: boolean;
   verified_seller?: boolean;
 }
 
