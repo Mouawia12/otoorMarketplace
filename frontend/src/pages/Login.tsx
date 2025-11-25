@@ -8,6 +8,7 @@ import { useState } from 'react';
 import api from '../lib/api';
 import { clearPendingOrder, loadPendingOrder } from '../utils/pendingOrder';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
+import { resolvePostAuthRoute } from '../utils/authNavigation';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -50,16 +51,9 @@ export default function Login() {
   };
 
   const postLoginNavigation = async (user: User) => {
-    const upperRoles = (user.roles ?? []).map((role) => role.toUpperCase());
     const params = new URLSearchParams(location.search);
     const redirectParam = params.get('redirect');
-
-    let target = redirectParam || '/account';
-    if (upperRoles.includes('SUPER_ADMIN') || upperRoles.includes('ADMIN')) {
-      target = redirectParam || '/admin/dashboard';
-    } else if (upperRoles.includes('SELLER')) {
-      target = redirectParam || '/seller/dashboard';
-    }
+    const target = resolvePostAuthRoute(user, redirectParam);
 
     const handled = await tryCompletePendingOrder();
     if (!handled) {

@@ -12,6 +12,18 @@ export interface User {
   phone?: string | null;
   roles: string[];
   seller_status?: string;
+  seller_profile_status?: string | null;
+  seller_profile?: {
+    status?: string;
+    full_name?: string;
+    phone?: string;
+    city?: string;
+    address?: string;
+    national_id?: string;
+    iban?: string;
+    bank_name?: string;
+  } | null;
+  seller_profile_submitted?: boolean;
   verified_seller?: boolean;
 }
 
@@ -68,8 +80,11 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem('auth_token');
-        // Clear sensitive client state
         useWishlistStore.getState().clear();
+        if (typeof window !== 'undefined') {
+          window.location.replace('/');
+          return;
+        }
         set({ user: null, token: null, isAuthenticated: false });
       },
 

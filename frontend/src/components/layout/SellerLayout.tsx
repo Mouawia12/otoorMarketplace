@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
+import { hasSubmittedSellerProfile } from '../../utils/authNavigation';
 
 export default function SellerLayout() {
   const { t } = useTranslation();
@@ -26,11 +27,18 @@ export default function SellerLayout() {
   }
 
   const sellerStatus = user?.seller_status ?? 'pending';
-  const isProfileFlow =
-    location.pathname.includes('/seller/profile-complete') ||
-    location.pathname.includes('/seller/profile-status');
-  if (sellerStatus !== 'approved' && !isProfileFlow) {
-    return <Navigate to="/seller/profile-status" replace />;
+  const hasSubmittedProfile = hasSubmittedSellerProfile(user);
+  const isProfileCompleteRoute = location.pathname.includes('/seller/profile-complete');
+  const isProfileStatusRoute = location.pathname.includes('/seller/profile-status');
+
+  if (sellerStatus !== 'approved') {
+    if (!hasSubmittedProfile) {
+      if (!isProfileCompleteRoute) {
+        return <Navigate to="/seller/profile-complete" replace />;
+      }
+    } else if (!isProfileStatusRoute && !isProfileCompleteRoute) {
+      return <Navigate to="/seller/profile-status" replace />;
+    }
   }
 
   const menuItems = [

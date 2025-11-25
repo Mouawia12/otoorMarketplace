@@ -54,7 +54,7 @@ export default function AdminBlogList() {
 
       <div className="bg-ivory rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-charcoal-light text-charcoal">
+          <thead className="bg-white text-charcoal">
             <tr>
               <th className="p-3 text-start">{t("common.title", "العنوان")}</th>
               <th className="p-3 text-start">{t("common.language", "اللغة")}</th>

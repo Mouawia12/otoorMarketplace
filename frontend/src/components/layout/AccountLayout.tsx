@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
+import { useUIStore } from '../../store/uiStore';
+import { hasSubmittedSellerProfile } from '../../utils/authNavigation';
 
 export default function AccountLayout() {
   const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user } = useAuthStore();
+  const { language } = useUIStore();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -14,15 +17,24 @@ export default function AccountLayout() {
 
   const isSeller = user?.roles?.some((r) => r.toLowerCase() === 'seller');
   const sellerStatus = user?.seller_status ?? 'pending';
+  const hasSubmittedProfile = hasSubmittedSellerProfile(user);
 
   // إذا تمت الموافقة على التاجر، اجعل لوحة البائع هي الافتراضية
   if (isSeller) {
     if (sellerStatus === 'approved') {
       return <Navigate to="/seller/dashboard" replace />;
     }
-    // لو كان تحت المراجعة أو مرفوض، وجهه لشاشة الحالة
-    return <Navigate to="/seller/profile-status" replace />;
+    const fallback = hasSubmittedProfile ? '/seller/profile-status' : '/seller/profile-complete';
+    return <Navigate to={fallback} replace />;
   }
+
+  const sellerCTA = t('seller.becomeSeller');
+  const resolvedSellerCTA =
+    sellerCTA && sellerCTA !== 'seller.becomeSeller'
+      ? sellerCTA
+      : language === 'ar'
+      ? 'سجل كتاجر'
+      : 'Register as Seller';
 
   const navItems = [
     { path: '/account', label: t('account.overview'), icon: '👤' },
@@ -31,7 +43,7 @@ export default function AccountLayout() {
     { path: '/account/bids', label: t('account.bids'), icon: '🔨' },
     { path: '/account/favorites', label: t('account.favorites'), icon: '❤️' },
     { path: '/account/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
-    { path: '/seller/profile-complete', label: t('seller.becomeSeller', 'سجل كتاجر'), icon: '🛍️' },
+    { path: '/seller/profile-complete', label: resolvedSellerCTA, icon: '🛍️' },
     { path: '/account/support', label: t('account.support'), icon: '💬' },
   ];
 

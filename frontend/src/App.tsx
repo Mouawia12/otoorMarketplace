@@ -72,6 +72,7 @@ import AdminBlogEdit from './pages/admin/blog/AdminBlogEdit';
 
 import { useAuthStore } from './store/authStore';
 import { useUIStore } from './store/uiStore';
+import i18n from './i18n/config';
 import { ScrollToTop } from './components/ScrollToTop';
 
 function App() {
@@ -85,6 +86,9 @@ function App() {
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
+    if (i18n.language !== language) {
+      i18n.changeLanguage(language);
+    }
   }, [language]);
 
   return (
