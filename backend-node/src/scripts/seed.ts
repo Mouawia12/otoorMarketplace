@@ -167,6 +167,7 @@ async function seedUsers() {
       passwordHash: sellerPassword,
       fullName: "Ahmed Al-Rashid",
       verifiedSeller: true,
+      sellerStatus: SellerStatus.APPROVED,
       roles: {
         create: [{ role: { connect: { name: RoleName.SELLER } } }],
       },
@@ -175,12 +176,38 @@ async function seedUsers() {
     include: { roles: { include: { role: true } } },
   });
 
+  await prisma.sellerProfile.upsert({
+    where: { userId: seller.id },
+    update: {
+      fullName: "Ahmed Al-Rashid",
+      phone: "+966511111111",
+      city: "Riyadh",
+      address: "Olaya Street, Tower 2",
+      nationalId: "1234567890",
+      iban: "SA4420000001234567891234",
+      bankName: "Al Rajhi Bank",
+      status: SellerStatus.APPROVED,
+    },
+    create: {
+      userId: seller.id,
+      fullName: "Ahmed Al-Rashid",
+      phone: "+966511111111",
+      city: "Riyadh",
+      address: "Olaya Street, Tower 2",
+      nationalId: "1234567890",
+      iban: "SA4420000001234567891234",
+      bankName: "Al Rajhi Bank",
+      status: SellerStatus.APPROVED,
+    },
+  });
+
   const buyer = await prisma.user.upsert({
     where: { email: "buyer@otoor.test" },
     create: {
       email: "buyer@otoor.test",
       passwordHash: buyerPassword,
       fullName: "Lina Al-Salem",
+      sellerStatus: SellerStatus.APPROVED,
       roles: {
         create: [{ role: { connect: { name: RoleName.BUYER } } }],
       },
@@ -190,6 +217,109 @@ async function seedUsers() {
   });
 
   return { admin, seller, buyer };
+}
+
+const productTemplateSeedData = [
+  {
+    nameAr: "مزيج العنبر الفاخر",
+    nameEn: "Amber Luxe Blend",
+    descriptionAr: "خليط غني من العنبر، الفانيليا ولمسات خشبية للسهرة.",
+    descriptionEn: "Rich amber, vanilla, and woody blend perfect for evenings.",
+    productType: "eau_de_parfum",
+    brand: "House Blend",
+    category: "oriental",
+    basePrice: 220,
+    sizeMl: 75,
+    concentration: "EDP",
+  },
+  {
+    nameAr: "نسيم البحر",
+    nameEn: "Sea Breeze",
+    descriptionAr: "عطر صيفي منعش بروائح البحر والحمضيات.",
+    descriptionEn: "Fresh summer scent with marine and citrus notes.",
+    productType: "eau_de_toilette",
+    brand: "Coastal",
+    category: "fresh",
+    basePrice: 140,
+    sizeMl: 100,
+    concentration: "EDT",
+  },
+  {
+    nameAr: "ليلة الورد",
+    nameEn: "Rosey Night",
+    descriptionAr: "باقة من الورود الشرقية مع لمسة من العود الأبيض.",
+    descriptionEn: "Bouquet of oriental roses with a touch of white oud.",
+    productType: "eau_de_parfum",
+    brand: "Rose Atelier",
+    category: "floral",
+    basePrice: 260,
+    sizeMl: 70,
+    concentration: "EDP",
+  },
+  {
+    nameAr: "غابات الشمال",
+    nameEn: "Nordic Woods",
+    descriptionAr: "مزيج خشبي دخاني مع أرز وأخشاب أرز الأطلس.",
+    descriptionEn: "Smoky woody blend with cedar and atlas woods.",
+    productType: "eau_de_parfum",
+    brand: "Nordic",
+    category: "woody",
+    basePrice: 210,
+    sizeMl: 90,
+    concentration: "EDP",
+  },
+  {
+    nameAr: "شروق الحمضيات",
+    nameEn: "Citrus Sunrise",
+    descriptionAr: "حمضيات مشرقة مع لمسات من النيرولي والياسمين.",
+    descriptionEn: "Bright citrus with neroli and jasmine touches.",
+    productType: "eau_de_parfum",
+    brand: "Sunline",
+    category: "citrus",
+    basePrice: 180,
+    sizeMl: 80,
+    concentration: "EDP",
+  },
+  {
+    nameAr: "عود ملكي",
+    nameEn: "Royal Oud",
+    descriptionAr: "تركيبة عربية فاخرة من العود والزعفران والمسك الأبيض.",
+    descriptionEn: "Luxurious oud with saffron and white musk.",
+    productType: "parfum",
+    brand: "Otoor",
+    category: "oriental",
+    basePrice: 350,
+    sizeMl: 60,
+    concentration: "PARFUM",
+  },
+];
+
+async function seedProductTemplates(adminId: number) {
+  for (const template of productTemplateSeedData) {
+    await prisma.productTemplate.create({
+      data: {
+        nameAr: template.nameAr,
+        nameEn: template.nameEn,
+        descriptionAr: template.descriptionAr,
+        descriptionEn: template.descriptionEn,
+        productType: template.productType,
+        brand: template.brand,
+        category: template.category,
+        basePrice: new Prisma.Decimal(template.basePrice),
+        sizeMl: template.sizeMl,
+        concentration: template.concentration,
+        createdById: adminId,
+        images: {
+          create: [
+            {
+              url: "/images/placeholder-perfume.svg",
+              sortOrder: 0,
+            },
+          ],
+        },
+      },
+    });
+  }
 }
 
 async function seedProducts(sellerId: number) {
@@ -324,7 +454,8 @@ async function main() {
   await resetDatabase();
   await ensureSchema();
   await seedRoles();
-  const { seller, buyer } = await seedUsers();
+  const { admin, seller, buyer } = await seedUsers();
+  await seedProductTemplates(admin.id);
   await seedProducts(seller.id);
   await seedAddresses(buyer.id);
   await seedAuctions(seller.id);

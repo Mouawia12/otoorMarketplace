@@ -64,6 +64,8 @@ export default function ProductFilters({
   );
   const [minPrice, setMinPrice] = useState<number>(filters?.min_price ?? baseMin);
   const [maxPrice, setMaxPrice] = useState<number>(filters?.max_price ?? baseMax);
+  const [minPriceInput, setMinPriceInput] = useState<string>(String(filters?.min_price ?? baseMin));
+  const [maxPriceInput, setMaxPriceInput] = useState<string>(String(filters?.max_price ?? baseMax));
 
   useEffect(() => {
     const minFromFilter =
@@ -83,8 +85,13 @@ export default function ProductFilters({
       setBrand(filters.brand ?? "");
       setCategory(filters.category ?? "");
       setCondition((filters.condition as Condition) ?? lockedCondition ?? "all");
-      setMinPrice(minFromFilter ?? baseMin);
-      setMaxPrice(maxFromFilter ?? (minFromFilter ? Math.max(minFromFilter + PRICE_GAP, baseMax) : nextCeiling));
+      const nextMin = minFromFilter ?? baseMin;
+      const nextMax =
+        maxFromFilter ?? (minFromFilter ? Math.max(minFromFilter + PRICE_GAP, baseMax) : nextCeiling);
+      setMinPrice(nextMin);
+      setMaxPrice(nextMax);
+      setMinPriceInput(String(Math.round(nextMin)));
+      setMaxPriceInput(String(Math.round(nextMax)));
       return;
     }
 
@@ -97,8 +104,12 @@ export default function ProductFilters({
     const maxQ = qs.get("max");
     const minNum = minQ ? Number(minQ) : baseMin;
     const maxNum = maxQ ? Number(maxQ) : nextCeiling;
-    setMinPrice(isNaN(minNum) ? baseMin : minNum);
-    setMaxPrice(isNaN(maxNum) ? nextCeiling : maxNum);
+    const parsedMin = isNaN(minNum) ? baseMin : minNum;
+    const parsedMax = isNaN(maxNum) ? nextCeiling : maxNum;
+    setMinPrice(parsedMin);
+    setMaxPrice(parsedMax);
+    setMinPriceInput(String(Math.round(parsedMin)));
+    setMaxPriceInput(String(Math.round(parsedMax)));
   }, [filters, location.search, lockedCondition, baseMin, baseMax]);
 
   const activeCount = useMemo(() => {
@@ -122,6 +133,8 @@ export default function ProductFilters({
     setCondition(lockedCondition ?? "all");
     setMinPrice(baseMin);
     setMaxPrice(baseMax);
+    setMinPriceInput(String(Math.round(baseMin)));
+    setMaxPriceInput(String(Math.round(baseMax)));
 
     onFilterChange?.({
       sort: "newest",
@@ -258,8 +271,13 @@ export default function ProductFilters({
             </div>
             <div className="relative h-10 flex items-center">
               <div
-                className="absolute inset-x-1 h-1.5 rounded-full"
+                className="absolute inset-x-1 h-1.5 rounded-full z-[1]"
                 style={{ background: trackBackground }}
+              />
+              <div
+                className="absolute inset-x-1 h-4 z-[3]"
+                onPointerDown={(e) => e.preventDefault()}
+                onTouchStart={(e) => e.preventDefault()}
               />
               <input
                 type="range"
@@ -270,6 +288,7 @@ export default function ProductFilters({
                 onChange={(e) => {
                   const val = Math.min(Number(e.target.value), maxPrice - PRICE_GAP);
                   setMinPrice(val);
+                  setMinPriceInput(String(Math.round(val)));
                 }}
                 className="range-thumb w-full h-1 appearance-none bg-transparent absolute"
                 aria-label={`${t("catalog.minLabel")} ${t("catalog.range")}`}
@@ -284,6 +303,7 @@ export default function ProductFilters({
                 onChange={(e) => {
                   const val = Math.max(Number(e.target.value), minPrice + PRICE_GAP);
                   setMaxPrice(val);
+                  setMaxPriceInput(String(Math.round(val)));
                 }}
                 className="range-thumb w-full h-1 appearance-none bg-transparent absolute"
                 aria-label={`${t("catalog.maxLabel")} ${t("catalog.range")}`}
@@ -298,10 +318,22 @@ export default function ProductFilters({
                   min={baseMin}
                   max={maxPrice - PRICE_GAP}
                   className={inputCls}
-                  value={minPrice}
-                  onChange={(e) => {
-                    const val = Math.max(baseMin, Math.min(Number(e.target.value) || baseMin, maxPrice - PRICE_GAP));
-                    setMinPrice(val);
+                  value={minPriceInput}
+                  onChange={(e) => setMinPriceInput(e.target.value)}
+                  onBlur={() => {
+                    const val = Number(minPriceInput);
+                    if (isNaN(val)) {
+                      setMinPriceInput(String(Math.round(minPrice)));
+                      return;
+                    }
+                    const clamped = Math.max(baseMin, Math.min(val, maxPrice - PRICE_GAP));
+                    setMinPrice(clamped);
+                    setMinPriceInput(String(Math.round(clamped)));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      (e.target as HTMLInputElement).blur();
+                    }
                   }}
                 />
               </div>
@@ -312,10 +344,22 @@ export default function ProductFilters({
                   min={minPrice + PRICE_GAP}
                   max={priceCeiling}
                   className={inputCls}
-                  value={maxPrice}
-                  onChange={(e) => {
-                    const val = Math.min(priceCeiling, Math.max(Number(e.target.value) || maxPrice, minPrice + PRICE_GAP));
-                    setMaxPrice(val);
+                  value={maxPriceInput}
+                  onChange={(e) => setMaxPriceInput(e.target.value)}
+                  onBlur={() => {
+                    const val = Number(maxPriceInput);
+                    if (isNaN(val)) {
+                      setMaxPriceInput(String(Math.round(maxPrice)));
+                      return;
+                    }
+                    const clamped = Math.min(priceCeiling, Math.max(val, minPrice + PRICE_GAP));
+                    setMaxPrice(clamped);
+                    setMaxPriceInput(String(Math.round(clamped)));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      (e.target as HTMLInputElement).blur();
+                    }
                   }}
                 />
               </div>
