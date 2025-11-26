@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
+import { useCartStore } from '../store/cartStore';
 import { useWishlistStore } from '../store/wishlistStore';
 import { fetchProductById, fetchRelatedProducts } from '../services/productService';
 import { fetchAuctionByProductId } from '../services/auctionService';
@@ -20,6 +21,7 @@ export default function ProductDetailPage() {
   const { t } = useTranslation();
   const { language } = useUIStore();
   const { isAuthenticated } = useAuthStore();
+  const addToCart = useCartStore((state) => state.add);
   const addToWishlist = useWishlistStore((s) => s.add);
   const removeFromWishlist = useWishlistStore((s) => s.remove);
   const wishlistHas = useWishlistStore((s) => s.has);
@@ -307,7 +309,26 @@ export default function ProductDetailPage() {
             <div className="space-y-3">
               <button
                 disabled={!isInStock}
-                onClick={() => navigate('/products?status=published')}
+                onClick={() => {
+                  if (!isInStock || !product) return;
+                  const primaryImage = images[0] || PLACEHOLDER_PERFUME;
+                  addToCart(
+                    {
+                      id: String(product.id),
+                      name,
+                      price: product.base_price,
+                      image: primaryImage,
+                      brand: product.brand,
+                    },
+                    1
+                  );
+                  const target = '/checkout';
+                  if (!isAuthenticated) {
+                    navigate(`/login?redirect=${encodeURIComponent(target)}`);
+                    return;
+                  }
+                  navigate(target);
+                }}
                 className="w-full bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}

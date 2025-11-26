@@ -181,6 +181,8 @@ export const listProductsForAdmin = async (status?: string) => {
 
   if (status) {
     where.status = friendlyToProductStatus(status);
+  } else {
+    where.status = { not: ProductStatus.DRAFT };
   }
 
   const products = await prisma.product.findMany({

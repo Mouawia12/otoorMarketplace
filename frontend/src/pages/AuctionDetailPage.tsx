@@ -116,6 +116,14 @@ export default function AuctionDetailPage() {
       : null;
   }, [bids, obfuscateName]);
 
+  const minBidValue = auction ? auction.current_price + auction.minimum_increment : 0;
+  const stepValue = auction?.minimum_increment ?? 1;
+
+  useEffect(() => {
+    if (!auction) return;
+    setBidAmount(auction.current_price + auction.minimum_increment);
+  }, [auction?.current_price, auction?.minimum_increment]);
+
   const handleBidSubmit = async () => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -124,9 +132,8 @@ export default function AuctionDetailPage() {
 
     if (!auction) return;
 
-    const minBid = auction.current_price + auction.minimum_increment;
-    if (bidAmount < minBid) {
-      setBidError(t('auction.minBid') + ': ' + formatPrice(minBid, language));
+    if (bidAmount < minBidValue) {
+      setBidError(t('auction.minBid') + ': ' + formatPrice(minBidValue, language));
       return;
     }
 
@@ -148,13 +155,18 @@ export default function AuctionDetailPage() {
 
   const incrementBid = () => {
     if (!auction) return;
-    setBidAmount(prev => prev + auction.minimum_increment);
+    setBidAmount((prev) => {
+      const base = Number.isFinite(prev) && prev >= minBidValue ? prev : minBidValue;
+      return base + stepValue;
+    });
   };
 
   const decrementBid = () => {
     if (!auction) return;
-    const minBid = auction.current_price + auction.minimum_increment;
-    setBidAmount(prev => Math.max(minBid, prev - auction.minimum_increment));
+    setBidAmount((prev) => {
+      const base = Number.isFinite(prev) && prev > minBidValue ? prev : minBidValue;
+      return Math.max(minBidValue, base - stepValue);
+    });
   };
 
   if (loading) {
@@ -328,7 +340,15 @@ export default function AuctionDetailPage() {
                   <input
                     type="number"
                     value={bidAmount}
-                    onChange={(e) => setBidAmount(parseFloat(e.target.value) || 0)}
+                    min={minBidValue}
+                    step={stepValue}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      setBidAmount(Number.isNaN(next) ? 0 : next);
+                    }}
+                    onBlur={() => {
+                      setBidAmount((prev) => Math.max(minBidValue, prev || minBidValue));
+                    }}
                     className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-luxury text-center text-xl font-bold focus:ring-2 focus:ring-gold focus:border-transparent"
                     aria-label={t('auction.bidAmount')}
                   />
