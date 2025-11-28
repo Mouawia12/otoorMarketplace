@@ -6,6 +6,7 @@ import { Product } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
+import SARIcon from '../components/common/SARIcon';
 import { resolveImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME, PLACEHOLDER_PERFUME_KEY } from '../utils/staticAssets';
 
@@ -128,8 +129,9 @@ export default function ProductDetail() {
           <h1 className="text-3xl font-bold text-charcoal mb-4">{name}</h1>
           
           <div className="flex items-center gap-4 mb-6">
-            <span className="text-4xl font-bold text-gold">
-              {formatPrice(product.base_price, language)}
+            <span className="text-4xl font-bold text-gold inline-flex items-center gap-2">
+              {formatPrice(product.base_price, language).replace(/\s?(SAR|﷼)$/i, '')}
+              <SARIcon size={22} className="text-gold" />
             </span>
             <span className={`px-3 py-1 rounded-full text-sm ${isInStock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {isInStock ? t('products.inStock') : t('products.outOfStock')}

@@ -70,14 +70,44 @@ router.patch("/users/:id", adminOnly, async (req, res, next) => {
     if (Number.isNaN(id)) {
       throw AppError.badRequest("Invalid user id");
     }
-    const status = req.body?.status;
-    if (typeof status !== "string") {
-      throw AppError.badRequest("Status is required");
+    const payload: {
+      status?: string;
+      seller_status?: string;
+      roles?: string[];
+    } = {};
+
+    if ("status" in req.body) {
+      if (typeof req.body.status !== "string") {
+        throw AppError.badRequest("Status must be a string");
+      }
+      payload.status = req.body.status;
+    }
+
+    if ("seller_status" in req.body) {
+      if (typeof req.body.seller_status !== "string") {
+        throw AppError.badRequest("Seller status must be a string");
+      }
+      payload.seller_status = req.body.seller_status;
+    }
+
+    if ("roles" in req.body) {
+      if (!Array.isArray(req.body.roles)) {
+        throw AppError.badRequest("Roles must be an array");
+      }
+      payload.roles = req.body.roles as string[];
+    }
+
+    if (
+      payload.status === undefined &&
+      payload.seller_status === undefined &&
+      payload.roles === undefined
+    ) {
+      throw AppError.badRequest("No valid fields provided");
     }
 
     const user = await updateUserStatus(
       id,
-      status,
+      payload,
       req.user.roles as RoleName[]
     );
     res.json(user);

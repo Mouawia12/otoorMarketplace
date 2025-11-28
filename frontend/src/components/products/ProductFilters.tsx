@@ -1,8 +1,9 @@
 // src/components/products/ProductFilters.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ProductFiltersMeta } from "../../services/productService";
+import { ProductFiltersMeta, fetchProductFiltersMeta } from "../../services/productService";
+import SARIcon from "../common/SARIcon";
 
 type Condition = "all" | "new" | "used";
 const PRICE_MIN = 0;
@@ -38,15 +39,19 @@ export default function ProductFilters({
   const navigate = useNavigate();
   const location = useLocation();
 
+  const syncingRef = useRef(true);
+  const [internalMeta, setInternalMeta] = useState<ProductFiltersMeta | null>(null);
+  const resolvedMeta = meta ?? internalMeta ?? undefined;
+
   const metaMin =
-    meta?.min_price ??
-    (meta as any)?.minPrice ??
-    (meta as any)?.price_range?.min ??
+    resolvedMeta?.min_price ??
+    (resolvedMeta as any)?.minPrice ??
+    (resolvedMeta as any)?.price_range?.min ??
     undefined;
   const metaMax =
-    meta?.max_price ??
-    (meta as any)?.maxPrice ??
-    (meta as any)?.price_range?.max ??
+    resolvedMeta?.max_price ??
+    (resolvedMeta as any)?.maxPrice ??
+    (resolvedMeta as any)?.price_range?.max ??
     undefined;
 
   const baseMin = typeof metaMin === "number" && metaMin >= 0 ? metaMin : PRICE_MIN;
@@ -56,6 +61,7 @@ export default function ProductFilters({
       : Math.max(PRICE_MAX_DEFAULT, baseMin + PRICE_GAP);
 
   const [priceCeiling, setPriceCeiling] = useState(baseMax);
+  const [expanded, setExpanded] = useState(false);
   const [sort, setSort] = useState(filters?.sort ?? "newest");
   const [brand, setBrand] = useState(filters?.brand ?? "");
   const [category, setCategory] = useState(filters?.category ?? "");
@@ -66,8 +72,31 @@ export default function ProductFilters({
   const [maxPrice, setMaxPrice] = useState<number>(filters?.max_price ?? baseMax);
   const [minPriceInput, setMinPriceInput] = useState<string>(String(filters?.min_price ?? baseMin));
   const [maxPriceInput, setMaxPriceInput] = useState<string>(String(filters?.max_price ?? baseMax));
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (meta) {
+      setInternalMeta(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const fetched = await fetchProductFiltersMeta();
+        if (!cancelled) {
+          setInternalMeta(fetched);
+        }
+      } catch (err) {
+        console.error("failed to load filters metadata", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [meta]);
+
+  useEffect(() => {
+    syncingRef.current = true;
     const minFromFilter =
       typeof filters?.min_price === "number" ? filters?.min_price : undefined;
     const maxFromFilter =
@@ -135,22 +164,13 @@ export default function ProductFilters({
     setMaxPrice(baseMax);
     setMinPriceInput(String(Math.round(baseMin)));
     setMaxPriceInput(String(Math.round(baseMax)));
-
-    onFilterChange?.({
-      sort: "newest",
-      brand: "",
-      category: "",
-      condition: lockedCondition ?? "all",
-      min_price: undefined,
-      max_price: undefined,
-    });
   }
 
-  function apply() {
+  const computedFilters = useMemo(() => {
     const effectiveCondition = lockedCondition ?? condition;
     const hasMin = minPrice > baseMin;
     const hasMax = maxPrice < priceCeiling;
-    const nextFilters: FilterState = {
+    const payload: FilterState = {
       sort,
       brand,
       category,
@@ -158,21 +178,39 @@ export default function ProductFilters({
       min_price: hasMin ? Number(minPrice) : undefined,
       max_price: hasMax ? Number(maxPrice) : undefined,
     };
+    return payload;
+  }, [brand, category, condition, lockedCondition, maxPrice, minPrice, priceCeiling, sort, baseMin]);
 
+  useEffect(() => {
+    if (!ready) {
+      setReady(true);
+      syncingRef.current = false;
+      return;
+    }
+    if (syncingRef.current) {
+      syncingRef.current = false;
+      return;
+    }
+    const payload = computedFilters;
     if (onFilterChange) {
-      onFilterChange(nextFilters);
+      onFilterChange(payload);
     } else {
       const params = new URLSearchParams();
-      if (nextFilters.sort) params.set("sort", nextFilters.sort);
-      if (nextFilters.brand) params.set("brand", nextFilters.brand);
-      if (nextFilters.category) params.set("category", nextFilters.category);
-      if (nextFilters.condition) params.set("condition", nextFilters.condition);
-      if (nextFilters.min_price !== undefined) params.set("min", String(nextFilters.min_price));
-      if (nextFilters.max_price !== undefined) params.set("max", String(nextFilters.max_price));
-
+      if (payload.sort) params.set("sort", payload.sort);
+      if (payload.brand) params.set("brand", payload.brand);
+      if (payload.category) params.set("category", payload.category);
+      if (payload.condition) params.set("condition", payload.condition);
+      if (payload.min_price !== undefined) params.set("min", String(payload.min_price));
+      if (payload.max_price !== undefined) params.set("max", String(payload.max_price));
       navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
     }
-  }
+  }, [computedFilters, onFilterChange, ready, navigate, location.pathname]);
+
+  useEffect(() => {
+    if (activeCount > 0) {
+      setExpanded(true);
+    }
+  }, [activeCount]);
 
   const conditionBadge =
     lockedCondition === "new"
@@ -181,12 +219,14 @@ export default function ProductFilters({
       ? t("catalog.used")
       : null;
 
+  /* Price slider gradient retained for potential future restoration.
   const trackBackground = useMemo(() => {
     const range = priceCeiling - baseMin || 1;
     const startPercent = ((minPrice - baseMin) / range) * 100;
     const endPercent = ((maxPrice - baseMin) / range) * 100;
     return `linear-gradient(to right, #e5dcc5 0%, #e5dcc5 ${startPercent}%, #d4b56c ${startPercent}%, #d4b56c ${endPercent}%, #e5dcc5 ${endPercent}%, #e5dcc5 100%)`;
   }, [minPrice, maxPrice, priceCeiling, baseMin]);
+  */
 
   return (
     <div
@@ -195,11 +235,19 @@ export default function ProductFilters({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 text-charcoal">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sand/60 text-charcoal">
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            aria-pressed={expanded}
+            aria-label={
+              expanded ? t("catalog.hideFilters", "إخفاء الفلاتر") : t("catalog.showFilters", "إظهار الفلاتر")
+            }
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sand/60 text-charcoal hover:bg-sand focus:outline-none focus:ring-2 focus:ring-gold transition"
+          >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 5h18M6 12h12M10 19h4" />
             </svg>
-          </span>
+          </button>
           <div className="leading-tight">
             <p className="text-sm font-extrabold">{t("catalog.filterTitle")}</p>
             <p className="text-[11px] text-taupe">
@@ -214,207 +262,124 @@ export default function ProductFilters({
             </span>
           )}
         </div>
-        <button
-          onClick={clearAll}
-          className="text-xs font-semibold text-charcoal/80 hover:text-charcoal underline underline-offset-2"
-        >
-          {t("catalog.clearFilters")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={clearAll}
+            className="text-xs font-semibold text-charcoal/80 hover:text-charcoal underline underline-offset-2"
+          >
+            {t("catalog.resetFilters")}
+          </button>
+        </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="space-y-1">
-          <label className={labelCls}>{t("catalog.sort")}</label>
-          <select className={inputCls} value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="newest">{t("catalog.sortNewest")}</option>
-            <option value="oldest">{t("catalog.sortOldest")}</option>
-            <option value="price_asc">{t("catalog.sortPriceLow")}</option>
-            <option value="price_desc">{t("catalog.sortPriceHigh")}</option>
-            <option value="stock">{t("catalog.sortStock")}</option>
-          </select>
-        </div>
+      {expanded && (
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="space-y-1">
+            <label className={labelCls}>{t("catalog.sort")}</label>
+            <select className={inputCls} value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="newest">{t("catalog.sortNewest")}</option>
+              <option value="oldest">{t("catalog.sortOldest")}</option>
+              <option value="price_asc">{t("catalog.sortPriceLow")}</option>
+              <option value="price_desc">{t("catalog.sortPriceHigh")}</option>
+              <option value="stock">{t("catalog.sortStock")}</option>
+            </select>
+          </div>
 
-        <div className="space-y-1">
-          <label className={labelCls}>{t("catalog.brand")}</label>
-          <select className={inputCls} value={brand} onChange={(e) => setBrand(e.target.value)}>
-            <option value="">{t("catalog.allBrands")}</option>
-            {(meta?.brands ?? []).map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="space-y-1">
+            <label className={labelCls}>{t("catalog.brand")}</label>
+            <select className={inputCls} value={brand} onChange={(e) => setBrand(e.target.value)}>
+              <option value="">{t("catalog.allBrands")}</option>
+              {(resolvedMeta?.brands ?? []).map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="space-y-1">
-          <label className={labelCls}>{t("catalog.category")}</label>
-          <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="">{t("catalog.allCategories")}</option>
-            {(meta?.categories ?? []).map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="space-y-1">
+            <label className={labelCls}>{t("catalog.category")}</label>
+            <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">{t("catalog.allCategories")}</option>
+              {(resolvedMeta?.categories ?? []).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="space-y-1 sm:col-span-2 lg:col-span-2">
-          <label className={labelCls}>{t("catalog.range")}</label>
-          <div className="rounded-xl border border-sand/60 bg-sand/30 px-3 py-3" dir="ltr">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-charcoal mb-2">
-              <span>
-                {t("catalog.minLabel")}: {minPrice} {t("catalog.currency")}
-              </span>
-              <span>
-                {t("catalog.maxLabel")}: {maxPrice} {t("catalog.currency")}
-              </span>
-            </div>
-            <div className="relative h-10 flex items-center">
-              <div
-                className="absolute inset-x-1 h-1.5 rounded-full z-[1]"
-                style={{ background: trackBackground }}
-              />
-              <div
-                className="absolute inset-x-1 h-4 z-[3]"
-                onPointerDown={(e) => e.preventDefault()}
-                onTouchStart={(e) => e.preventDefault()}
-              />
-              <input
-                type="range"
-                min={baseMin}
-                max={priceCeiling}
-                value={minPrice}
-                step={1}
-                onChange={(e) => {
-                  const val = Math.min(Number(e.target.value), maxPrice - PRICE_GAP);
-                  setMinPrice(val);
-                  setMinPriceInput(String(Math.round(val)));
-                }}
-                className="range-thumb w-full h-1 appearance-none bg-transparent absolute"
-                aria-label={`${t("catalog.minLabel")} ${t("catalog.range")}`}
-                style={{ zIndex: minPrice > priceCeiling - PRICE_GAP * 2 ? 6 : 4 }}
-              />
-              <input
-                type="range"
-                min={baseMin}
-                max={priceCeiling}
-                value={maxPrice}
-                step={1}
-                onChange={(e) => {
-                  const val = Math.max(Number(e.target.value), minPrice + PRICE_GAP);
-                  setMaxPrice(val);
-                  setMaxPriceInput(String(Math.round(val)));
-                }}
-                className="range-thumb w-full h-1 appearance-none bg-transparent absolute"
-                aria-label={`${t("catalog.maxLabel")} ${t("catalog.range")}`}
-                style={{ zIndex: 5 }}
-              />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className={labelCls}>{t("catalog.min")}</label>
-                <input
-                  type="number"
-                  min={baseMin}
-                  max={maxPrice - PRICE_GAP}
-                  className={inputCls}
-                  value={minPriceInput}
-                  onChange={(e) => setMinPriceInput(e.target.value)}
-                  onBlur={() => {
-                    const val = Number(minPriceInput);
-                    if (isNaN(val)) {
-                      setMinPriceInput(String(Math.round(minPrice)));
-                      return;
-                    }
-                    const clamped = Math.max(baseMin, Math.min(val, maxPrice - PRICE_GAP));
-                    setMinPrice(clamped);
-                    setMinPriceInput(String(Math.round(clamped)));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      (e.target as HTMLInputElement).blur();
-                    }
-                  }}
-                />
+          <div className="space-y-1 sm:col-span-2 lg:col-span-2">
+            <label className={labelCls}>{t("catalog.range")}</label>
+            <div className="rounded-xl border border-sand/60 bg-sand/30 px-3 py-3" dir="ltr">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-charcoal mb-2">
+                <span className="inline-flex items-center gap-1">
+                  {t("catalog.minLabel")}: {minPrice} <SARIcon size={12} />
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  {t("catalog.maxLabel")}: {maxPrice} <SARIcon size={12} />
+                </span>
               </div>
-              <div className="space-y-1">
-                <label className={labelCls}>{t("catalog.max")}</label>
-                <input
-                  type="number"
-                  min={minPrice + PRICE_GAP}
-                  max={priceCeiling}
-                  className={inputCls}
-                  value={maxPriceInput}
-                  onChange={(e) => setMaxPriceInput(e.target.value)}
-                  onBlur={() => {
-                    const val = Number(maxPriceInput);
-                    if (isNaN(val)) {
-                      setMaxPriceInput(String(Math.round(maxPrice)));
-                      return;
-                    }
-                    const clamped = Math.min(priceCeiling, Math.max(val, minPrice + PRICE_GAP));
-                    setMaxPrice(clamped);
-                    setMaxPriceInput(String(Math.round(clamped)));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      (e.target as HTMLInputElement).blur();
-                    }
-                  }}
-                />
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className={labelCls}>{t("catalog.min")}</label>
+                  <input
+                    type="number"
+                    min={baseMin}
+                    max={maxPrice - PRICE_GAP}
+                    className={inputCls}
+                    value={minPriceInput}
+                    placeholder="0"
+                    onChange={(e) => setMinPriceInput(e.target.value)}
+                    onBlur={() => {
+                      const val = Number(minPriceInput);
+                      if (isNaN(val)) {
+                        setMinPriceInput(String(Math.round(minPrice)));
+                        return;
+                      }
+                      const clamped = Math.max(baseMin, Math.min(val, maxPrice - PRICE_GAP));
+                      setMinPrice(clamped);
+                      setMinPriceInput(String(Math.round(clamped)));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className={labelCls}>{t("catalog.max")}</label>
+                  <input
+                    type="number"
+                    min={minPrice + PRICE_GAP}
+                    max={priceCeiling}
+                    className={inputCls}
+                    value={maxPriceInput}
+                    placeholder={t("catalog.max", "الحد الأقصى")}
+                    onChange={(e) => setMaxPriceInput(e.target.value)}
+                    onBlur={() => {
+                      const val = Number(maxPriceInput);
+                      if (isNaN(val)) {
+                        setMaxPriceInput(String(Math.round(maxPrice)));
+                        return;
+                      }
+                      const clamped = Math.min(priceCeiling, Math.max(val, minPrice + PRICE_GAP));
+                      setMaxPrice(clamped);
+                      setMaxPriceInput(String(Math.round(clamped)));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                  />
+                </div>
               </div>
             </div>
-            <style>
-              {`
-                .range-thumb::-webkit-slider-thumb {
-                  -webkit-appearance: none;
-                  appearance: none;
-                  height: 16px;
-                  width: 16px;
-                  border-radius: 999px;
-                  background: #2c2c2c;
-                  border: 2px solid #fff;
-                  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
-                  cursor: pointer;
-                  margin-top: -6px;
-                }
-                .range-thumb::-moz-range-thumb {
-                  height: 16px;
-                  width: 16px;
-                  border-radius: 999px;
-                  background: #2c2c2c;
-                  border: 2px solid #fff;
-                  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
-                  cursor: pointer;
-                }
-                .range-thumb::-webkit-slider-runnable-track {
-                  height: 1.5px;
-                  background: transparent;
-                }
-                .range-thumb::-moz-range-track {
-                  height: 1.5px;
-                  background: transparent;
-                }
-              `}
-            </style>
           </div>
         </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        <button
-          onClick={apply}
-          className="h-10 px-4 rounded-xl bg-charcoal text-ivory text-sm font-semibold hover:bg-charcoal-light transition"
-        >
-          {t("catalog.applyFilters")}
-        </button>
-        <button
-          onClick={clearAll}
-          className="h-10 px-4 rounded-xl bg-white border border-sand/60 text-sm font-semibold hover:bg-sand/60 transition"
-        >
-          {t("catalog.resetFilters")}
-        </button>
-      </div>
+      )}
     </div>
   );
 }

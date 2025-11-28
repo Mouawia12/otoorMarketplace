@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
 import api from '../lib/api';
+import SARIcon from '../components/common/SARIcon';
 
 interface EarningsRecord {
   id: number;
@@ -80,6 +81,21 @@ export default function SellerEarningsPage() {
     window.open('/seller/earnings?export=csv', '_blank');
   };
 
+  const renderCurrency = (
+    value: number,
+    size = 18,
+    { className = '', prefix = '' }: { className?: string; prefix?: string } = {}
+  ) => {
+    const formatted = formatPrice(value, language).replace(/\s?(SAR|﷼)$/i, '');
+    return (
+      <span className={`inline-flex items-center gap-1 ${className}`.trim()}>
+        {prefix}
+        {formatted}
+        <SARIcon size={size} />
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -106,7 +122,7 @@ export default function SellerEarningsPage() {
             <span className="text-2xl">💰</span>
             <h3 className="text-sm text-taupe">{t('seller.totalEarnings')}</h3>
           </div>
-          <p className="text-3xl font-bold text-charcoal">{formatPrice(summary.totalEarnings, language)}</p>
+          <p className="text-3xl font-bold text-charcoal">{renderCurrency(summary.totalEarnings, 20)}</p>
         </div>
 
         <div className="bg-white rounded-luxury p-6 shadow-luxury">
@@ -114,7 +130,9 @@ export default function SellerEarningsPage() {
             <span className="text-2xl">📊</span>
             <h3 className="text-sm text-taupe">{t('seller.commission')}</h3>
           </div>
-          <p className="text-3xl font-bold text-red-600">{formatPrice(summary.totalCommission, language)}</p>
+          <p className="text-3xl font-bold">
+            {renderCurrency(summary.totalCommission, 20, { className: 'text-red-600' })}
+          </p>
         </div>
 
         <div className="bg-gradient-to-br from-gold to-gold-hover rounded-luxury p-6 shadow-luxury">
@@ -122,7 +140,7 @@ export default function SellerEarningsPage() {
             <span className="text-2xl">✨</span>
             <h3 className="text-sm text-charcoal">{t('seller.netEarnings')}</h3>
           </div>
-          <p className="text-3xl font-bold text-charcoal">{formatPrice(summary.netEarnings, language)}</p>
+          <p className="text-3xl font-bold text-charcoal">{renderCurrency(summary.netEarnings, 20)}</p>
         </div>
 
         <div className="bg-white rounded-luxury p-6 shadow-luxury">
@@ -130,7 +148,7 @@ export default function SellerEarningsPage() {
             <span className="text-2xl">📈</span>
             <h3 className="text-sm text-taupe">{t('seller.averageOrder')}</h3>
           </div>
-          <p className="text-3xl font-bold text-charcoal">{formatPrice(summary.averageOrder, language)}</p>
+          <p className="text-3xl font-bold text-charcoal">{renderCurrency(summary.averageOrder, 20)}</p>
         </div>
       </div>
 
@@ -164,9 +182,15 @@ export default function SellerEarningsPage() {
                   <td className="px-4 py-4 text-charcoal">
                     {i18n.language === 'ar' ? record.productNameAr : record.productName}
                   </td>
-                  <td className="px-4 py-4 text-charcoal font-semibold">{formatPrice(record.amount, language)}</td>
-                  <td className="px-4 py-4 text-red-600">-{formatPrice(record.commission, language)}</td>
-                  <td className="px-4 py-4 text-green-600 font-bold">{formatPrice(record.netEarnings, language)}</td>
+                  <td className="px-4 py-4 text-charcoal font-semibold">
+                    {renderCurrency(record.amount, 16)}
+                  </td>
+                  <td className="px-4 py-4 text-red-600">
+                    {renderCurrency(record.commission, 16, { prefix: '-' })}
+                  </td>
+                  <td className="px-4 py-4 text-green-600 font-bold">
+                    {renderCurrency(record.netEarnings, 16)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -189,7 +213,7 @@ export default function SellerEarningsPage() {
                   style={{ height: `${heightPercent}%` }}
                 >
                   <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-charcoal text-ivory text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
-                    {formatPrice(record.netEarnings, language)}
+                    {renderCurrency(record.netEarnings, 14)}
                   </div>
                 </div>
                 <span className="text-xs text-taupe">

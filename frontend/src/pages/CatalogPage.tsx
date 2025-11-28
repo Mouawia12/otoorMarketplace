@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import ProductCard from '../components/products/ProductCard';
@@ -156,32 +156,43 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
     };
   };
 
-  const handleFilterChange = (newFilters: any) => {
-    const nextFilters = {
-      ...filters,
-      ...newFilters,
-      condition: lockedCondition ?? newFilters.condition ?? (filters.condition || 'all'),
-    };
-    setFilters(nextFilters);
-    setCurrentPage(1);
-    
-    // Update URL params
-    const params = new URLSearchParams();
-    if (nextFilters.search) params.set('search', nextFilters.search);
-    if (nextFilters.brand) params.set('brand', nextFilters.brand);
-    if (nextFilters.category) params.set('category', nextFilters.category);
-    if (!lockedCondition && nextFilters.condition && nextFilters.condition !== 'all') {
-      params.set('condition', nextFilters.condition);
-    }
-    if (nextFilters.sort && nextFilters.sort !== 'newest') params.set('sort', nextFilters.sort);
-    if (typeof nextFilters.min_price === 'number') {
-      params.set('min_price', String(nextFilters.min_price));
-    }
-    if (typeof nextFilters.max_price === 'number') {
-      params.set('max_price', String(nextFilters.max_price));
-    }
-    setSearchParams(params);
-  };
+  const handleFilterChange = useCallback(
+    (newFilters: Partial<typeof filters>) => {
+      let nextFiltersState: typeof filters | undefined;
+      setFilters((prev) => {
+        nextFiltersState = {
+          ...prev,
+          ...newFilters,
+          condition: lockedCondition ?? newFilters.condition ?? prev.condition ?? 'all',
+        };
+        return nextFiltersState;
+      });
+      setCurrentPage(1);
+
+      if (!nextFiltersState) {
+        return;
+      }
+
+      const params = new URLSearchParams();
+      if (nextFiltersState.search) params.set('search', nextFiltersState.search);
+      if (nextFiltersState.brand) params.set('brand', nextFiltersState.brand);
+      if (nextFiltersState.category) params.set('category', nextFiltersState.category);
+      if (!lockedCondition && nextFiltersState.condition && nextFiltersState.condition !== 'all') {
+        params.set('condition', nextFiltersState.condition);
+      }
+      if (nextFiltersState.sort && nextFiltersState.sort !== 'newest') {
+        params.set('sort', nextFiltersState.sort);
+      }
+      if (typeof nextFiltersState.min_price === 'number') {
+        params.set('min_price', String(nextFiltersState.min_price));
+      }
+      if (typeof nextFiltersState.max_price === 'number') {
+        params.set('max_price', String(nextFiltersState.max_price));
+      }
+      setSearchParams(params);
+    },
+    [lockedCondition, setSearchParams]
+  );
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

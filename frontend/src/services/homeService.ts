@@ -13,6 +13,10 @@ export interface HeroSlide {
   image: string;
   title: { ar: string; en: string };
   subtitle: { ar: string; en: string };
+  priceInfo?: {
+    value: number;
+    prefix?: { ar: string; en: string };
+  };
   primaryCta: { text: { ar: string; en: string }; link: string };
   secondaryCta?: { text: { ar: string; en: string }; link: string };
 }
@@ -44,8 +48,12 @@ const buildHeroSlideFromProduct = (product: Product, index: number): HeroSlide =
       en: product.name_en,
     },
     subtitle: {
-      ar: `${product.brand} • ${Math.round(product.base_price)} ر.س`,
-      en: `${product.brand} • SAR ${Math.round(product.base_price)}`,
+      ar: product.brand,
+      en: product.brand,
+    },
+    priceInfo: {
+      value: Number(product.base_price) || 0,
+      prefix: { ar: '•', en: '•' },
     },
     primaryCta: {
       text: {
@@ -76,8 +84,11 @@ const buildHeroSlideFromAuction = (auction: Auction, index: number): HeroSlide |
       en: `${product.name_en} - Live Auction`,
     },
     subtitle: {
-      ar: `السعر الحالي: ${Math.round(auction.current_price)} ر.س`,
-      en: `Current bid: SAR ${Math.round(auction.current_price)}`,
+      ar: 'السعر الحالي:',
+      en: 'Current bid:',
+    },
+    priceInfo: {
+      value: Number(auction.current_price) || 0,
     },
     primaryCta: {
       text: {

@@ -1,7 +1,7 @@
 import favicon32 from '@/assets/pwa/favicon-32.png?url';
 import faviconPng from '@/assets/pwa/favicon.png?url';
 import appleTouchIcon from '@/assets/pwa/favicon-180.png?url';
-import { getManifestUrl, getThemeColor } from './manifest';
+import { MANIFEST_URL, THEME_COLOR } from './manifestConfig';
 
 const ensureLink = (key: string, attributes: Record<string, string>) => {
   if (typeof document === 'undefined') return;
@@ -57,10 +57,10 @@ export const registerPwaAssets = () => {
 
   ensureLink('manifest', {
     rel: 'manifest',
-    href: getManifestUrl(),
+    href: MANIFEST_URL,
   });
 
-  ensureMeta('theme-color', getThemeColor());
+  ensureMeta('theme-color', THEME_COLOR);
 };
 
 registerPwaAssets();

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HeroSlide } from '../../../services/homeService';
+import SARIcon from '../../../components/common/SARIcon';
 
 interface HeroProps {
   slides: HeroSlide[];
@@ -60,8 +61,20 @@ export default function Hero({ slides }: HeroProps) {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-ivory mb-4 animate-fade-in">
               {slide.title[lang]}
             </h1>
-            <p className="text-lg md:text-xl text-sand mb-8 animate-fade-in-delay">
-              {slide.subtitle[lang]}
+            <p className="text-lg md:text-xl text-sand mb-8 animate-fade-in-delay flex items-center gap-2 flex-wrap">
+              <span>{slide.subtitle[lang]}</span>
+              {slide.priceInfo && (
+                <span className="inline-flex items-center gap-1 text-ivory font-semibold">
+                  {slide.priceInfo.prefix?.[lang] && (
+                    <span>{slide.priceInfo.prefix[lang]}</span>
+                  )}
+                  {slide.priceInfo.value.toLocaleString(
+                    lang === 'ar' ? 'ar-SA' : 'en-US',
+                    { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+                  )}
+                  <SARIcon size={18} className="text-ivory" />
+                </span>
+              )}
             </p>
             <div className="flex flex-wrap gap-4">
               <Link

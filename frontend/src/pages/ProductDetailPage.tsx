@@ -11,6 +11,7 @@ import ProductCard from '../components/products/ProductCard';
 import { Product, Auction, ProductReview } from '../types';
 import { fetchProductReviews } from '../services/reviewService';
 import { formatPrice } from '../utils/currency';
+import SARIcon from '../components/common/SARIcon';
 import { resolveImageUrl } from '../utils/image';
 import Countdown from '../components/common/Countdown';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
@@ -188,7 +189,10 @@ export default function ProductDetailPage() {
               <div className="flex items-center gap-6 text-charcoal">
                 <div>
                   <p className="text-sm opacity-80">{t('auction.currentBid')}</p>
-                  <p className="text-2xl font-bold">{formatPrice(activeAuction.current_price, language)}</p>
+                  <p className="text-2xl font-bold inline-flex items-center gap-1">
+                    {formatPrice(activeAuction.current_price, language).replace(/\s?(SAR|﷼)$/i, '')}
+                    <SARIcon size={18} />
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm opacity-80">{t('auction.totalBids')}</p>
@@ -303,7 +307,10 @@ export default function ProductDetailPage() {
 
           <div className="bg-sand rounded-luxury p-6">
             <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-4xl font-bold text-gold">{formatPrice(product.base_price, language)}</span>
+              <span className="text-4xl font-bold text-gold inline-flex items-center gap-2">
+                {formatPrice(product.base_price, language).replace(/\s?(SAR|﷼)$/i, '')}
+                <SARIcon size={22} className="text-gold" />
+              </span>
             </div>
 
             <div className="space-y-3">

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
+import SARIcon from '../components/common/SARIcon';
 import api from '../lib/api';
 
 interface DashboardStats {
@@ -75,6 +76,16 @@ export default function SellerDashboardPage() {
     },
   ];
 
+  const renderPrice = (value: number, size = 18, className = '') => {
+    const formatted = formatPrice(value, language).replace(/\s?(SAR|﷼)$/i, '');
+    return (
+      <span className={`inline-flex items-center gap-1 ${className}`.trim()}>
+        {formatted}
+        <SARIcon size={size} />
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
@@ -89,7 +100,7 @@ export default function SellerDashboardPage() {
             <span className="text-3xl">💰</span>
             <h3 className="text-h3">{t('seller.totalEarnings')}</h3>
           </div>
-        <p className="text-4xl font-bold">{formatPrice(stats.totalEarnings, language)}</p>
+        <p className="text-4xl font-bold">{renderPrice(stats.totalEarnings, 22)}</p>
         <Link to="/seller/earnings" className="text-sm underline mt-2 inline-block hover:text-charcoal-light">
           {t('seller.viewDetails')}
         </Link>
@@ -100,7 +111,7 @@ export default function SellerDashboardPage() {
             <span className="text-3xl">📅</span>
             <h3 className="text-h3 text-charcoal">{t('seller.monthlyEarnings')}</h3>
           </div>
-          <p className="text-4xl font-bold text-charcoal">{formatPrice(stats.monthlyEarnings, language)}</p>
+          <p className="text-4xl font-bold text-charcoal">{renderPrice(stats.monthlyEarnings, 22)}</p>
           <p className="text-sm text-taupe mt-2">{t('seller.thisMonth')}</p>
         </div>
       </div>

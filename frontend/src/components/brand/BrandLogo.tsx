@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useUIStore } from "../../store/uiStore";
 import logoWordmarkAr from "@/assets/brand/logo-ao-wordmark-ar.svg?url";
 import logoWordmarkEn from "@/assets/brand/logo-ao-wordmark-en.svg?url";
@@ -26,32 +26,61 @@ export default function BrandLogo({
 }: BrandLogoProps) {
   const { language } = useUIStore();
 
-  const basePath = import.meta.env.VITE_CDN_BASE_URL
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const basePath = import.meta.env?.VITE_CDN_BASE_URL
     ? `${import.meta.env.VITE_CDN_BASE_URL.replace(/\/+$/, "")}/brand`
-    : `${window.location.origin}/brand`;
+    : origin
+    ? `${origin}/brand`
+    : "/brand";
   const fileBase =
     language === "ar" ? "logo-ao-wordmark-ar" : "logo-ao-wordmark-en";
   const localFallback = language === "ar" ? logoWordmarkAr : logoWordmarkEn;
 
-  // نحضّر قائمة احتمالات تلقائية: svg ثم png ثم الاسم كما هو (بدون امتداد)
-  const candidates = useMemo(() => {
+  const remoteCandidates = useMemo(() => {
     if (srcOverride) return [srcOverride];
-    const sources = [
+    return [
       `${basePath}/${fileBase}.svg`,
       `${basePath}/${fileBase}.png`,
       `${basePath}/${fileBase}`,
     ];
-    if (localFallback) {
-      sources.push(localFallback);
-    }
-    return sources;
-  }, [srcOverride, fileBase, basePath, localFallback]);
+  }, [srcOverride, basePath, fileBase]);
 
-  const [idx, setIdx] = useState(0);
+  const [currentSrc, setCurrentSrc] = useState(srcOverride ?? localFallback);
+
+  useEffect(() => {
+    setCurrentSrc(srcOverride ?? localFallback);
+  }, [srcOverride, localFallback]);
+
+  useEffect(() => {
+    if (srcOverride) return;
+    let cancelled = false;
+
+    const tryLoad = (index: number) => {
+      if (index >= remoteCandidates.length || cancelled) return;
+      const img = new Image();
+      img.onload = () => {
+        if (!cancelled) {
+          setCurrentSrc(remoteCandidates[index]);
+        }
+      };
+      img.onerror = () => {
+        if (!cancelled) {
+          tryLoad(index + 1);
+        }
+      };
+      img.src = remoteCandidates[index];
+    };
+
+    tryLoad(0);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [remoteCandidates, srcOverride]);
 
   const onError = useCallback(() => {
-    setIdx((i) => (i + 1 < candidates.length ? i + 1 : i));
-  }, [candidates.length]);
+    setCurrentSrc(localFallback);
+  }, [localFallback]);
 
   const effectiveAlt =
     alt ??
@@ -61,14 +90,14 @@ export default function BrandLogo({
 
   return (
     <img
-      src={candidates[idx]}
+      src={currentSrc}
       onError={onError}
       alt={effectiveAlt}
       width={size}
       height={size}
       className={className}
       style={{ height: "auto", display: "block" }}
-      loading="lazy"
+      loading="eager"
       data-variant={variant}
     />
   );

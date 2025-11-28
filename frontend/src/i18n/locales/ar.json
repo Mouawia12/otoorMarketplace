@@ -176,7 +176,7 @@
     "max": "الحد الأقصى",
     "minLabel": "الأقل",
     "maxLabel": "الأكثر",
-    "currency": "ريال",
+    "currency": "",
     "filterTitle": "تصفية النتائج",
     "filterHint": "اضبط الفلاتر لتحسين النتائج",
     "filterActive": "{{count}} فلاتر مفعّلة",

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
+import SARIcon from '../components/common/SARIcon';
 import { fetchAuctions } from '../services/auctionService';
 
 interface Bid {
@@ -138,10 +139,16 @@ export default function BidsPage() {
                     {t('lang') === 'ar' ? bid.auctionNameAr : bid.auctionName}
                   </td>
                   <td className="px-4 py-4 text-charcoal font-semibold">
-                    {formatPrice(bid.yourMaxBid, language)}
+                    <span className="inline-flex items-center gap-1">
+                      {formatPrice(bid.yourMaxBid, language).replace(/\s?(SAR|﷼)$/i, '')}
+                      <SARIcon size={14} />
+                    </span>
                   </td>
                   <td className="px-4 py-4 text-charcoal-light">
-                    {formatPrice(bid.currentPrice, language)}
+                    <span className="inline-flex items-center gap-1">
+                      {formatPrice(bid.currentPrice, language).replace(/\s?(SAR|﷼)$/i, '')}
+                      <SARIcon size={14} />
+                    </span>
                   </td>
                   <td className="px-4 py-4">{getStatusBadge(bid.status)}</td>
                   <td className="px-4 py-4 text-charcoal-light">

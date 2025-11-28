@@ -7,6 +7,7 @@ import { formatPrice } from "../utils/currency";
 import { normalizeImagePathForStorage, resolveImageUrl } from "../utils/image";
 import { sellerSearchTemplates } from "../services/productTemplateService";
 import { PLACEHOLDER_PERFUME } from "../utils/staticAssets";
+import SARIcon from "../components/common/SARIcon";
 
 type AuctionFilter = "all" | "active" | "scheduled" | "completed" | "cancelled";
 
@@ -98,6 +99,17 @@ export default function SellerAuctionsPage() {
     );
   }
 
+  const renderPrice = (value: number | undefined, size = 16, className = "") => {
+    if (value === undefined || value === null) return "-";
+    const formatted = formatPrice(value, language).replace(/\s?(SAR|﷼)$/i, "");
+    return (
+      <span className={`inline-flex items-center gap-1 ${className}`.trim()}>
+        {formatted}
+        <SARIcon size={size} />
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
@@ -159,11 +171,11 @@ export default function SellerAuctionsPage() {
                       {new Date(auction.end_time).toLocaleString(i18n.language === "ar" ? "ar-EG" : "en-US")}
                     </td>
                     <td className="px-4 py-4 text-charcoal-light">
-                      {formatPrice(auction.starting_price, language)}
+                      {renderPrice(auction.starting_price)}
                     </td>
                     <td className="px-4 py-4 text-charcoal font-semibold">
                       {auction.status === "active"
-                        ? formatPrice(auction.current_price, language)
+                        ? renderPrice(auction.current_price)
                         : "-"}
                     </td>
                     <td className="px-4 py-4 text-charcoal-light">{auction.total_bids ?? 0}</td>

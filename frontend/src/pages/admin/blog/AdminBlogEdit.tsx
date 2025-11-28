@@ -202,29 +202,29 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
               <input value={form.tags} onChange={e=>on("tags",e.target.value)} placeholder="tag1, tag2"
                      className="w-full bg-white border border-sand rounded-lg px-3 py-2" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1">{t("common.language","اللغة")}</label>
-                <select value={form.lang} onChange={e=>on("lang",e.target.value as "ar"|"en")}
-                        className="w-full bg-white border border-sand rounded-lg px-3 py-2">
-                  <option value="ar">العربية</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-              <div>
-                <label className="block mb-1">{t("common.status","الحالة")}</label>
-                <select value={form.status} onChange={e=>on("status",e.target.value as "draft"|"published")}
-                        className="w-full bg-white border border-sand rounded-lg px-3 py-2">
-                  <option value="draft">{t("common.draft","مسودة")}</option>
-                  <option value="published">{t("common.published","منشور")}</option>
-                </select>
-              </div>
-            </div>
-
             <div>
               <label className="block mb-1">{t("common.date","التاريخ")}</label>
               <input type="date" value={form.date} onChange={e=>on("date",e.target.value)}
                      className="w-full bg-white border border-sand rounded-lg px-3 py-2" />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1">{t("common.language","اللغة")}</label>
+              <select value={form.lang} onChange={e=>on("lang",e.target.value as "ar"|"en")}
+                      className="w-full bg-white border border-sand rounded-lg px-3 py-2">
+                <option value="ar">العربية</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1">{t("common.status","الحالة")}</label>
+              <select value={form.status} onChange={e=>on("status",e.target.value as "draft"|"published")}
+                      className="w-full bg-white border border-sand rounded-lg px-3 py-2">
+                <option value="draft">{t("common.draft","مسودة")}</option>
+                <option value="published">{t("common.published","منشور")}</option>
+              </select>
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import SARIcon from '../components/common/SARIcon';
 
 interface Settings {
   commissionNew: number;
@@ -74,7 +75,11 @@ export default function AdminSettingsPage() {
           <div>
             <h3 className="text-h3 text-charcoal mb-4">{t('admin.fees')}</h3>
             <div>
-              <label className="block text-charcoal font-semibold mb-2">{t('admin.authenticityFee')} (ريال)</label>
+              <label className="block text-charcoal font-semibold mb-2">
+                {t('admin.authenticityFee')} (
+                <SARIcon size={14} className="text-charcoal align-text-bottom" />
+                )
+              </label>
               <input type="number" value={settings.authenticityFee} onChange={(e) => setSettings({ ...settings, authenticityFee: parseFloat(e.target.value) })} className="w-full md:w-1/3 px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none" />
             </div>
           </div>
