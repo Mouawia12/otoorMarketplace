@@ -8,6 +8,7 @@ import { formatPrice } from '../utils/currency';
 import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
 import { sellerSearchTemplates } from '../services/productTemplateService';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
+import SARIcon from '../components/common/SARIcon';
 
 type StatusFilter = 'all' | 'published' | 'draft' | 'pending' | 'rejected';
 
@@ -161,30 +162,30 @@ export default function SellerProductsPage() {
           </select>
         </div>
 
-        <div className="overflow-x-auto lg:overflow-visible">
-          <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm md:text-base">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.id')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.title')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.brand')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.type')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.price')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.status')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.createdAt')}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t('seller.actions')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.id')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.title')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.brand')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.type')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.price')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.status')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.createdAt')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.map((product) => (
                 <tr key={product.id} className="border-b border-gray-100 hover:bg-sand transition">
-                  <td className="px-4 py-4 text-charcoal-light">{product.id}</td>
-                  <td className="px-4 py-4 text-charcoal font-medium">
+                  <td className="px-3 md:px-4 py-4 text-charcoal-light">{product.id}</td>
+                  <td className="px-3 md:px-4 py-4 text-charcoal font-medium">
                     {i18n.language === 'ar' ? product.name_ar : product.name_en}
                   </td>
-                  <td className="px-4 py-4 text-charcoal-light">{product.brand}</td>
-                  <td className="px-4 py-4 text-charcoal-light">{product.product_type}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-3 md:px-4 py-4 text-charcoal-light">{product.brand}</td>
+                  <td className="px-3 md:px-4 py-4 text-charcoal-light">{product.product_type}</td>
+                  <td className="px-3 md:px-4 py-4">
                     {editingId === product.id ? (
                       <div className="flex gap-2 items-center">
                         <input
@@ -212,13 +213,14 @@ export default function SellerProductsPage() {
                           setEditingId(product.id);
                           setEditPrice(product.base_price.toString());
                         }}
-                        className="text-charcoal font-semibold cursor-pointer hover:text-gold"
+                        className="inline-flex items-center gap-1 text-charcoal font-semibold cursor-pointer hover:text-gold"
                       >
-                        {formatPrice(product.base_price, language)}
+                        <span>{formatPrice(product.base_price, language).replace(/\s?(SAR|﷼)$/i, '')}</span>
+                        <SARIcon size={16} />
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-3 md:px-4 py-4">
                     <select
                       value={product.status === 'published' ? 'pending' : product.status}
                       onChange={(e) => handleStatusChange(product.id, e.target.value)}
@@ -229,12 +231,12 @@ export default function SellerProductsPage() {
                       <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
                     </select>
                   </td>
-                  <td className="px-4 py-4 text-charcoal-light">
+                  <td className="px-3 md:px-4 py-4 text-charcoal-light">
                     {new Date(product.created_at).toLocaleDateString(
                       i18n.language === 'ar' ? 'ar-EG' : 'en-US'
                     )}
                   </td>
-                  <td className="px-4 py-4 text-right">
+                  <td className="px-3 md:px-4 py-4 text-right">
                     <button
                       onClick={() => setEditingProduct(product)}
                       className="px-2 py-1 rounded-full border border-gold text-charcoal hover:bg-gold/10 transition"

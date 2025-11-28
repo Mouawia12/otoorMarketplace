@@ -4,6 +4,7 @@ import {
   Prisma,
   ProductStatus,
   RoleName,
+  SellerStatus,
   UserStatus,
 } from "@prisma/client";
 
@@ -69,38 +70,119 @@ export const listUsersForAdmin = async () => {
   }));
 };
 
+type AdminUserUpdatePayload = {
+  status?: string;
+  seller_status?: string;
+  roles?: string[];
+};
+
 export const updateUserStatus = async (
   userId: number,
-  status: string,
+  updates: AdminUserUpdatePayload,
   allowedRoles: RoleName[]
 ) => {
   if (!allowedRoles.some((role) => role === RoleName.ADMIN || role === RoleName.SUPER_ADMIN)) {
     throw AppError.forbidden();
   }
 
-  const normalized = status.toUpperCase();
-  if (!Object.values(UserStatus).includes(normalized as UserStatus)) {
-    throw AppError.badRequest("Invalid status value");
+  const updateData: Prisma.UserUpdateInput = {};
+
+  if (updates.status) {
+    const normalizedStatus = updates.status.toUpperCase();
+    if (!Object.values(UserStatus).includes(normalizedStatus as UserStatus)) {
+      throw AppError.badRequest("Invalid status value");
+    }
+    updateData.status = normalizedStatus as UserStatus;
   }
 
-  const updated = (await prisma.user.update({
-    where: { id: userId },
-    data: {
-      status: normalized as UserStatus,
-    },
-    include: {
-      roles: { include: { role: true } },
-    },
-  })) as Prisma.UserGetPayload<{
-    include: { roles: { include: { role: true } } };
-  }>;
+  if (updates.seller_status) {
+    const normalizedSellerStatus = updates.seller_status.toUpperCase();
+    if (!Object.values(SellerStatus).includes(normalizedSellerStatus as SellerStatus)) {
+      throw AppError.badRequest("Invalid seller status value");
+    }
+    updateData.sellerStatus = normalizedSellerStatus as SellerStatus;
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    if (Object.keys(updateData).length > 0) {
+      await tx.user.update({
+        where: { id: userId },
+        data: updateData,
+      });
+    } else {
+      const exists = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
+      if (!exists) {
+        throw AppError.notFound("User not found");
+      }
+    }
+
+    if (updates.roles) {
+      if (!Array.isArray(updates.roles) || updates.roles.length === 0) {
+        throw AppError.badRequest("Roles must be a non-empty array");
+      }
+
+      const normalizedRoles = Array.from(
+        new Set(
+          updates.roles.map((role) => role.trim().toUpperCase()).filter((role) => role.length > 0)
+        )
+      );
+
+      const invalidRoles = normalizedRoles.filter(
+        (role) => !Object.values(RoleName).includes(role as RoleName)
+      );
+      if (invalidRoles.length > 0) {
+        throw AppError.badRequest(`Invalid roles: ${invalidRoles.join(", ")}`);
+      }
+
+      if (
+        normalizedRoles.includes(RoleName.SUPER_ADMIN) &&
+        !allowedRoles.includes(RoleName.SUPER_ADMIN)
+      ) {
+        throw AppError.forbidden("Only super admins can assign super admin role");
+      }
+
+      if (!normalizedRoles.includes(RoleName.BUYER)) {
+        normalizedRoles.push(RoleName.BUYER);
+      }
+
+      const roleRecords = await tx.role.findMany({
+        where: { name: { in: normalizedRoles as RoleName[] } },
+      });
+
+      if (roleRecords.length !== normalizedRoles.length) {
+        throw AppError.badRequest("Some roles were not found");
+      }
+
+      await tx.userRole.deleteMany({ where: { userId } });
+      await tx.userRole.createMany({
+        data: roleRecords.map((role) => ({ userId, roleId: role.id })),
+        skipDuplicates: true,
+      });
+    }
+
+    const refreshed = await tx.user.findUnique({
+      where: { id: userId },
+      include: {
+        roles: { include: { role: true } },
+        sellerProfile: { select: { status: true } },
+      },
+    });
+
+    if (!refreshed) {
+      throw AppError.notFound("User not found");
+    }
+
+    return refreshed;
+  });
 
   return {
-    id: updated.id,
-    email: updated.email,
-    full_name: updated.fullName,
-    status: updated.status,
-    roles: updated.roles.map((relation) => relation.role.name.toLowerCase()),
+    id: result.id,
+    email: result.email,
+    full_name: result.fullName,
+    status: result.status,
+    roles: result.roles.map((relation) => relation.role.name.toLowerCase()),
+    seller_status: result.sellerStatus?.toLowerCase?.() ?? "pending",
+    seller_profile_status: result.sellerProfile?.status?.toLowerCase?.(),
   };
 };
 

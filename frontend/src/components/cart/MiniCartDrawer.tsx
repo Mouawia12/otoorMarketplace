@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useCartStore } from "../../store/cartStore";
 import { formatPrice } from "../../utils/currency";
+import SARIcon from "../common/SARIcon";
 
 interface MiniCartDrawerProps {
   open: boolean;
@@ -13,6 +14,15 @@ export default function MiniCartDrawer({ open, onClose }: MiniCartDrawerProps) {
   const { items, remove, totals } = useCartStore();
   const { sub, total } = totals();
   const lang = i18n.language as 'ar' | 'en';
+  const renderPrice = (value: number | undefined, size = 14, colorClass = "") => {
+    const formatted = formatPrice(value, lang).replace(/\s?(SAR|﷼)$/i, "");
+    return (
+      <span className={`inline-flex items-center gap-1 ${colorClass}`.trim()}>
+        {formatted}
+        <SARIcon size={size} />
+      </span>
+    );
+  };
 
   if (!open) return null;
 
@@ -87,7 +97,7 @@ export default function MiniCartDrawer({ open, onClose }: MiniCartDrawerProps) {
                     <h3 className="text-ivory font-semibold text-sm truncate">{item.name}</h3>
                     {item.brand && <p className="text-taupe text-xs">{item.brand}</p>}
                     {item.variantLabel && <p className="text-gold text-xs">{item.variantLabel}</p>}
-                    <p className="text-gold font-bold mt-1">{formatPrice(item.price, lang)}</p>
+                    <p className="text-gold font-bold mt-1">{renderPrice(item.price, 14, "text-gold")}</p>
                     <p className="text-taupe text-xs mt-1">{t('cart.qty')}: {item.qty}</p>
                   </div>
                   <button
@@ -106,11 +116,11 @@ export default function MiniCartDrawer({ open, onClose }: MiniCartDrawerProps) {
             <div className="sticky bottom-0 bg-charcoal border-t border-charcoal-light p-4 space-y-3">
               <div className="flex justify-between text-ivory">
                 <span>{t('cart.subtotal')}:</span>
-                <span className="font-bold">{formatPrice(sub, lang)}</span>
+                <span className="font-bold">{renderPrice(sub)}</span>
               </div>
               <div className="flex justify-between text-ivory text-lg font-bold">
                 <span>{t('cart.total')}:</span>
-                <span className="text-gold">{formatPrice(total, lang)}</span>
+                <span className="text-gold">{renderPrice(total, 16, "text-gold")}</span>
               </div>
               <Link
                 to="/cart"

@@ -27,6 +27,12 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<(User & { created_at?: string }) | null>(null);
+  const [editStatus, setEditStatus] = useState<User["status"]>("ACTIVE");
+  const [editSellerStatus, setEditSellerStatus] = useState<string>("pending");
+  const [editRoles, setEditRoles] = useState<string[]>([]);
+  const [savingUser, setSavingUser] = useState(false);
+  const roleOptions = ["buyer", "seller", "admin", "moderator", "support"];
 
   const loadUsers = async () => {
     try {
@@ -62,17 +68,6 @@ export default function AdminUsersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleStatusToggle = async (user: User) => {
-    const nextStatus = user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
-    try {
-      await api.patch(`/admin/users/${user.id}`, { status: nextStatus });
-      await loadUsers();
-    } catch (err: any) {
-      console.error("Failed to update user status", err);
-      alert(err?.response?.data?.detail ?? t("admin.updateUserFailed"));
-    }
-  };
-
   const handleSellerDecision = async (userId: number, status: "approved" | "rejected") => {
     try {
       await api.patch(`/seller/profile/${userId}/status`, { status });
@@ -80,6 +75,69 @@ export default function AdminUsersPage() {
     } catch (err: any) {
       console.error("Failed to update seller request", err);
       alert(err?.response?.data?.detail ?? t("common.error"));
+    }
+  };
+
+  const openEditModal = (user: User & { created_at?: string }) => {
+    setSelectedUser(user);
+    setEditStatus(user.status);
+    setEditSellerStatus(user.seller_status || "pending");
+    const normalizedRoles =
+      user.roles && user.roles.length > 0
+        ? Array.from(new Set(user.roles.map((role) => role.toLowerCase())))
+        : [];
+    if (!normalizedRoles.includes("buyer")) {
+      normalizedRoles.push("buyer");
+    }
+    setEditRoles(normalizedRoles);
+  };
+
+  const closeEditModal = () => {
+    setSelectedUser(null);
+    setSavingUser(false);
+  };
+
+  const toggleRole = (role: string) => {
+    setEditRoles((prev) => {
+      const normalized = role.toLowerCase();
+      if (normalized === "buyer") {
+        return prev.includes("buyer") ? prev : [...prev, "buyer"];
+      }
+      return prev.includes(normalized)
+        ? prev.filter((r) => r !== normalized)
+        : [...prev, normalized];
+    });
+  };
+
+  const handleSaveUser = async () => {
+    if (!selectedUser) return;
+    try {
+      setSavingUser(true);
+      const normalizedRoles = editRoles.includes("buyer") ? editRoles : [...editRoles, "buyer"];
+      await api.patch(`/admin/users/${selectedUser.id}`, {
+        status: editStatus,
+        seller_status: editSellerStatus,
+        roles: normalizedRoles,
+      });
+      await loadUsers();
+      closeEditModal();
+    } catch (err: any) {
+      console.error("Failed to update user", err);
+      alert(err?.response?.data?.detail ?? t("admin.updateUserFailed"));
+      setSavingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (!window.confirm(t("admin.confirmDeleteUser", "هل أنت متأكد من حذف هذا المستخدم؟"))) {
+      return;
+    }
+    try {
+      await api.delete(`/admin/users/${user.id}`);
+      await loadUsers();
+    } catch (err: any) {
+      console.error("Failed to delete user", err);
+      alert(err?.response?.data?.detail ?? t("admin.deleteUserFailed", "فشل حذف المستخدم"));
     }
   };
 
@@ -238,16 +296,22 @@ export default function AdminUsersPage() {
                       : "—"}
                   </td>
                   <td className="px-4 py-4">
-                    <button
-                      onClick={() => handleStatusToggle(user)}
-                      className={`text-sm font-semibold ${
-                        user.status === "ACTIVE"
-                          ? "text-red-600 hover:text-red-700"
-                          : "text-green-600 hover:text-green-700"
-                      }`}
-                    >
-                      {user.status === "ACTIVE" ? t("admin.suspend") : t("admin.activate")}
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => openEditModal(user)}
+                        className="text-gold hover:text-gold-dark"
+                        aria-label={t("common.edit")}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user)}
+                        className="text-red-500 hover:text-red-600"
+                        aria-label={t("common.delete")}
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -255,6 +319,98 @@ export default function AdminUsersPage() {
           </table>
         </div>
       </div>
+
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-h3 text-charcoal">
+                {t("admin.editUser", "تعديل المستخدم")}
+              </h3>
+              <button onClick={closeEditModal} className="text-charcoal-light hover:text-charcoal">
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <span className="text-charcoal font-semibold">{t("admin.name")}: </span>
+                <span className="text-charcoal-light">{selectedUser.full_name}</span>
+              </div>
+              <div>
+                <span className="text-charcoal font-semibold">{t("admin.email")}: </span>
+                <span className="text-charcoal-light break-all">{selectedUser.email}</span>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1">{t("admin.status")}</label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as User["status"])}
+                  className="w-full border border-sand rounded-lg px-3 py-2"
+                >
+                  <option value="ACTIVE">{t("admin.activate", "تفعيل")}</option>
+                  <option value="SUSPENDED">{t("admin.suspend", "تعليق")}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">{t("seller.status", "حالة التاجر")}</label>
+                <select
+                  value={editSellerStatus}
+                  onChange={(e) => setEditSellerStatus(e.target.value)}
+                  className="w-full border border-sand rounded-lg px-3 py-2"
+                >
+                  <option value="pending">{t("seller.statusPending", "قيد المراجعة")}</option>
+                  <option value="approved">{t("seller.statusApproved", "مقبول")}</option>
+                  <option value="rejected">{t("seller.statusRejected", "مرفوض")}</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2">{t("admin.role")}</label>
+              <div className="flex flex-wrap gap-2">
+                {roleOptions.map((role) => (
+                  <label
+                    key={role}
+                    className={`px-3 py-1 rounded-full border cursor-pointer text-sm ${
+                      editRoles.includes(role)
+                        ? "bg-gold text-charcoal border-gold"
+                        : "border-sand text-charcoal-light"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={editRoles.includes(role)}
+                      onChange={() => toggleRole(role)}
+                    />
+                    {role}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={closeEditModal}
+                className="px-4 py-2 rounded-luxury border border-sand text-charcoal"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={handleSaveUser}
+                disabled={savingUser}
+                className="px-5 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover disabled:opacity-60"
+              >
+                {savingUser ? t("common.loading") : t("common.save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

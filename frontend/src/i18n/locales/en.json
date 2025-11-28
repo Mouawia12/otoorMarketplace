@@ -175,7 +175,7 @@
     "max": "Max",
     "minLabel": "Lowest",
     "maxLabel": "Highest",
-    "currency": "SAR",
+    "currency": "",
     "filterTitle": "Filter Results",
     "filterHint": "Adjust filters to refine results",
     "filterActive": "{{count}} active filters",
