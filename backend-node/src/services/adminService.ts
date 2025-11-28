@@ -218,6 +218,10 @@ export const deleteUserByAdmin = async (
     throw AppError.forbidden("Cannot delete a super admin");
   }
 
+  await prisma.sellerProfile.deleteMany({
+    where: { userId },
+  });
+
   await prisma.user.delete({
     where: { id: userId },
   });
