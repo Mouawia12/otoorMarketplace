@@ -519,6 +519,17 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
     }));
   };
 
+  const handleSetPrimaryImage = (url: string) => {
+    setFormData((prev) => {
+      if (!prev.image_urls.includes(url)) return prev;
+      const remaining = prev.image_urls.filter((img) => img !== url);
+      return {
+        ...prev,
+        image_urls: [url, ...remaining],
+      };
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-luxury p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -762,6 +773,13 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                         className="absolute top-2 right-2 bg-white/90 text-red-600 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow"
                       >
                         ×
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetPrimaryImage(url)}
+                        className="absolute bottom-2 left-2 bg-charcoal/85 text-white text-xs px-2 py-1 rounded-full shadow hover:bg-charcoal transition"
+                      >
+                        {t('seller.setPrimaryImage', 'Set as cover image')}
                       </button>
                     </div>
                   );

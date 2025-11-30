@@ -9,6 +9,7 @@ import { formatPrice } from '../utils/currency';
 import SARIcon from '../components/common/SARIcon';
 import { resolveImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME, PLACEHOLDER_PERFUME_KEY } from '../utils/staticAssets';
+import ProductImageCarousel from '../components/products/ProductImageCarousel';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -18,7 +19,6 @@ export default function ProductDetail() {
   const { isAuthenticated } = useAuthStore();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -97,33 +97,12 @@ export default function ProductDetail() {
       </button>
 
       <div className="grid lg:grid-cols-2 gap-8">
-        <div>
-          <div className="bg-ivory rounded-luxury overflow-hidden mb-4 aspect-square">
-            <img
-              src={images[selectedImage]}
-              alt={name}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.src = PLACEHOLDER_PERFUME;
-              }}
-            />
-          </div>
-          {images.length > 1 && (
-            <div className="flex gap-2">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedImage(idx)}
-                  className={`w-20 h-20 rounded-luxury overflow-hidden border-2 transition ${
-                    selectedImage === idx ? 'border-gold' : 'border-transparent'
-                  }`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductImageCarousel
+          images={images}
+          name={name}
+          fallback={PLACEHOLDER_PERFUME}
+          dir={language === 'ar' ? 'rtl' : 'ltr'}
+        />
 
         <div className="bg-white p-8 rounded-luxury shadow-luxury">
           <h1 className="text-3xl font-bold text-charcoal mb-4">{name}</h1>

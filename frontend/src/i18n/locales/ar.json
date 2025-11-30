@@ -543,6 +543,7 @@
     "titleAr": "العنوان (AR)",
     "images": "الصور",
     "imageUploadHint": "يدعم PNG أو JPG أو WEBP بحد أقصى ٥ ميجابايت لكل صورة",
+    "setPrimaryImage": "اجعلها الصورة الرئيسية",
     "imageRequired": "يرجى رفع صورة واحدة على الأقل",
     "uploadFailed": "تعذر رفع الصورة",
     "uploading": "جاري رفع الصور...",

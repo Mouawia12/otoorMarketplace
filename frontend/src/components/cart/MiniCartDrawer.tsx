@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCartStore } from "../../store/cartStore";
+import { useAuthStore } from "../../store/authStore";
 import { formatPrice } from "../../utils/currency";
 import SARIcon from "../common/SARIcon";
 
@@ -11,6 +12,8 @@ interface MiniCartDrawerProps {
 
 export default function MiniCartDrawer({ open, onClose }: MiniCartDrawerProps) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
   const { items, remove, totals } = useCartStore();
   const { sub, total } = totals();
   const lang = i18n.language as 'ar' | 'en';
@@ -22,6 +25,16 @@ export default function MiniCartDrawer({ open, onClose }: MiniCartDrawerProps) {
         <SARIcon size={size} />
       </span>
     );
+  };
+
+  const handleCheckout = () => {
+    onClose();
+    const target = "/checkout";
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=${encodeURIComponent(target)}`);
+      return;
+    }
+    navigate(target);
   };
 
   if (!open) return null;
@@ -129,13 +142,13 @@ export default function MiniCartDrawer({ open, onClose }: MiniCartDrawerProps) {
               >
                 {t('cart.viewCart')}
               </Link>
-              <Link
-                to="/checkout"
-                onClick={onClose}
+              <button
+                type="button"
+                onClick={handleCheckout}
                 className="block w-full bg-charcoal-light text-ivory py-3 rounded-luxury hover:bg-charcoal-lighter transition font-semibold text-center"
               >
                 {t('cart.checkout')}
-              </Link>
+              </button>
             </div>
           </>
         )}

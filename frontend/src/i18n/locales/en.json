@@ -541,6 +541,7 @@
     "titleAr": "Title (AR)",
     "images": "Images",
     "imageUploadHint": "PNG, JPG or WEBP up to 5MB each",
+    "setPrimaryImage": "Set as cover image",
     "imageRequired": "Please upload at least one image",
     "uploadFailed": "Failed to upload image",
     "uploading": "Uploading images...",
