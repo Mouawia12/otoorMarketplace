@@ -452,6 +452,17 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
     }));
   };
 
+  const handleSetPrimaryImage = (url: string) => {
+    setProductForm((prev) => {
+      if (!prev.image_urls.includes(url)) return prev;
+      const remaining = prev.image_urls.filter((img) => img !== url);
+      return {
+        ...prev,
+        image_urls: [url, ...remaining],
+      };
+    });
+  };
+
   const applyTemplate = (template: ProductTemplate) => {
     setSelectedTemplateId(template.id);
     setProductForm({
@@ -734,6 +745,13 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                             className="absolute top-2 right-2 bg-white/90 text-red-600 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow"
                           >
                             ×
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetPrimaryImage(url)}
+                            className="absolute bottom-2 left-2 bg-charcoal/85 text-white text-xs px-2 py-1 rounded-full shadow hover:bg-charcoal transition"
+                          >
+                            {t("seller.setPrimaryImage", "Set as cover image")}
                           </button>
                         </div>
                       );

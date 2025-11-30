@@ -1,10 +1,13 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCartStore } from "../store/cartStore";
+import { useAuthStore } from "../store/authStore";
 import SARIcon from "../components/common/SARIcon";
 
 export default function CartPage() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
   const lang = i18n.language as "ar" | "en";
   const locale = lang === "ar" ? "ar-SA" : "en-US";
 
@@ -16,6 +19,15 @@ export default function CartPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(v);
+
+  const handleCheckout = () => {
+    const target = "/checkout";
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=${encodeURIComponent(target)}`);
+      return;
+    }
+    navigate(target);
+  };
 
   const isEmpty = !items || items.length === 0;
 
@@ -150,12 +162,13 @@ export default function CartPage() {
                           </span>
                         </div>
 
-                        <Link
-                          to="/checkout"
+                        <button
+                          type="button"
+                          onClick={handleCheckout}
                           className="block w-full h-11 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition text-center leading-[44px]"
                         >
                           {t("cart.checkout")}
-                        </Link>
+                        </button>
                       </div>
                     </div>
 
@@ -243,12 +256,13 @@ export default function CartPage() {
               </div>
             </div>
 
-            <Link
-              to="/checkout"
+            <button
+              type="button"
+              onClick={handleCheckout}
               className="mt-4 block w-full h-11 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover transition text-center leading-[44px]"
             >
               {t("cart.checkout")}
-            </Link>
+            </button>
 
             <Link
               to="/new"

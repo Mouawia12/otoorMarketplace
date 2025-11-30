@@ -10,6 +10,7 @@ import { resolveImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import Countdown from '../components/common/Countdown';
 import { useMemo } from 'react';
+import ProductImageCarousel from '../components/products/ProductImageCarousel';
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +25,6 @@ export default function AuctionDetailPage() {
   const [bidAmount, setBidAmount] = useState(0);
   const [bidError, setBidError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(0);
 
   const obfuscateName = useCallback(
     (fullName?: string, email?: string, fallbackId?: number) => {
@@ -230,42 +230,12 @@ export default function AuctionDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Image Gallery */}
-        <div className="space-y-4">
-          <div className="bg-ivory rounded-luxury overflow-hidden aspect-square">
-            <img
-              src={images[selectedImage] || PLACEHOLDER_PERFUME}
-              alt={name}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.src = PLACEHOLDER_PERFUME;
-              }}
-            />
-          </div>
-          
-          {images.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
-              {images.map((img, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedImage(index)}
-                  className={`aspect-square rounded-luxury overflow-hidden border-2 transition ${
-                    selectedImage === index ? 'border-gold' : 'border-transparent'
-                  }`}
-                >
-                  <img
-                    src={img || PLACEHOLDER_PERFUME}
-                    alt={`${name} ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = PLACEHOLDER_PERFUME;
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductImageCarousel
+          images={images}
+          name={name}
+          fallback={PLACEHOLDER_PERFUME}
+          dir={language === 'ar' ? 'rtl' : 'ltr'}
+        />
 
         {/* Product Info */}
         <div className="space-y-6">
