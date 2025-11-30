@@ -34,7 +34,7 @@ export default function ProductImageCarousel({
   const showControls = sanitized.length > 1;
 
   const goTo = (nextIndex: number) => {
-    setActiveIndex((prev) => {
+    setActiveIndex(() => {
       const total = sanitized.length;
       if (!total) return 0;
       const normalized = ((nextIndex % total) + total) % total;
