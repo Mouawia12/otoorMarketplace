@@ -18,12 +18,19 @@ export declare const listUsersForAdmin: () => Promise<{
     seller_profile_status: string | undefined;
     verified_seller: boolean;
 }[]>;
-export declare const updateUserStatus: (userId: number, status: string, allowedRoles: RoleName[]) => Promise<{
+type AdminUserUpdatePayload = {
+    status?: string;
+    seller_status?: string;
+    roles?: string[];
+};
+export declare const updateUserStatus: (userId: number, updates: AdminUserUpdatePayload, allowedRoles: RoleName[]) => Promise<{
     id: number;
     email: string;
     full_name: string;
     status: import(".prisma/client").$Enums.UserStatus;
     roles: string[];
+    seller_status: string;
+    seller_profile_status: string | undefined;
 }>;
 export declare const deleteUserByAdmin: (userId: number, actorRoles: RoleName[], actorId?: number) => Promise<{
     success: boolean;

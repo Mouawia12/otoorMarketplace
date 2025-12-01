@@ -6,6 +6,7 @@ import { Product, ProductTemplate } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
 import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
+import { compressImageFile } from '../utils/imageCompression';
 import { sellerSearchTemplates } from '../services/productTemplateService';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import SARIcon from '../components/common/SARIcon';
@@ -486,9 +487,15 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
     try {
       setUploadingImages(true);
       const uploadedPaths: string[] = [];
+      const MAX_BYTES = 3 * 1024 * 1024;
       for (const file of files) {
+        const optimized = await compressImageFile(file, { maxBytes: MAX_BYTES });
+        if (optimized.size > MAX_BYTES) {
+          alert(t('seller.imageTooLarge', 'حجم الصورة يجب ألا يتجاوز ٣ ميجابايت'));
+          continue;
+        }
         const formDataPayload = new FormData();
-        formDataPayload.append('image', file);
+        formDataPayload.append('image', optimized);
         const { data } = await api.post('/uploads/image', formDataPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });

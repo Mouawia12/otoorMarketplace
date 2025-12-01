@@ -20,8 +20,8 @@ app.use((0, cors_1.default)(corsOptions));
 app.use((0, helmet_1.default)({
     crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
-app.use(express_1.default.json({ limit: "1mb" }));
-app.use(express_1.default.urlencoded({ extended: true }));
+app.use(express_1.default.json({ limit: "5mb" }));
+app.use(express_1.default.urlencoded({ extended: true, limit: "5mb" }));
 if (env_1.config.nodeEnv === "development") {
     app.use((0, morgan_1.default)("dev"));
 }

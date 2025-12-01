@@ -5,6 +5,9 @@ import slugify from "slugify";
 import { marked } from "marked";
 import api from "../../../lib/api";
 import { normalizeImagePathForStorage, resolveImageUrl } from "../../../utils/image";
+import { compressImageFile } from "../../../utils/imageCompression";
+
+const MAX_COVER_BYTES = 3 * 1024 * 1024; // 3MB
 
 type Mode = "create" | "edit";
 type Form = {
@@ -23,11 +26,13 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
   const [saving, setSaving] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string>("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Form>({
     title:"", slug:"", description:"", cover:"", author:"", category:"",
     tags:"", lang:"ar", date:new Date().toISOString().slice(0,10),
     status:"draft", content:""
   });
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mode === "edit" && id) {
@@ -67,7 +72,15 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
     }
   }, [mode, id]);
 
-  const on = (k: keyof Form, v:any)=> setForm(s=>({...s,[k]:v}));
+  const on = (k: keyof Form, v:any)=> {
+    setForm(s=>({...s,[k]:v}));
+    setErrors((prev) => {
+      if (!prev[k]) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
+  };
   const html = useMemo(
     () => marked.parse(form.content || "") as string,
     [form.content]
@@ -82,7 +95,31 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
       reader.readAsDataURL(file);
     });
 
+  const validateForm = () => {
+    const nextErrors: Record<string, string> = {};
+    if (!form.title.trim()) nextErrors.title = t("validation.required", "هذا الحقل مطلوب");
+    if (!form.slug.trim()) nextErrors.slug = t("validation.required", "هذا الحقل مطلوب");
+    if (!form.description.trim()) nextErrors.description = t("validation.required", "هذا الحقل مطلوب");
+    if (!form.content.trim()) nextErrors.content = t("validation.required", "هذا الحقل مطلوب");
+    if (!coverPreview && !coverFile && !form.cover?.trim()) nextErrors.cover = t("validation.coverRequired", "يرجى رفع صورة للغلاف");
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const formatServerError = (raw: string) => {
+    if (!raw) return t("common.error", "حدث خطأ");
+    if (/entity\.too\.large/i.test(raw)) {
+      return t("errors.imageTooLarge", "حجم الملف أكبر من المسموح (٣ ميجابايت)");
+    }
+    return raw;
+  };
+
   const save = async ()=>{
+    if (!validateForm()) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setSubmitError(null);
     setSaving(true);
     try{
       const coverData = coverFile ? await readFileAsDataUrl(coverFile) : undefined;
@@ -100,7 +137,11 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
       }
 
       navigate("/admin/blog");
-    }catch(e){ console.error(e); alert(t("common.error","حدث خطأ")); }
+    }catch(e: any){ 
+      console.error(e); 
+      const message = e?.response?.data?.message || e?.response?.data?.detail || e?.message;
+      setSubmitError(formatServerError(message));
+    }
     finally{ setSaving(false); }
   };
 
@@ -125,13 +166,33 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
     [form.tags]
   );
 
-  const handleCoverInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setCoverFile(file);
-      on("cover", file.name);
+      const optimized = await compressImageFile(file, { maxBytes: MAX_COVER_BYTES });
+      if (optimized.size > MAX_COVER_BYTES) {
+        setErrors((prev) => ({
+          ...prev,
+          cover: t("validation.coverTooLarge", "حجم الصورة يتجاوز ٣ ميجابايت"),
+        }));
+        setCoverFile(null);
+        return;
+      }
+      setCoverFile(optimized);
+      setErrors((prev) => {
+        if (!prev.cover) return prev;
+        const next = { ...prev };
+        delete next.cover;
+        return next;
+      });
+      on("cover", optimized.name);
     }
   };
+
+  const fieldBorder = (field: keyof Form | "cover" | "content") =>
+    `w-full bg-white rounded-lg px-3 py-2 border ${
+      errors[field] ? "border-red-500 focus:border-red-500" : "border-sand focus:border-gold"
+    }`;
 
   return (
     <div className="p-6">
@@ -147,6 +208,11 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
           {saving ? t("common.loading","جاري الحفظ") : t("common.save","حفظ")}
         </button>
       </div>
+      {submitError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {submitError}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="bg-ivory rounded-xl shadow-sm p-4 space-y-4">
@@ -154,19 +220,22 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
             <div>
               <label className="block mb-1">{t("common.title","العنوان")}</label>
               <input value={form.title} onChange={e=>on("title",e.target.value)} onBlur={autoSlug}
-                     className="w-full bg-white border border-sand rounded-lg px-3 py-2" />
+                     className={fieldBorder("title")} />
+              {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
             </div>
             <div>
               <label className="block mb-1">Slug</label>
               <input value={form.slug} onChange={e=>on("slug",e.target.value)}
-                     className="w-full bg-white border border-sand rounded-lg px-3 py-2" />
+                     className={fieldBorder("slug")} />
+              {errors.slug && <p className="text-sm text-red-600 mt-1">{errors.slug}</p>}
             </div>
           </div>
 
           <div>
             <label className="block mb-1">{t("common.description","الوصف")}</label>
             <textarea value={form.description} onChange={e=>on("description",e.target.value)}
-                      className="w-full bg-white border border-sand rounded-lg px-3 py-2 min-h-[80px]" />
+                      className={`${fieldBorder("description")} min-h-[80px]`} />
+            {errors.description && <p className="text-sm text-red-600 mt-1">{errors.description}</p>}
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -179,7 +248,7 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
                   onChange={handleCoverInput}
                   className="block w-full text-sm text-charcoal file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gold file:text-charcoal hover:file:bg-gold-hover"
                 />
-                <div className="w-full rounded-lg border border-sand bg-sand/40 overflow-hidden">
+                <div className={`w-full rounded-lg border ${errors.cover ? "border-red-500" : "border-sand"} bg-sand/40 overflow-hidden`}>
                   {coverPreview ? (
                     <div className="relative aspect-[4/3]">
                       <img
@@ -208,6 +277,7 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
                     </div>
                   )}
                 </div>
+                {errors.cover && <p className="text-sm text-red-600">{errors.cover}</p>}
               </div>
             </div>
             <div>
@@ -257,8 +327,9 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
           <div>
             <label className="block mb-1">{t("common.content","المحتوى (Markdown)")}</label>
             <textarea value={form.content} onChange={e=>on("content",e.target.value)}
-                      className="w-full bg-white border border-sand rounded-lg px-3 py-2 min-h-[260px] font-mono"
+                      className={`${fieldBorder("content")} min-h-[260px] font-mono`}
                       placeholder={`## عنوان فرعي\n\nنص…`} />
+            {errors.content && <p className="text-sm text-red-600 mt-1">{errors.content}</p>}
           </div>
         </div>
 
