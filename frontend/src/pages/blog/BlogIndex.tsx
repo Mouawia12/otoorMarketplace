@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
 import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
+import { resolveImageUrl } from '../../utils/image';
 import { fetchPosts, BlogPost } from '../../services/blogApi';
 
 const POSTS_PER_PAGE = 12;
@@ -262,7 +263,12 @@ export default function BlogIndex() {
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-10 sm:mb-12">
-              {paginatedPosts.map((post) => (
+              {paginatedPosts.map((post) => {
+                const coverSrc =
+                  post.cover && !post.cover.startsWith('data:') && !post.cover.startsWith('blob:')
+                    ? resolveImageUrl(post.cover) || BLOG_PLACEHOLDER
+                    : post.cover || BLOG_PLACEHOLDER;
+                return (
                 <Link
                   key={`${post.slug}-${(post as any).lang || language}`}
                   to={`/blog/${post.slug}`}
@@ -271,7 +277,7 @@ export default function BlogIndex() {
                   {/* Cover Image */}
                   <div className="aspect-[16/9] overflow-hidden bg-sand">
                     <img
-                      src={post.cover}
+                      src={coverSrc}
                       alt={post.title}
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -315,7 +321,8 @@ export default function BlogIndex() {
                     </div>
                   </div>
                 </Link>
-              ))}
+              );
+              })}
             </div>
           )}
 
