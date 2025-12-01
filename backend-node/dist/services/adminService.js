@@ -55,29 +55,86 @@ const listUsersForAdmin = async () => {
     }));
 };
 exports.listUsersForAdmin = listUsersForAdmin;
-const updateUserStatus = async (userId, status, allowedRoles) => {
+const updateUserStatus = async (userId, updates, allowedRoles) => {
     if (!allowedRoles.some((role) => role === client_1.RoleName.ADMIN || role === client_1.RoleName.SUPER_ADMIN)) {
         throw errors_1.AppError.forbidden();
     }
-    const normalized = status.toUpperCase();
-    if (!Object.values(client_1.UserStatus).includes(normalized)) {
-        throw errors_1.AppError.badRequest("Invalid status value");
+    const updateData = {};
+    if (updates.status) {
+        const normalizedStatus = updates.status.toUpperCase();
+        if (!Object.values(client_1.UserStatus).includes(normalizedStatus)) {
+            throw errors_1.AppError.badRequest("Invalid status value");
+        }
+        updateData.status = normalizedStatus;
     }
-    const updated = (await client_2.prisma.user.update({
-        where: { id: userId },
-        data: {
-            status: normalized,
-        },
-        include: {
-            roles: { include: { role: true } },
-        },
-    }));
+    if (updates.seller_status) {
+        const normalizedSellerStatus = updates.seller_status.toUpperCase();
+        if (!Object.values(client_1.SellerStatus).includes(normalizedSellerStatus)) {
+            throw errors_1.AppError.badRequest("Invalid seller status value");
+        }
+        updateData.sellerStatus = normalizedSellerStatus;
+    }
+    const result = await client_2.prisma.$transaction(async (tx) => {
+        if (Object.keys(updateData).length > 0) {
+            await tx.user.update({
+                where: { id: userId },
+                data: updateData,
+            });
+        }
+        else {
+            const exists = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
+            if (!exists) {
+                throw errors_1.AppError.notFound("User not found");
+            }
+        }
+        if (updates.roles) {
+            if (!Array.isArray(updates.roles) || updates.roles.length === 0) {
+                throw errors_1.AppError.badRequest("Roles must be a non-empty array");
+            }
+            const normalizedRoles = Array.from(new Set(updates.roles.map((role) => role.trim().toUpperCase()).filter((role) => role.length > 0)));
+            const invalidRoles = normalizedRoles.filter((role) => !Object.values(client_1.RoleName).includes(role));
+            if (invalidRoles.length > 0) {
+                throw errors_1.AppError.badRequest(`Invalid roles: ${invalidRoles.join(", ")}`);
+            }
+            if (normalizedRoles.includes(client_1.RoleName.SUPER_ADMIN) &&
+                !allowedRoles.includes(client_1.RoleName.SUPER_ADMIN)) {
+                throw errors_1.AppError.forbidden("Only super admins can assign super admin role");
+            }
+            if (!normalizedRoles.includes(client_1.RoleName.BUYER)) {
+                normalizedRoles.push(client_1.RoleName.BUYER);
+            }
+            const roleRecords = await tx.role.findMany({
+                where: { name: { in: normalizedRoles } },
+            });
+            if (roleRecords.length !== normalizedRoles.length) {
+                throw errors_1.AppError.badRequest("Some roles were not found");
+            }
+            await tx.userRole.deleteMany({ where: { userId } });
+            await tx.userRole.createMany({
+                data: roleRecords.map((role) => ({ userId, roleId: role.id })),
+                skipDuplicates: true,
+            });
+        }
+        const refreshed = await tx.user.findUnique({
+            where: { id: userId },
+            include: {
+                roles: { include: { role: true } },
+                sellerProfile: { select: { status: true } },
+            },
+        });
+        if (!refreshed) {
+            throw errors_1.AppError.notFound("User not found");
+        }
+        return refreshed;
+    });
     return {
-        id: updated.id,
-        email: updated.email,
-        full_name: updated.fullName,
-        status: updated.status,
-        roles: updated.roles.map((relation) => relation.role.name.toLowerCase()),
+        id: result.id,
+        email: result.email,
+        full_name: result.fullName,
+        status: result.status,
+        roles: result.roles.map((relation) => relation.role.name.toLowerCase()),
+        seller_status: result.sellerStatus?.toLowerCase?.() ?? "pending",
+        seller_profile_status: result.sellerProfile?.status?.toLowerCase?.(),
     };
 };
 exports.updateUserStatus = updateUserStatus;
@@ -101,6 +158,9 @@ const deleteUserByAdmin = async (userId, actorRoles, actorId) => {
         !actorRoles.includes(client_1.RoleName.SUPER_ADMIN)) {
         throw errors_1.AppError.forbidden("Cannot delete a super admin");
     }
+    await client_2.prisma.sellerProfile.deleteMany({
+        where: { userId },
+    });
     await client_2.prisma.user.delete({
         where: { id: userId },
     });

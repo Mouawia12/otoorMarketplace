@@ -9,6 +9,7 @@ import {
   adminUpdateTemplate,
 } from '../services/productTemplateService';
 import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
+import { compressImageFile } from '../utils/imageCompression';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import api from '../lib/api';
 
@@ -212,6 +213,8 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
   const [formData, setFormData] = useState<TemplateFormState>(() => createInitialFormState());
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -232,14 +235,33 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
     } else {
       setFormData(createInitialFormState());
     }
+    setErrors({});
   }, [isOpen, mode, template]);
 
   if (!isOpen) return null;
 
+  const validateForm = () => {
+    const nextErrors: Record<string, string> = {};
+    if (!formData.name_en.trim()) nextErrors.name_en = t('validation.required', 'هذا الحقل مطلوب');
+    if (!formData.name_ar.trim()) nextErrors.name_ar = t('validation.required', 'هذا الحقل مطلوب');
+    if (!formData.brand.trim()) nextErrors.brand = t('validation.required', 'هذا الحقل مطلوب');
+    if (!formData.category.trim()) nextErrors.category = t('validation.required', 'هذا الحقل مطلوب');
+    if (!formData.base_price || Number(formData.base_price) <= 0) nextErrors.base_price = t('validation.priceInvalid', 'أدخل سعراً صحيحاً');
+    if (!formData.size_ml || Number(formData.size_ml) <= 0) nextErrors.size_ml = t('validation.sizeInvalid', 'أدخل حجماً صحيحاً');
+    if (!formData.concentration.trim()) nextErrors.concentration = t('validation.required', 'هذا الحقل مطلوب');
+    if (!formData.description_en.trim()) nextErrors.description_en = t('validation.required', 'هذا الحقل مطلوب');
+    if (!formData.description_ar.trim()) nextErrors.description_ar = t('validation.required', 'هذا الحقل مطلوب');
+    if (!formData.image_urls.length) nextErrors.image_urls = t('seller.imageRequired', 'Please upload at least one image');
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!validateForm()) return;
     try {
       setLoading(true);
+      setSubmitError(null);
       const payload = {
         nameEn: formData.name_en,
         nameAr: formData.name_ar,
@@ -264,7 +286,8 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
       onSuccess(result);
     } catch (error: any) {
       console.error('Failed to save template', error);
-      alert(error.response?.data?.detail || t('admin.templateSaveFailed', 'تعذر حفظ القالب'));
+      const message = error.response?.data?.detail || error.response?.data?.message || t('admin.templateSaveFailed', 'تعذر حفظ القالب');
+      setSubmitError(message);
     } finally {
       setLoading(false);
     }
@@ -274,6 +297,12 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
     (field: keyof Omit<TemplateFormState, 'image_urls'>) =>
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+      setErrors((prev) => {
+        if (!prev[field]) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
     };
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,9 +312,15 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
     try {
       setUploading(true);
       const uploaded: string[] = [];
+      const MAX_BYTES = 3 * 1024 * 1024;
       for (const file of files) {
+        const optimized = await compressImageFile(file, { maxBytes: MAX_BYTES });
+        if (optimized.size > MAX_BYTES) {
+          alert(t('seller.imageTooLarge', 'حجم الصورة يجب ألا يتجاوز ٣ ميجابايت'));
+          continue;
+        }
         const form = new FormData();
-        form.append('image', file);
+        form.append('image', optimized);
         const { data } = await api.post('/uploads/image', form, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -296,6 +331,12 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
         ...prev,
         image_urls: [...prev.image_urls, ...uploaded.filter(Boolean)],
       }));
+      setErrors((prev) => {
+        if (!prev.image_urls) return prev;
+        const next = { ...prev };
+        delete next.image_urls;
+        return next;
+      });
     } catch (error) {
       console.error('Failed to upload image', error);
       alert(t('seller.uploadFailed', 'فشل رفع الصورة'));
@@ -329,6 +370,12 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
           {mode === 'edit' ? t('admin.editTemplate', 'تعديل القالب') : t('admin.addTemplate', 'إضافة قالب')}
         </h3>
 
+        {submitError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -337,9 +384,10 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                 type="text"
                 value={formData.name_en}
                 onChange={handleChange('name_en')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.name_en ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 required
               />
+              {errors.name_en && <p className="text-sm text-red-600 mt-1">{errors.name_en}</p>}
             </div>
             <div>
               <label className="block text-charcoal font-semibold mb-2">{t('seller.titleAr', 'Title (AR)')}</label>
@@ -347,9 +395,10 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                 type="text"
                 value={formData.name_ar}
                 onChange={handleChange('name_ar')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.name_ar ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 required
               />
+              {errors.name_ar && <p className="text-sm text-red-600 mt-1">{errors.name_ar}</p>}
             </div>
           </div>
 
@@ -360,9 +409,10 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                 type="text"
                 value={formData.brand}
                 onChange={handleChange('brand')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.brand ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 required
               />
+              {errors.brand && <p className="text-sm text-red-600 mt-1">{errors.brand}</p>}
             </div>
             <div>
               <label className="block text-charcoal font-semibold mb-2">{t('seller.category', 'Category')}</label>
@@ -370,9 +420,10 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                 type="text"
                 value={formData.category}
                 onChange={handleChange('category')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.category ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 required
               />
+              {errors.category && <p className="text-sm text-red-600 mt-1">{errors.category}</p>}
             </div>
           </div>
 
@@ -397,9 +448,10 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                 step="0.01"
                 value={formData.base_price}
                 onChange={handleChange('base_price')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.base_price ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 required
               />
+              {errors.base_price && <p className="text-sm text-red-600 mt-1">{errors.base_price}</p>}
             </div>
             <div>
               <label className="block text-charcoal font-semibold mb-2">{t('seller.size', 'Size (ml)')}</label>
@@ -407,9 +459,10 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                 type="number"
                 value={formData.size_ml}
                 onChange={handleChange('size_ml')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.size_ml ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 required
               />
+              {errors.size_ml && <p className="text-sm text-red-600 mt-1">{errors.size_ml}</p>}
             </div>
           </div>
 
@@ -420,9 +473,10 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                 type="text"
                 value={formData.concentration}
                 onChange={handleChange('concentration')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.concentration ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 required
               />
+              {errors.concentration && <p className="text-sm text-red-600 mt-1">{errors.concentration}</p>}
             </div>
           </div>
 
@@ -432,18 +486,20 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
               <textarea
                 value={formData.description_en}
                 onChange={handleChange('description_en')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.description_en ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 rows={3}
               />
+              {errors.description_en && <p className="text-sm text-red-600 mt-1">{errors.description_en}</p>}
             </div>
             <div>
               <label className="block text-charcoal font-semibold mb-2">{t('seller.descriptionAr', 'Description (AR)')}</label>
               <textarea
                 value={formData.description_ar}
                 onChange={handleChange('description_ar')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                className={`w-full px-4 py-2 rounded-luxury border ${errors.description_ar ? 'border-red-500' : 'border-gray-300'} focus:border-gold focus:outline-none`}
                 rows={3}
               />
+              {errors.description_ar && <p className="text-sm text-red-600 mt-1">{errors.description_ar}</p>}
             </div>
           </div>
 
@@ -490,7 +546,8 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
                       );
                     })}
                   </div>
-            )}
+                )}
+            {errors.image_urls && <p className="text-sm text-red-600 mt-2">{errors.image_urls}</p>}
           </div>
 
           <div className="flex justify-end gap-3">
