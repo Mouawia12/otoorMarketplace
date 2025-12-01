@@ -461,30 +461,35 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
               {uploading ? t('seller.uploading', 'جاري الرفع...') : t('seller.imageUploadHint', 'PNG أو JPG حتى ٥ ميجابايت')}
             </p>
             {formData.image_urls.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                {formData.image_urls.map((url) => {
-                  const preview = resolveImageUrl(url) || url;
-                  return (
-                    <div key={url} className="relative border border-gray-200 rounded-lg overflow-hidden">
-                      <img src={preview} alt="Template" className="w-full h-24 object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(url)}
-                        className="absolute top-2 right-2 bg-white/90 text-red-600 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow"
-                      >
-                        ×
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetPrimaryImage(url)}
-                        className="absolute bottom-2 left-2 bg-charcoal/85 text-white text-xs px-2 py-1 rounded-full shadow hover:bg-charcoal transition"
-                      >
-                        {t('seller.setPrimaryImage', 'Set as cover image')}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                    {formData.image_urls.map((url) => {
+                      const preview = resolveImageUrl(url) || url;
+                      return (
+                        <div
+                          key={url}
+                          className="relative aspect-square min-h-[110px] border border-gray-200 rounded-lg bg-sand/40 flex items-center justify-center overflow-hidden"
+                        >
+                          <div className="absolute inset-3 rounded-lg bg-white/90 border border-gray-100 flex items-center justify-center overflow-hidden">
+                            <img src={preview} alt="Template" className="max-h-full max-w-full object-contain" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(url)}
+                            className="absolute top-2 right-2 bg-white/90 text-red-600 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow"
+                          >
+                            ×
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetPrimaryImage(url)}
+                            className="absolute bottom-2 left-2 bg-charcoal/85 text-white text-xs px-2 py-1 rounded-full shadow hover:bg-charcoal transition"
+                          >
+                            {t('seller.setPrimaryImage', 'Set as cover image')}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
             )}
           </div>
 

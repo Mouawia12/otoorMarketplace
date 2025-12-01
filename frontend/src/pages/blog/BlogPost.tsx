@@ -5,6 +5,7 @@ import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
 import { extractToc } from '../../services/blogService';
 import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
+import { resolveImageUrl } from '../../utils/image';
 import { BlogPost as BlogPostType, fetchPost, fetchPosts } from '../../services/blogApi';
 
 export default function BlogPost() {
@@ -71,14 +72,23 @@ export default function BlogPost() {
     );
   }
 
+  const buildCoverSrc = (src?: string | null) => {
+    if (!src) return BLOG_PLACEHOLDER;
+    if (src.startsWith('data:') || src.startsWith('blob:')) return src;
+    return resolveImageUrl(src) || BLOG_PLACEHOLDER;
+  };
+
+  const coverSrc = buildCoverSrc(post.cover);
+
   const pageTitle = post.title;
   const pageDesc = post.description;
   const canonicalUrl = `${window.location.origin}/blog/${post.slug}`;
   const imageUrl = (() => {
-    if (!post.cover) return `${window.location.origin}/logo.png`;
-    if (post.cover.startsWith('http')) return post.cover;
-    if (post.cover.startsWith('data:') || post.cover.startsWith('blob:')) return post.cover;
-    return `${window.location.origin}${post.cover}`;
+    if (!coverSrc) return `${window.location.origin}/logo.png`;
+    if (coverSrc.startsWith('http')) return coverSrc;
+    if (coverSrc.startsWith('data:') || coverSrc.startsWith('blob:')) return coverSrc;
+    const prefix = coverSrc.startsWith('/') ? '' : '/';
+    return `${window.location.origin}${prefix}${coverSrc}`;
   })();
 
   const articleSchema = {
@@ -233,11 +243,12 @@ export default function BlogPost() {
               {/* Cover Image */}
               <div className="aspect-video rounded-luxury overflow-hidden mb-6 sm:mb-8 bg-ivory">
                 <img
-                  src={post.cover}
+                  src={coverSrc}
                   alt={post.title}
                   loading="lazy"
                   className="w-full h-full object-cover"
                   onError={(e) => {
+                    e.currentTarget.onerror = null;
                     e.currentTarget.src = BLOG_PLACEHOLDER;
                   }}
                 />
@@ -342,7 +353,9 @@ export default function BlogPost() {
                 {t('blog.related')}
               </h2>
               <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
-                {relatedPosts.map(related => (
+                {relatedPosts.map(related => {
+                  const relatedCover = buildCoverSrc(related.cover);
+                  return (
                   <Link
                     key={related.slug}
                     to={`/blog/${related.slug}`}
@@ -350,11 +363,12 @@ export default function BlogPost() {
                   >
                     <div className="aspect-video overflow-hidden bg-sand">
                       <img
-                        src={related.cover}
+                        src={relatedCover}
                         alt={related.title}
                         loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
+                        e.currentTarget.onerror = null;
                         e.currentTarget.src = BLOG_PLACEHOLDER;
                         }}
                       />
@@ -368,7 +382,8 @@ export default function BlogPost() {
                       </p>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}

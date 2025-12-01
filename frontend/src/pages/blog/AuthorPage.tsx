@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useUIStore } from '../../store/uiStore';
 import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
+import { resolveImageUrl } from '../../utils/image';
 import { useEffect, useState } from 'react';
 import { BlogPost, fetchPosts } from '../../services/blogApi';
 
@@ -103,7 +104,12 @@ export default function AuthorPage() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {posts.map(post => (
+              {posts.map(post => {
+                const coverSrc =
+                  post.cover && !post.cover.startsWith('data:') && !post.cover.startsWith('blob:')
+                    ? resolveImageUrl(post.cover) || BLOG_PLACEHOLDER
+                    : post.cover || BLOG_PLACEHOLDER;
+                return (
                 <Link
                   key={post.slug}
                   to={`/blog/${post.slug}`}
@@ -111,7 +117,7 @@ export default function AuthorPage() {
                 >
                   <div className="aspect-video overflow-hidden bg-sand">
                     <img
-                      src={post.cover}
+                      src={coverSrc}
                       alt={post.title}
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -137,7 +143,8 @@ export default function AuthorPage() {
                     </p>
                   </div>
                 </Link>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

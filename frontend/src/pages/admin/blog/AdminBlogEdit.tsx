@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import slugify from "slugify";
 import { marked } from "marked";
 import api from "../../../lib/api";
+import { normalizeImagePathForStorage, resolveImageUrl } from "../../../utils/image";
 
 type Mode = "create" | "edit";
 type Form = {
@@ -38,11 +39,12 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
             ? existing.tags.join(", ")
             : existing.tags || "";
 
+          const sanitizedCover = normalizeImagePathForStorage(existing.cover) || existing.cover || "";
           setForm({
             title: existing.title,
             slug: existing.slug,
             description: existing.description,
-            cover: existing.cover,
+            cover: sanitizedCover,
             author: existing.author,
             category: existing.category,
             tags: tagsValue,
@@ -52,7 +54,10 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
             content: existing.content,
           });
           if (existing.cover) {
-            setCoverPreview(existing.cover);
+            const previewUrl = existing.cover.startsWith("data:") || existing.cover.startsWith("blob:")
+              ? existing.cover
+              : resolveImageUrl(existing.cover) || existing.cover;
+            setCoverPreview(previewUrl);
           }
         } catch (error) {
           console.error("Failed to load post", error);
@@ -109,7 +114,9 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
 
   useEffect(() => {
     if (!coverFile && form.cover && !coverPreview) {
-      setCoverPreview(form.cover);
+      const isDataUrl = form.cover.startsWith("data:") || form.cover.startsWith("blob:");
+      const resolved = isDataUrl ? form.cover : resolveImageUrl(form.cover) || form.cover;
+      setCoverPreview(resolved);
     }
   }, [coverFile, form.cover, coverPreview]);
 
