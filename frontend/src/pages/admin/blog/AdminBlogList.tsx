@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import api from "../../../lib/api";
+import { resolveImageUrl } from "../../../utils/image";
+import { BLOG_PLACEHOLDER } from "../../../utils/staticAssets";
 
 type AdminBlogPost = {
   id: number;
@@ -56,6 +58,7 @@ export default function AdminBlogList() {
         <table className="w-full text-sm">
           <thead className="bg-white text-charcoal">
             <tr>
+              <th className="p-3 text-start w-24">{t("common.cover", "الغلاف")}</th>
               <th className="p-3 text-start">{t("common.title", "العنوان")}</th>
               <th className="p-3 text-start">{t("common.language", "اللغة")}</th>
               <th className="p-3 text-start">{t("common.status", "الحالة")}</th>
@@ -65,12 +68,29 @@ export default function AdminBlogList() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="p-4" colSpan={5}>{t("common.loading", "جاري التحميل")}…</td></tr>
+              <tr><td className="p-4" colSpan={6}>{t("common.loading", "جاري التحميل")}…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td className="p-4" colSpan={5}>{t("common.noResults", "لا توجد نتائج")}.</td></tr>
+              <tr><td className="p-4" colSpan={6}>{t("common.noResults", "لا توجد نتائج")}.</td></tr>
             ) : (
               filtered.map((row) => (
                 <tr key={row.id} className="border-t border-sand">
+                  <td className="p-3">
+                    <div className="w-20 h-12 rounded-lg overflow-hidden bg-sand flex items-center justify-center border border-sand/60">
+                      <img
+                        src={
+                          row.cover
+                            ? resolveImageUrl(row.cover) || BLOG_PLACEHOLDER
+                            : BLOG_PLACEHOLDER
+                        }
+                        alt={row.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = BLOG_PLACEHOLDER;
+                        }}
+                      />
+                    </div>
+                  </td>
                   <td className="p-3">{row.title}</td>
                   <td className="p-3">{row.lang.toUpperCase()}</td>
                   <td className="p-3">

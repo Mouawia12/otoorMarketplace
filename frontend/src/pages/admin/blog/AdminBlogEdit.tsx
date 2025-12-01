@@ -179,16 +179,35 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
                   onChange={handleCoverInput}
                   className="block w-full text-sm text-charcoal file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gold file:text-charcoal hover:file:bg-gold-hover"
                 />
-                {coverPreview && (
-                  <div className="w-full h-32 rounded-lg overflow-hidden border border-sand bg-sand/40 flex items-center justify-center">
-                    <img
-                      src={coverPreview}
-                      alt="Cover preview"
-                      className="w-full h-full object-cover"
-                      onError={(e)=>{ e.currentTarget.style.display="none"; }}
-                    />
-                  </div>
-                )}
+                <div className="w-full rounded-lg border border-sand bg-sand/40 overflow-hidden">
+                  {coverPreview ? (
+                    <div className="relative aspect-[4/3]">
+                      <img
+                        src={coverPreview}
+                        alt="Cover preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute bottom-2 left-3 right-3 text-white">
+                        <p className="text-xs opacity-80">
+                          {form.category || t("common.category", "التصنيف")}
+                        </p>
+                        <p className="font-semibold text-sm line-clamp-2">
+                          {form.title || t("common.title", "العنوان")}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-[4/3] flex flex-col items-center justify-center text-charcoal-light text-sm gap-1">
+                      <span className="text-3xl">🖼️</span>
+                      <p>{t("common.noImage","لا توجد صورة غلاف بعد")}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div>
@@ -247,24 +266,35 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
           <h2 className="text-lg font-semibold">{t("common.preview","معاينة")}</h2>
 
           <div className="bg-white border border-sand rounded-xl overflow-hidden shadow-sm">
-            <div className="h-48 bg-sand/50 relative">
+            <div className="relative aspect-[16/9] bg-sand/50 flex items-center justify-center">
               {coverPreview ? (
-                <img
-                  src={coverPreview}
-                  alt="Cover"
-                  className="w-full h-full object-cover"
-                  onError={(e)=>{ e.currentTarget.style.display="none"; }}
-                />
+                <>
+                  <img
+                    src={coverPreview}
+                    alt="Cover"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent pointer-events-none" />
+                  <div className="absolute bottom-3 left-3 right-3 text-ivory">
+                    <p className="text-xs opacity-90">
+                      {form.category || t("common.category", "التصنيف")}
+                    </p>
+                    <h3 className="text-xl font-bold line-clamp-2">
+                      {form.title || t("common.title", "العنوان")}
+                    </h3>
+                  </div>
+                </>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-charcoal-light text-sm">
-                  {t("common.noImage","لا توجد صورة غلاف بعد")}
+                <div className="w-full h-full flex flex-col items-center justify-center text-charcoal-light gap-2">
+                  <span className="text-4xl">🖼️</span>
+                  <p className="text-sm">{t("common.noImage","لا توجد صورة غلاف بعد")}</p>
+                  <p className="text-xs">{t("common.cover","قم برفع صورة ليظهر المعاينة")}</p>
                 </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-              <div className="absolute bottom-3 left-3 right-3 text-ivory">
-                <p className="text-xs">{form.category || t("common.category","التصنيف")}</p>
-                <h3 className="text-xl font-bold">{form.title || "Heading"}</h3>
-              </div>
             </div>
             <div className="p-4 space-y-2">
               <div className="flex flex-wrap gap-2 text-xs text-charcoal-light">
