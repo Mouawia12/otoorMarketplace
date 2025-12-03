@@ -17,6 +17,7 @@ export default function CheckoutPage() {
 
   const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState("");
+  const [couponSuccess, setCouponSuccess] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -31,30 +32,50 @@ export default function CheckoutPage() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const buildCouponItemsPayload = () =>
+    items.map((item) => ({
+      product_id: Number(item.id),
+      quantity: item.qty,
+    }));
+
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
       setCouponError(t('checkout.couponRequired'));
       return;
     }
+    if (items.length === 0) {
+      setCouponError(t('checkout.emptyCart'));
+      return;
+    }
 
     setCouponLoading(true);
     setCouponError("");
+    setCouponSuccess("");
 
-    setTimeout(() => {
-      const validCoupons = ["SAVE10", "WELCOME20", "VIP30"];
-      const amounts = { SAVE10: 10, WELCOME20: 20, VIP30: 30 };
-
-      if (validCoupons.includes(couponCode.toUpperCase())) {
-        setCoupon({
-          code: couponCode.toUpperCase(),
-          amount: amounts[couponCode.toUpperCase() as keyof typeof amounts],
-        });
-        setCouponError("");
-      } else {
-        setCouponError(t('checkout.invalidCoupon'));
-      }
+    try {
+      const response = await api.post("/coupons/validate", {
+        code: couponCode.toUpperCase(),
+        items: buildCouponItemsPayload(),
+      });
+      const payload = response.data;
+      const couponData = payload.coupon;
+      const discountAmount = Number(payload.discount_amount ?? 0);
+      setCoupon({
+        code: couponData.code,
+        amount: discountAmount,
+        meta: {
+          discount_type: couponData.discount_type,
+          discount_value: Number(couponData.discount_value),
+          seller_id: couponData.seller_id ?? null,
+        },
+      });
+      setCouponSuccess(t('checkout.couponApplied'));
+    } catch (error: any) {
+      const apiMessage = error?.response?.data?.message || error?.response?.data?.detail;
+      setCouponError(apiMessage ?? t('checkout.invalidCoupon'));
+    } finally {
       setCouponLoading(false);
-    }, 1000);
+    }
   };
 
   const validateForm = () => {
@@ -89,8 +110,7 @@ export default function CheckoutPage() {
         quantity: item.qty,
         unitPrice: item.price,
       })),
-      discount_amount: coupon?.amount ?? 0,
-      shipping_fee: shippingCost,
+      coupon_code: coupon?.code ?? undefined,
     };
   };
 
@@ -342,6 +362,8 @@ export default function CheckoutPage() {
                       onClick={() => {
                         setCoupon(null);
                         setCouponCode("");
+                        setCouponError("");
+                        setCouponSuccess("");
                       }}
                       className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-semibold min-h-[44px]"
                     >
@@ -357,12 +379,12 @@ export default function CheckoutPage() {
                     </button>
                   )}
                 </div>
-                {couponError && <p className="text-red-500 text-sm mt-2">{couponError}</p>}
-                {coupon && (
+                {couponSuccess && coupon && (
                   <p className="text-green-600 text-sm mt-2">
-                    {t('checkout.couponApplied')}: {coupon.code} (-{formatPrice(coupon.amount, lang)})
+                    {couponSuccess}: {coupon.code} (-{formatPrice(discount, lang)})
                   </p>
                 )}
+                {couponError && <p className="text-red-500 text-sm mt-2">{couponError}</p>}
               </div>
 
               <div className="space-y-3 mb-6">

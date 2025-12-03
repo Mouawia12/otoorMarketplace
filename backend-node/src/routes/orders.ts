@@ -105,8 +105,7 @@ router.post("/", authenticate(), async (req, res, next) => {
       paymentMethod: body.payment_method ?? "COD",
       shipping: body.shipping,
       items,
-      discountAmount: Number(body.discount_amount ?? 0),
-      shippingFee: Number(body.shipping_fee ?? 0),
+      couponCode: typeof body.coupon_code === "string" ? body.coupon_code : undefined,
     });
 
     res.status(201).json(order);

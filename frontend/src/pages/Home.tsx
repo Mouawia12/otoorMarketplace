@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import homeService, { HeroSlide, Brand } from '../services/homeService';
 import Hero from './home/HomeSections/Hero';
@@ -11,10 +11,15 @@ import Editorial from './home/HomeSections/Editorial';
 import Newsletter from './home/HomeSections/Newsletter';
 import Testimonials from './home/HomeSections/Testimonials';
 import { Product, Auction } from '../types';
+import { fetchActivePromotions, Promotion } from '../services/promotionService';
+import { resolveImageUrl } from '../utils/image';
+import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
+import FloatingPromotion from '../components/promotions/FloatingPromotion';
 
 export default function Home() {
   const { t } = useTranslation();
   const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([]);
+  const [heroPromotionSlides, setHeroPromotionSlides] = useState<HeroSlide[]>([]);
   const [featuredNew, setFeaturedNew] = useState<Product[]>([]);
   const [featuredUsed, setFeaturedUsed] = useState<Product[]>([]);
   const [liveAuctions, setLiveAuctions] = useState<Auction[]>([]);
@@ -26,8 +31,16 @@ export default function Home() {
     const loadHomeData = async () => {
       try {
         setLoading(true);
-        const data = await homeService.getHomeData();
+        const [data, heroPromotions] = await Promise.all([
+          homeService.getHomeData(),
+          fetchActivePromotions(['HERO']),
+        ]);
 
+        const promoSlides = heroPromotions
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+          .map((promotion) => mapPromotionToHeroSlide(promotion));
+
+        setHeroPromotionSlides(promoSlides);
         setHeroSlides(data.heroSlides);
         setFeaturedNew(data.featuredNew);
         setFeaturedUsed(data.featuredUsed);
@@ -42,7 +55,19 @@ export default function Home() {
     };
 
     loadHomeData();
-  }, []);
+  }, [t]);
+
+  const combinedHeroSlides = useMemo(() => {
+    if (!heroPromotionSlides.length) return heroSlides;
+    const seen = new Set<string>();
+    return [...heroPromotionSlides, ...heroSlides].filter((slide) => {
+      if (seen.has(slide.id)) {
+        return false;
+      }
+      seen.add(slide.id);
+      return true;
+    });
+  }, [heroSlides, heroPromotionSlides]);
 
   if (loading) {
     return (
@@ -73,7 +98,7 @@ export default function Home() {
 
   return (
     <div className="space-y-0">
-      <Hero slides={heroSlides} />
+      <Hero slides={combinedHeroSlides} />
       <PromoTiles />
       <AuctionsStrip auctions={liveAuctions} />
       <FeaturedGrid
@@ -95,6 +120,47 @@ export default function Home() {
       <Editorial />
       <Newsletter />
       <TrustBadges />
+      <FloatingPromotion />
     </div>
   );
 }
+
+const mapPromotionToHeroSlide = (promotion: Promotion): HeroSlide => {
+  const image =
+    resolveImageUrl(promotion.image_url ?? undefined) || PLACEHOLDER_PERFUME;
+  const title = {
+    ar: promotion.title_ar,
+    en: promotion.title_en,
+  };
+  const subtitle = {
+    ar: promotion.subtitle_ar ?? promotion.badge_text_ar ?? '',
+    en: promotion.subtitle_en ?? promotion.badge_text_en ?? '',
+  };
+  const primaryCtaText = {
+    ar: promotion.button_text_ar || 'تسوق الآن',
+    en: promotion.button_text_en || 'Shop now',
+  };
+  const secondaryTextAr = promotion.badge_text_ar || promotion.subtitle_ar;
+  const secondaryTextEn = promotion.badge_text_en || promotion.subtitle_en;
+
+  return {
+    id: `promo-${promotion.id}`,
+    image,
+    title,
+    subtitle,
+    primaryCta: {
+      text: primaryCtaText,
+      link: promotion.link_url || '/products',
+    },
+    secondaryCta:
+      secondaryTextAr || secondaryTextEn
+        ? {
+            text: {
+              ar: secondaryTextAr || primaryCtaText.ar,
+              en: secondaryTextEn || primaryCtaText.en,
+            },
+            link: promotion.link_url || '/products',
+          }
+        : undefined,
+  };
+};

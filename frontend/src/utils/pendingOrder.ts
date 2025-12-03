@@ -13,8 +13,9 @@ export type PendingOrderPayload = {
     quantity: number;
     unitPrice?: number;
   }>;
-  discount_amount: number;
-  shipping_fee: number;
+  coupon_code?: string | null;
+  discount_amount?: number;
+  shipping_fee?: number;
 };
 
 const STORAGE_KEY = "pending_order_payload";

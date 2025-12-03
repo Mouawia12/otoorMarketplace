@@ -39,6 +39,7 @@ export default function AdminLayout() {
     { path: '/admin/library',   label: t('admin.productLibrary', 'مكتبة المنتجات'), icon: '📚' },
     { path: '/admin/auctions',  label: t('admin.auctions'),  icon: '🔨' },
     { path: '/admin/orders',    label: t('admin.orders'),    icon: '📦' },
+    { path: '/admin/coupons',   label: t('admin.coupons', 'الكوبونات'), icon: '🏷️' },
     { path: '/admin/users',     label: t('admin.users'),     icon: '👥' },
     { path: '/admin/auth-requests', label: t('admin.authRequests'), icon: '✅' },
 

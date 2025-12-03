@@ -1,10 +1,14 @@
-import { Prisma, OrderStatus } from "@prisma/client";
+import { Prisma, OrderStatus, type Coupon } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { normalizeProduct } from "./productService";
 import { config } from "../config/env";
+import {
+  finalizeCouponUsage,
+  prepareCouponForOrder,
+} from "./couponService";
 
 const orderItemSchema = z.object({
   productId: z.coerce.number().int().positive(),
@@ -26,8 +30,7 @@ const createOrderSchema = z.object({
     })
     .optional(),
   items: z.array(orderItemSchema).min(1),
-  discountAmount: z.coerce.number().nonnegative().default(0),
-  shippingFee: z.coerce.number().nonnegative().default(0),
+  couponCode: z.string().min(3).optional(),
 });
 
 export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
@@ -58,6 +61,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         stockQuantity: true,
         status: true,
         basePrice: true,
+        sellerId: true,
       },
     });
 
@@ -96,7 +100,8 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
 
     const normalizedItems = data.items.map((item) => {
       const product = productMap.get(item.productId)!;
-      const unitPrice = new Prisma.Decimal(product.basePrice.toNumber());
+      const basePriceNumber = product.basePrice.toNumber();
+      const unitPrice = new Prisma.Decimal(basePriceNumber);
       return {
         productId: item.productId,
         quantity: item.quantity,
@@ -104,6 +109,27 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         totalPrice: unitPrice.mul(item.quantity),
       };
     });
+
+    const couponLines = data.items.map((item) => {
+      const product = productMap.get(item.productId)!;
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        sellerId: product.sellerId,
+        unitPrice: product.basePrice.toNumber(),
+      };
+    });
+
+    let appliedCoupon: { coupon: Coupon; discountAmount: number } | null = null;
+    if (data.couponCode) {
+      appliedCoupon = await prepareCouponForOrder(
+        tx,
+        data.couponCode,
+        couponLines
+      );
+    }
+
+    const discountAmount = appliedCoupon?.discountAmount ?? 0;
 
     const order = await tx.order.create({
       data: {
@@ -117,15 +143,17 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         shippingRegion: shipping.region,
         shippingAddress: shipping.address,
         subtotalAmount: new Prisma.Decimal(subtotal),
-        discountAmount: new Prisma.Decimal(data.discountAmount),
+        discountAmount: new Prisma.Decimal(discountAmount),
         shippingFee: new Prisma.Decimal(shippingFeeValue),
         totalAmount: new Prisma.Decimal(
-          subtotal - data.discountAmount + shippingFeeValue
+          Math.max(0, subtotal - discountAmount) + shippingFeeValue
         ),
         platformFee: new Prisma.Decimal(
-          (subtotal - data.discountAmount + shippingFeeValue) *
+          (Math.max(0, subtotal - discountAmount) + shippingFeeValue) *
             config.platformCommissionRate
         ),
+        couponId: appliedCoupon?.coupon.id ?? null,
+        couponCode: appliedCoupon?.coupon.code ?? null,
         items: {
           create: normalizedItems,
         },
@@ -134,6 +162,10 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         items: true,
       },
     });
+
+    if (appliedCoupon) {
+      await finalizeCouponUsage(tx, appliedCoupon.coupon);
+    }
 
     // decrement stock
     for (const item of normalizedItems) {
@@ -243,6 +275,8 @@ const mapOrderToDto = (
     shipping_region: order.shippingRegion,
     shipping_method: order.shippingMethod,
     shipping_fee: Number(order.shippingFee),
+    discount_amount: Number(order.discountAmount ?? 0),
+    coupon_code: order.couponCode ?? null,
     status: statusToFriendly(order.status),
     created_at: order.createdAt.toISOString(),
     platform_fee: Number(order.platformFee ?? 0),
