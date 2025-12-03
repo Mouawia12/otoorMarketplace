@@ -8,6 +8,8 @@ import {
   authenticateWithGoogle,
   changePassword,
   changePasswordSchema,
+  requestPasswordReset,
+  resetPassword,
 } from "../services/authService";
 import { authenticate } from "../middleware/auth";
 import { getUserProfile, updateUserProfile } from "../services/userService";
@@ -48,6 +50,24 @@ router.post("/google", async (req, res, next) => {
       access_token: payload.token,
       user: payload.user,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/forgot-password", async (req, res, next) => {
+  try {
+    await requestPasswordReset(req.body);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/reset-password", async (req, res, next) => {
+  try {
+    await resetPassword(req.body);
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }

@@ -7,11 +7,11 @@ export declare const addToWishlist: (input: z.infer<typeof wishlistInputSchema>)
     product: {
         image_urls: string[];
         images: {
+            url: string;
             id: number;
             createdAt: Date;
             productId: number;
             sortOrder: number;
-            url: string;
             altText: string | null;
         }[];
         id: number;
@@ -43,11 +43,11 @@ export declare const listWishlist: (userId: number) => Promise<{
     product: {
         image_urls: string[];
         images: {
+            url: string;
             id: number;
             createdAt: Date;
             productId: number;
             sortOrder: number;
-            url: string;
             altText: string | null;
         }[];
         id: number;

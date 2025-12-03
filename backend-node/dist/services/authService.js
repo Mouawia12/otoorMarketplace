@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePassword = exports.authenticateUser = exports.authenticateWithGoogle = exports.registerUser = exports.googleLoginSchema = exports.changePasswordSchema = exports.loginSchema = exports.registerSchema = void 0;
+exports.changePassword = exports.authenticateUser = exports.resetPassword = exports.requestPasswordReset = exports.authenticateWithGoogle = exports.registerUser = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.googleLoginSchema = exports.changePasswordSchema = exports.loginSchema = exports.registerSchema = void 0;
 const crypto_1 = __importDefault(require("crypto"));
 const google_auth_library_1 = require("google-auth-library");
 const client_1 = require("@prisma/client");
@@ -13,6 +13,7 @@ const password_1 = require("../utils/password");
 const errors_1 = require("../utils/errors");
 const jwt_1 = require("../utils/jwt");
 const env_1 = require("../config/env");
+const mailer_1 = require("../utils/mailer");
 const userWithRolesInclude = client_1.Prisma.validator()({
     roles: { include: { role: true } },
     sellerProfile: true,
@@ -74,6 +75,20 @@ exports.googleLoginSchema = zod_1.z.object({
         .optional()
         .describe("requested role for new accounts (default buyer)"),
 });
+exports.forgotPasswordSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+});
+exports.resetPasswordSchema = zod_1.z
+    .object({
+    token: zod_1.z.string().min(10),
+    password: zod_1.z.string().min(8),
+    confirmPassword: zod_1.z.string().min(8),
+})
+    .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+});
+const PASSWORD_RESET_EXPIRY_MINUTES = 15;
 const registerUser = async (input) => {
     const data = exports.registerSchema.parse(input);
     const roles = data.roles && data.roles.length > 0 ? data.roles : [client_1.RoleName.BUYER];
@@ -178,6 +193,83 @@ const authenticateWithGoogle = async (input) => {
     };
 };
 exports.authenticateWithGoogle = authenticateWithGoogle;
+const requestPasswordReset = async (input) => {
+    const data = exports.forgotPasswordSchema.parse(input);
+    const user = await client_2.prisma.user.findUnique({
+        where: { email: data.email },
+    });
+    if (!user) {
+        throw errors_1.AppError.notFound("الحساب غير موجود");
+    }
+    await client_2.prisma.passwordResetToken.deleteMany({
+        where: { userId: user.id },
+    });
+    const rawToken = crypto_1.default.randomBytes(48).toString("hex");
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_MINUTES * 60 * 1000);
+    await client_2.prisma.passwordResetToken.create({
+        data: {
+            token: rawToken,
+            userId: user.id,
+            expiresAt,
+        },
+    });
+    const resetUrl = `${env_1.config.auth.passwordResetUrl}?token=${encodeURIComponent(rawToken)}`;
+    const plainText = [
+        "مرحباً،",
+        "",
+        "لقد طلبت إعادة تعيين كلمة المرور الخاصة بك في منصة أطور.",
+        `لإعادة التعيين اضغط على الرابط التالي (صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة):`,
+        resetUrl,
+        "",
+        "إذا لم تطلب هذه العملية فيرجى تجاهل الرسالة.",
+    ].join("\n");
+    const html = `
+    <p>مرحباً ${user.fullName ?? ""}</p>
+    <p>لقد استلمنا طلباً لإعادة تعيين كلمة المرور الخاصة بك.</p>
+    <p>
+      <a href="${resetUrl}" style="color:#a67c52;font-weight:bold;">إعادة تعيين كلمة المرور</a>
+    </p>
+    <p>الرابط صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة واحدة فقط.</p>
+    <p>إذا لم تطلب هذه العملية يمكنك تجاهل هذه الرسالة.</p>
+  `;
+    await (0, mailer_1.sendMail)({
+        to: user.email,
+        subject: "إعادة تعيين كلمة المرور",
+        html,
+        text: plainText,
+    });
+};
+exports.requestPasswordReset = requestPasswordReset;
+const resetPassword = async (input) => {
+    const data = exports.resetPasswordSchema.parse(input);
+    const tokenRecord = await client_2.prisma.passwordResetToken.findUnique({
+        where: { token: data.token },
+    });
+    if (!tokenRecord) {
+        throw errors_1.AppError.badRequest("الرابط غير صالح أو منتهي");
+    }
+    if (tokenRecord.usedAt) {
+        throw errors_1.AppError.badRequest("تم استخدام رابط إعادة التعيين مسبقاً");
+    }
+    if (tokenRecord.expiresAt.getTime() < Date.now()) {
+        throw errors_1.AppError.badRequest("انتهت صلاحية رابط إعادة التعيين");
+    }
+    const passwordHash = await (0, password_1.hashPassword)(data.password);
+    await client_2.prisma.$transaction([
+        client_2.prisma.user.update({
+            where: { id: tokenRecord.userId },
+            data: { passwordHash },
+        }),
+        client_2.prisma.passwordResetToken.update({
+            where: { id: tokenRecord.id },
+            data: { usedAt: new Date() },
+        }),
+        client_2.prisma.passwordResetToken.deleteMany({
+            where: { userId: tokenRecord.userId, id: { not: tokenRecord.id } },
+        }),
+    ]);
+};
+exports.resetPassword = resetPassword;
 const authenticateUser = async (input) => {
     const data = exports.loginSchema.parse(input);
     const user = (await client_2.prisma.user.findUnique({

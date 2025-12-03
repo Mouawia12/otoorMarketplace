@@ -45,6 +45,24 @@ router.post("/google", async (req, res, next) => {
         next(error);
     }
 });
+router.post("/forgot-password", async (req, res, next) => {
+    try {
+        await (0, authService_1.requestPasswordReset)(req.body);
+        res.json({ success: true });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/reset-password", async (req, res, next) => {
+    try {
+        await (0, authService_1.resetPassword)(req.body);
+        res.json({ success: true });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.post("/change-password", (0, auth_1.authenticate)(), async (req, res, next) => {
     try {
         if (!req.user) {

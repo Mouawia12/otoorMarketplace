@@ -28,6 +28,14 @@ export declare const googleLoginSchema: z.ZodObject<{
         seller: "seller";
     }>>;
 }, z.core.$strip>;
+export declare const forgotPasswordSchema: z.ZodObject<{
+    email: z.ZodString;
+}, z.core.$strip>;
+export declare const resetPasswordSchema: z.ZodObject<{
+    token: z.ZodString;
+    password: z.ZodString;
+    confirmPassword: z.ZodString;
+}, z.core.$strip>;
 export declare const registerUser: (input: z.infer<typeof registerSchema>) => Promise<{
     token: string;
     user: {
@@ -86,6 +94,8 @@ export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginS
         verified_seller: boolean;
     };
 }>;
+export declare const requestPasswordReset: (input: z.infer<typeof forgotPasswordSchema>) => Promise<void>;
+export declare const resetPassword: (input: z.infer<typeof resetPasswordSchema>) => Promise<void>;
 export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => Promise<{
     token: string;
     user: {

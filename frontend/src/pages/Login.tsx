@@ -25,6 +25,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [processingPending, setProcessingPending] = useState(false);
   const hasGoogleClient = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+  const resetSuccess = new URLSearchParams(location.search).get('reset') === 'success';
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema)
@@ -90,6 +91,11 @@ export default function Login() {
             {error}
           </div>
         )}
+        {resetSuccess && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-luxury mb-4">
+            {t('auth.resetPasswordLoginMessage')}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
@@ -118,6 +124,12 @@ export default function Login() {
             {errors.password && (
               <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
             )}
+          </div>
+
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-sm text-gold hover:underline">
+              {t('auth.forgotPassword')}
+            </Link>
           </div>
 
           <button
