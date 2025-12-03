@@ -53,6 +53,7 @@ import AdminAuditPage from './pages/AdminAuditPage';
 import AdminSellerProfilesPage from './pages/AdminSellerProfilesPage';
 import AdminProductLibraryPage from './pages/AdminProductLibraryPage';
 import AdminChangePassword from './pages/admin/AdminChangePassword';
+import AdminCouponsPage from './pages/AdminCouponsPage';
 
 // ✅ صفحات الفوتر الثابتة (صفحة واحدة تُستخدم لكل المسارات)
 import InfoPage from './pages/static/InfoPage';
@@ -71,6 +72,7 @@ import AuthorPage from './pages/blog/AuthorPage';
 // ✅ إدارة المدونة داخل لوحة الإدارة
 import AdminBlogList from './pages/admin/blog/AdminBlogList';
 import AdminBlogEdit from './pages/admin/blog/AdminBlogEdit';
+import SellerCouponsPage from './pages/SellerCouponsPage';
 
 import { useAuthStore } from './store/authStore';
 import { useUIStore } from './store/uiStore';
@@ -164,6 +166,7 @@ function App() {
             <Route path="products" element={<SellerProductsPage />} />
             <Route path="auctions" element={<SellerAuctionsPage />} />
             <Route path="orders" element={<SellerOrdersPage />} />
+            <Route path="coupons" element={<SellerCouponsPage />} />
             <Route path="earnings" element={<SellerEarningsPage />} />
             <Route path="support" element={<SellerSupportPage />} />
             <Route path="change-password" element={<SellerChangePassword />} />
@@ -179,6 +182,7 @@ function App() {
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="auth-requests" element={<AdminAuthRequestsPage />} />
             <Route path="seller-profiles" element={<AdminSellerProfilesPage />} />
+            <Route path="coupons" element={<AdminCouponsPage />} />
 
             {/* Blog (Admin) */}
             <Route path="blog" element={<AdminBlogList />} />

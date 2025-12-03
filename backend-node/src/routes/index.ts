@@ -11,6 +11,8 @@ import sellerProfileRouter from "./sellerProfile";
 import uploadsRouter from "./uploads";
 import blogRouter from "./blog";
 import supportRouter from "./support";
+import couponsRouter from "./coupons";
+import promotionsRouter from "./promotions";
 
 const router = Router();
 
@@ -25,5 +27,7 @@ router.use("/seller/profile", sellerProfileRouter);
 router.use("/uploads", uploadsRouter);
 router.use("/blog", blogRouter);
 router.use("/support", supportRouter);
+router.use("/coupons", couponsRouter);
+router.use("/promotions", promotionsRouter);
 
 export default router;

@@ -50,6 +50,8 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
     shipping_region: string;
     shipping_method: string;
     shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
     status: string;
     created_at: string;
     platform_fee: number;

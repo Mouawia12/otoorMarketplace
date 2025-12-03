@@ -14,15 +14,27 @@ export type CartItem = {
 
 type ShippingMethod = "standard" | "express";
 
+type CouponMeta = {
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  seller_id?: number | null;
+};
+
+type AppliedCoupon = {
+  code: string;
+  amount: number;
+  meta: CouponMeta;
+};
+
 type CartState = {
   items: CartItem[];
-  coupon?: { code: string; amount: number } | null;
+  coupon?: AppliedCoupon | null;
   shipping: ShippingMethod;
   add: (p: Omit<CartItem, "qty">, qty?: number) => void;
   remove: (id: string, variantId?: string) => void;
   setQty: (id: string, qty: number, variantId?: string) => void;
   clear: () => void;
-  setCoupon: (c: CartState["coupon"]) => void;
+  setCoupon: (c: AppliedCoupon | null) => void;
   setShipping: (m: ShippingMethod) => void;
   totals: () => { sub: number; discount: number; shipping: number; total: number };
   count: () => number;
@@ -59,7 +71,8 @@ export const useCartStore = create<CartState>()(
       setShipping: (m) => set({ shipping: m }),
       totals: () => {
         const sub = get().items.reduce((s, i) => s + i.price * i.qty, 0);
-        const discount = get().coupon?.amount ?? 0;
+        const coupon = get().coupon;
+        const discount = Math.min(coupon?.amount ?? 0, sub);
         const ship = get().shipping === "express" ? 35 : 0;
         const total = Math.max(0, sub - discount) + ship;
         return { sub, discount, shipping: ship, total };

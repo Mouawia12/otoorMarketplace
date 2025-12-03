@@ -11,6 +11,9 @@ export default function Navbar() {
   const { t, i18n } = useTranslation();
   const { isAuthenticated, user, logout } = useAuthStore();
   const { language, setLanguage } = useUIStore();
+  const normalizedRoles = (user?.roles ?? []).map((role) => role.toUpperCase());
+  const isSeller = normalizedRoles.includes('SELLER');
+  const isAdmin = normalizedRoles.includes('ADMIN') || normalizedRoles.includes('SUPER_ADMIN');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -108,14 +111,21 @@ export default function Navbar() {
 
               {isAuthenticated ? (
                 <>
-              {user?.roles?.includes('seller') ? (
-                <Link to="/seller/dashboard" className="hover:text-gold transition whitespace-nowrap">{t('nav.sellerDashboard')}</Link>
-              ) : (
-                <Link to="/account" className="hover:text-gold transition whitespace-nowrap">{t('nav.dashboard')}</Link>
+              {isSeller && (
+                <Link to="/seller/dashboard" className="hover:text-gold transition whitespace-nowrap">
+                  {t('nav.sellerDashboard')}
+                </Link>
               )}
-                  {(user?.roles?.includes('admin') || user?.roles?.includes('super_admin')) && (
-                    <Link to="/admin/dashboard" className="hover:text-gold transition whitespace-nowrap">{t('nav.adminDashboard')}</Link>
-                  )}
+              {!isSeller && !isAdmin && (
+                <Link to="/account" className="hover:text-gold transition whitespace-nowrap">
+                  {t('nav.dashboard')}
+                </Link>
+              )}
+              {isAdmin && (
+                <Link to="/admin/dashboard" className="hover:text-gold transition whitespace-nowrap">
+                  {t('nav.adminDashboard')}
+                </Link>
+              )}
                   <button onClick={logout} className="hover:text-gold transition whitespace-nowrap min-h-[44px]">
                     {t('common.logout', 'تسجيل الخروج')}
                   </button>
@@ -252,11 +262,12 @@ export default function Navbar() {
               {isAuthenticated ? (
                 <>
                   <div className="border-t border-charcoal-light my-2 pt-2">
-                    {user?.roles?.includes('seller') ? (
+                    {isSeller && (
                       <Link to="/seller/dashboard" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
                         {t('nav.sellerDashboard')}
                       </Link>
-                    ) : (
+                    )}
+                    {!isSeller && !isAdmin && (
                       <Link to="/account" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
                         {t('nav.dashboard')}
                       </Link>
@@ -264,7 +275,7 @@ export default function Navbar() {
                     <Link to="/account" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
                       {t('nav.account')}
                     </Link>
-                    {(user?.roles?.includes('admin') || user?.roles?.includes('super_admin')) && (
+                    {isAdmin && (
                       <Link to="/admin/dashboard" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
                         {t('nav.adminDashboard')}
                       </Link>

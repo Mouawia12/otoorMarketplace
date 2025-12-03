@@ -46,6 +46,7 @@ export default function SellerLayout() {
     { path: '/seller/products', label: t('seller.products'), icon: '🛍️' },
     { path: '/seller/auctions', label: t('seller.auctions'), icon: '🔨' },
     { path: '/seller/orders', label: t('seller.orders'), icon: '📦' },
+    { path: '/seller/coupons', label: t('seller.coupons', 'الكوبونات'), icon: '🏷️' },
     { path: '/seller/profile-status', label: t('seller.status', 'حالة الطلب'), icon: '📄' },
     { path: '/seller/earnings', label: t('seller.earnings'), icon: '💰' },
     { path: '/seller/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },

@@ -18,8 +18,7 @@ declare const createOrderSchema: z.ZodObject<{
         quantity: z.ZodCoercedNumber<unknown>;
         unitPrice: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
     }, z.core.$strip>>;
-    discountAmount: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
-    shippingFee: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    couponCode: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => Promise<{
     id: number;
@@ -36,6 +35,8 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
     shipping_region: string;
     shipping_method: string;
     shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
     status: string;
     created_at: string;
     platform_fee: number;
@@ -116,6 +117,8 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
     shipping_region: string;
     shipping_method: string;
     shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
     status: string;
     created_at: string;
     platform_fee: number;
@@ -196,6 +199,8 @@ export declare const listAllOrders: (status?: string) => Promise<{
     shipping_region: string;
     shipping_method: string;
     shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
     status: string;
     created_at: string;
     platform_fee: number;
@@ -276,6 +281,8 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
     shipping_region: string;
     shipping_method: string;
     shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
     status: string;
     created_at: string;
     platform_fee: number;
@@ -356,6 +363,8 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
     shipping_region: string;
     shipping_method: string;
     shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
     status: string;
     created_at: string;
     platform_fee: number;
@@ -436,6 +445,8 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
     shipping_region: string;
     shipping_method: string;
     shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
     status: string;
     created_at: string;
     platform_fee: number;

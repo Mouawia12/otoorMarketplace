@@ -7,6 +7,7 @@ const client_2 = require("../prisma/client");
 const errors_1 = require("../utils/errors");
 const productService_1 = require("./productService");
 const env_1 = require("../config/env");
+const couponService_1 = require("./couponService");
 const orderItemSchema = zod_1.z.object({
     productId: zod_1.z.coerce.number().int().positive(),
     quantity: zod_1.z.coerce.number().int().positive(),
@@ -26,8 +27,7 @@ const createOrderSchema = zod_1.z.object({
     })
         .optional(),
     items: zod_1.z.array(orderItemSchema).min(1),
-    discountAmount: zod_1.z.coerce.number().nonnegative().default(0),
-    shippingFee: zod_1.z.coerce.number().nonnegative().default(0),
+    couponCode: zod_1.z.string().min(3).optional(),
 });
 const createOrder = async (input) => {
     const data = createOrderSchema.parse(input);
@@ -54,6 +54,7 @@ const createOrder = async (input) => {
                 stockQuantity: true,
                 status: true,
                 basePrice: true,
+                sellerId: true,
             },
         });
         const productMap = new Map(products.map((product) => [product.id, product]));
@@ -84,7 +85,8 @@ const createOrder = async (input) => {
         }
         const normalizedItems = data.items.map((item) => {
             const product = productMap.get(item.productId);
-            const unitPrice = new client_1.Prisma.Decimal(product.basePrice.toNumber());
+            const basePriceNumber = product.basePrice.toNumber();
+            const unitPrice = new client_1.Prisma.Decimal(basePriceNumber);
             return {
                 productId: item.productId,
                 quantity: item.quantity,
@@ -92,6 +94,20 @@ const createOrder = async (input) => {
                 totalPrice: unitPrice.mul(item.quantity),
             };
         });
+        const couponLines = data.items.map((item) => {
+            const product = productMap.get(item.productId);
+            return {
+                productId: item.productId,
+                quantity: item.quantity,
+                sellerId: product.sellerId,
+                unitPrice: product.basePrice.toNumber(),
+            };
+        });
+        let appliedCoupon = null;
+        if (data.couponCode) {
+            appliedCoupon = await (0, couponService_1.prepareCouponForOrder)(tx, data.couponCode, couponLines);
+        }
+        const discountAmount = appliedCoupon?.discountAmount ?? 0;
         const order = await tx.order.create({
             data: {
                 buyerId: data.buyerId,
@@ -104,11 +120,13 @@ const createOrder = async (input) => {
                 shippingRegion: shipping.region,
                 shippingAddress: shipping.address,
                 subtotalAmount: new client_1.Prisma.Decimal(subtotal),
-                discountAmount: new client_1.Prisma.Decimal(data.discountAmount),
+                discountAmount: new client_1.Prisma.Decimal(discountAmount),
                 shippingFee: new client_1.Prisma.Decimal(shippingFeeValue),
-                totalAmount: new client_1.Prisma.Decimal(subtotal - data.discountAmount + shippingFeeValue),
-                platformFee: new client_1.Prisma.Decimal((subtotal - data.discountAmount + shippingFeeValue) *
+                totalAmount: new client_1.Prisma.Decimal(Math.max(0, subtotal - discountAmount) + shippingFeeValue),
+                platformFee: new client_1.Prisma.Decimal((Math.max(0, subtotal - discountAmount) + shippingFeeValue) *
                     env_1.config.platformCommissionRate),
+                couponId: appliedCoupon?.coupon.id ?? null,
+                couponCode: appliedCoupon?.coupon.code ?? null,
                 items: {
                     create: normalizedItems,
                 },
@@ -117,6 +135,9 @@ const createOrder = async (input) => {
                 items: true,
             },
         });
+        if (appliedCoupon) {
+            await (0, couponService_1.finalizeCouponUsage)(tx, appliedCoupon.coupon);
+        }
         // decrement stock
         for (const item of normalizedItems) {
             await tx.product.update({
@@ -213,6 +234,8 @@ const mapOrderToDto = (order) => {
         shipping_region: order.shippingRegion,
         shipping_method: order.shippingMethod,
         shipping_fee: Number(order.shippingFee),
+        discount_amount: Number(order.discountAmount ?? 0),
+        coupon_code: order.couponCode ?? null,
         status: statusToFriendly(order.status),
         created_at: order.createdAt.toISOString(),
         platform_fee: Number(order.platformFee ?? 0),
