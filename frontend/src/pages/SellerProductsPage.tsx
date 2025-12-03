@@ -48,6 +48,20 @@ const statusBadgeClass = (status: string) => {
   }
 };
 
+const convertArabicDigits = (value: string) => {
+  const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  return value.replace(/[٠-٩]/g, (d) => String(arabic.indexOf(d)));
+};
+
+const parseNumericInput = (value: string) => {
+  if (!value) return NaN;
+  const normalized = convertArabicDigits(value)
+    .replace(/[٬,]/g, '')
+    .replace(/٫/g, '.')
+    .replace(/[^\d.]/g, '');
+  return normalized ? parseFloat(normalized) : NaN;
+};
+
 export default function SellerProductsPage() {
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
@@ -103,7 +117,7 @@ export default function SellerProductsPage() {
   };
 
   const handleSavePrice = async (productId: number) => {
-    const priceValue = parseFloat(editPrice);
+    const priceValue = parseNumericInput(editPrice);
     if (isNaN(priceValue) || priceValue <= 0) {
       alert(t('seller.invalidPrice', 'Please enter a valid price'));
       return;
@@ -412,16 +426,25 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       }
 
       const imageUrls = formData.image_urls;
+      const parsedPrice = parseNumericInput(formData.base_price);
+      const parsedSize = parseInt(convertArabicDigits(formData.size_ml || '0'), 10);
+      const parsedStock = parseInt(convertArabicDigits(formData.stock_quantity || '0'), 10);
+
+      if (!parsedPrice || Number.isNaN(parsedPrice)) {
+        alert(t('seller.invalidPrice', 'Please enter a valid price'));
+        return;
+      }
+
       const payload = {
         nameEn: formData.name_en,
         nameAr: formData.name_ar,
         brand: formData.brand,
         productType: formData.product_type,
         category: formData.category,
-        basePrice: parseFloat(formData.base_price),
-        sizeMl: parseInt(formData.size_ml || '0', 10),
+        basePrice: parsedPrice,
+        sizeMl: parsedSize,
         concentration: formData.concentration,
-        stockQuantity: parseInt(formData.stock_quantity || '0', 10),
+        stockQuantity: parsedStock,
         descriptionEn: formData.description_en,
         descriptionAr: formData.description_ar,
         condition: formData.condition || 'NEW',

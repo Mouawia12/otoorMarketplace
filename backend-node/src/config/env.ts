@@ -25,6 +25,17 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   SUPPORT_EMAIL: z.string().email().default("support@otourmarketplace.com"),
+  MAIL_HOST: z.string().min(1, "MAIL_HOST is required").default("localhost"),
+  MAIL_PORT: z.coerce.number().default(587),
+  MAIL_USERNAME: z.string().min(1, "MAIL_USERNAME is required"),
+  MAIL_PASSWORD: z.string().min(1, "MAIL_PASSWORD is required"),
+  MAIL_ENCRYPTION: z.enum(["none", "tls", "ssl"]).default("tls"),
+  MAIL_FROM_ADDRESS: z.string().email(),
+  MAIL_FROM_NAME: z.string().default("Otoor Marketplace"),
+  PASSWORD_RESET_URL: z
+    .string()
+    .url()
+    .default("http://localhost:5173/reset-password"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -50,6 +61,14 @@ const {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   SUPPORT_EMAIL,
+  MAIL_HOST,
+  MAIL_PORT,
+  MAIL_USERNAME,
+  MAIL_PASSWORD,
+  MAIL_ENCRYPTION,
+  MAIL_FROM_ADDRESS,
+  MAIL_FROM_NAME,
+  PASSWORD_RESET_URL,
 } = parsed.data;
 
 const allowedOrigins =
@@ -82,5 +101,19 @@ export const config = {
   },
   support: {
     email: SUPPORT_EMAIL,
+  },
+  mail: {
+    host: MAIL_HOST,
+    port: MAIL_PORT,
+    username: MAIL_USERNAME,
+    password: MAIL_PASSWORD,
+    encryption: MAIL_ENCRYPTION,
+    from: {
+      address: MAIL_FROM_ADDRESS,
+      name: MAIL_FROM_NAME,
+    },
+  },
+  auth: {
+    passwordResetUrl: PASSWORD_RESET_URL.replace(/\/+$/, ""),
   },
 };

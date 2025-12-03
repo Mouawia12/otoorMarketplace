@@ -23,5 +23,19 @@ export declare const config: {
     support: {
         email: string;
     };
+    mail: {
+        host: string;
+        port: number;
+        username: string;
+        password: string;
+        encryption: "none" | "tls" | "ssl";
+        from: {
+            address: string;
+            name: string;
+        };
+    };
+    auth: {
+        passwordResetUrl: string;
+    };
 };
 //# sourceMappingURL=env.d.ts.map
