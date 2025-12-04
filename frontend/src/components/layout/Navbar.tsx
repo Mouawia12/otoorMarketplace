@@ -6,6 +6,7 @@ import BrandLogo from '../brand/BrandLogo';
 import { useState } from 'react';
 import CartIconButton from '../cart/CartIconButton';
 import WishlistIconButton from '../wishlist/WishlistIconButton';
+import PromoStripBar from '../promotions/PromoStripBar';
 
 export default function Navbar() {
   const { t, i18n } = useTranslation();
@@ -40,6 +41,7 @@ export default function Navbar() {
 
   return (
     <nav dir={i18n.language === 'ar' ? 'rtl' : 'ltr'} className="sticky top-0 z-50 bg-charcoal text-ivory shadow-lg">
+      <PromoStripBar />
 
       {/* ===== Mobile + Tablet (<lg) ===== */}
       <div className="lg:hidden h-14">

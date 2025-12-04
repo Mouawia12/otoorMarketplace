@@ -2,33 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Promotion, fetchActivePromotions } from '../../services/promotionService';
 
-const STORAGE_KEY = 'promo_strip_dismissed';
-
-const loadDismissed = (): number[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveDismissed = (ids: number[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-  } catch {
-    /* ignore */
-  }
-};
-
 export default function PromoStripBar() {
   const { i18n } = useTranslation();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [dismissed, setDismissed] = useState<number[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return loadDismissed();
-  });
+  const [dismissed, setDismissed] = useState<number[]>([]);
 
   const activePromotions = useMemo(() => {
     return promotions.filter((promo) => !dismissed.includes(promo.id));
@@ -73,7 +51,6 @@ export default function PromoStripBar() {
   const dismiss = () => {
     const nextDismissed = [...dismissed, current.id];
     setDismissed(nextDismissed);
-    saveDismissed(nextDismissed);
   };
 
   return (

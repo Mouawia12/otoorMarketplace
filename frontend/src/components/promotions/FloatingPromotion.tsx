@@ -3,34 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Promotion, fetchActivePromotions } from '../../services/promotionService';
 import { resolveImageUrl } from '../../utils/image';
 
-const STORAGE_KEY = 'floating_promo_dismissed';
-
-const hasDismissed = (id: number) => {
-  if (typeof window === 'undefined') return false;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return false;
-  try {
-    const list = JSON.parse(raw) as number[];
-    return list.includes(id);
-  } catch {
-    return false;
-  }
-};
-
-const markDismissed = (id: number) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const list: number[] = raw ? JSON.parse(raw) : [];
-    if (!list.includes(id)) {
-      list.push(id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    }
-  } catch {
-    /* ignore */
-  }
-};
-
 export default function FloatingPromotion() {
   const { i18n } = useTranslation();
   const [promotion, setPromotion] = useState<Promotion | null>(null);
@@ -40,9 +12,8 @@ export default function FloatingPromotion() {
     const load = async () => {
       try {
         const data = await fetchActivePromotions(['FLOATING']);
-        const available = data.find((promo) => !hasDismissed(promo.id));
-        if (available) {
-          setPromotion(available);
+        if (data.length) {
+          setPromotion(data[0]);
         }
       } catch (error) {
         console.error('Failed to load floating promotion', error);
@@ -67,7 +38,6 @@ export default function FloatingPromotion() {
 
   const dismiss = () => {
     setHidden(true);
-    markDismissed(promotion.id);
   };
 
   return (
