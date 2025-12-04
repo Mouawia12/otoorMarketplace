@@ -88,9 +88,9 @@ export default function PromoStripBar() {
               {badge}
             </span>
           )}
-          <div className="text-sm sm:text-base font-semibold whitespace-pre-line">
-            {title}
-            {subtitle && <span className="font-normal opacity-80 ml-2">{subtitle}</span>}
+          <div className="text-sm sm:text-base font-semibold whitespace-pre-line flex flex-wrap items-center gap-2">
+            <span>{title}</span>
+            {subtitle && <span className="font-normal opacity-80">{subtitle}</span>}
           </div>
         </div>
         <div className="flex items-center gap-3">
