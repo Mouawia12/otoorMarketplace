@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Promotion,
@@ -8,6 +8,9 @@ import {
   fetchPromotions,
   updatePromotion,
 } from '../services/promotionService';
+import api from '../lib/api';
+import { compressImageFile } from '../utils/imageCompression';
+import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
 
 const typeLabels: Record<PromotionType, { icon: string; className: string }> = {
   HERO: { icon: '🎞️', className: 'bg-purple-100 text-purple-700' },
@@ -28,6 +31,7 @@ type FormState = {
   badge_text_ar: string;
   button_text_en: string;
   button_text_ar: string;
+  image_url: string;
   link_url: string;
   background_color: string;
   text_color: string;
@@ -51,6 +55,7 @@ const defaultForm: FormState = {
   badge_text_ar: '',
   button_text_en: '',
   button_text_ar: '',
+  image_url: '',
   link_url: '',
   background_color: '#111827',
   text_color: '#ffffff',
@@ -80,6 +85,7 @@ export default function AdminAdsPage() {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingHeroImage, setUploadingHeroImage] = useState(false);
 
   const loadPromotions = async () => {
     try {
@@ -135,6 +141,7 @@ export default function AdminAdsPage() {
         badge_text_ar: promotion.badge_text_ar ?? '',
         button_text_en: promotion.button_text_en ?? '',
         button_text_ar: promotion.button_text_ar ?? '',
+        image_url: promotion.image_url ?? '',
         link_url: promotion.link_url ?? '',
         background_color: promotion.background_color ?? '#111827',
         text_color: promotion.text_color ?? '#ffffff',
@@ -168,6 +175,7 @@ export default function AdminAdsPage() {
       badge_text_ar: form.badge_text_ar || null,
       button_text_en: form.button_text_en || null,
       button_text_ar: form.button_text_ar || null,
+      image_url: form.type === 'HERO' ? form.image_url || null : null,
       link_url: form.link_url || null,
       background_color: form.background_color || null,
       text_color: form.text_color || null,
@@ -191,6 +199,35 @@ export default function AdminAdsPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleHeroImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    try {
+      setUploadingHeroImage(true);
+      const optimized = await compressImageFile(file, { maxBytes: 3 * 1024 * 1024 });
+      const formDataPayload = new FormData();
+      formDataPayload.append('image', optimized);
+      const { data } = await api.post('/uploads/image', formDataPayload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const stored = normalizeImagePathForStorage(data?.path || data?.url) || data?.path || data?.url;
+      if (stored) {
+        setForm((prev) => ({ ...prev, image_url: stored }));
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || t('adminPromotions.uploadFailed'));
+    } finally {
+      setUploadingHeroImage(false);
+    }
+  };
+
+  const handleRemoveHeroImage = () => {
+    setForm((prev) => ({ ...prev, image_url: '' }));
   };
 
   const handleDelete = async (promotion: Promotion) => {
@@ -221,6 +258,7 @@ export default function AdminAdsPage() {
     const description = lang === 'ar' ? promotion.description_ar : promotion.description_en;
     const badge = lang === 'ar' ? promotion.badge_text_ar : promotion.badge_text_en;
     const buttonLabel = lang === 'ar' ? promotion.button_text_ar : promotion.button_text_en;
+    const image = promotion.image_url ? resolveImageUrl(promotion.image_url) : null;
 
     if (promotion.type === 'STRIP') {
       return (
@@ -254,19 +292,26 @@ export default function AdminAdsPage() {
 
     return (
       <div className="rounded-3xl overflow-hidden shadow-lg" style={{ backgroundColor: bg, color }}>
-        <div className="p-6 space-y-3">
-          {badge && (
-            <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-white/15">
-              {badge}
-            </span>
-          )}
-          <h3 className="text-2xl font-bold">{title}</h3>
-          {subtitle && <p className="text-lg opacity-90">{subtitle}</p>}
-          {description && <p className="text-sm opacity-80">{description}</p>}
-          {buttonLabel && (
-            <button className="mt-4 inline-flex px-4 py-2 rounded-full bg-white text-charcoal font-semibold text-sm">
-              {buttonLabel}
-            </button>
+        <div className="grid grid-cols-1 md:grid-cols-2">
+          <div className="p-6 space-y-3">
+            {badge && (
+              <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-white/15">
+                {badge}
+              </span>
+            )}
+            <h3 className="text-2xl font-bold">{title}</h3>
+            {subtitle && <p className="text-lg opacity-90">{subtitle}</p>}
+            {description && <p className="text-sm opacity-80">{description}</p>}
+            {buttonLabel && (
+              <button className="mt-4 inline-flex px-4 py-2 rounded-full bg-white text-charcoal font-semibold text-sm">
+                {buttonLabel}
+              </button>
+            )}
+          </div>
+          {image && (
+            <div className="relative hidden md:block">
+              <img src={image} alt={title ?? ''} className="w-full h-full object-cover" />
+            </div>
           )}
         </div>
       </div>
@@ -491,19 +536,63 @@ export default function AdminAdsPage() {
                       className="w-full border border-sand rounded-lg px-3 py-2"
                     />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      id="is_active"
-                      type="checkbox"
-                      checked={form.is_active}
-                      onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                      className="w-4 h-4"
-                    />
-                    <label htmlFor="is_active" className="text-sm font-semibold text-charcoal">
-                      {t('admin.active')}
-                    </label>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="is_active"
+                    type="checkbox"
+                    checked={form.is_active}
+                    onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="is_active" className="text-sm font-semibold text-charcoal">
+                    {t('admin.active')}
+                  </label>
                 </div>
+              </div>
+
+                {form.type === 'HERO' && (
+                  <div className="space-y-3 rounded-2xl border border-sand/70 p-4 bg-sand/20">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold">
+                        {t('adminPromotions.bannerImage')}
+                      </label>
+                      {form.image_url && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveHeroImage}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          {t('adminPromotions.removeImage')}
+                        </button>
+                      )}
+                    </div>
+
+                    {form.image_url ? (
+                      <div className="relative rounded-2xl overflow-hidden border border-sand/80">
+                        <img
+                          src={resolveImageUrl(form.image_url)}
+                          alt="Hero banner"
+                          className="w-full h-48 object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleHeroImageUpload}
+                          disabled={uploadingHeroImage}
+                          className="w-full border border-sand rounded-lg px-3 py-2 bg-white"
+                        />
+                        <p className="text-xs text-charcoal-light">
+                          {uploadingHeroImage
+                            ? t('common.loading')
+                            : t('adminPromotions.uploadHint')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
