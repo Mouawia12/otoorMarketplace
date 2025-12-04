@@ -8,7 +8,6 @@ import {
   fetchPromotions,
   updatePromotion,
 } from '../services/promotionService';
-import { resolveImageUrl } from '../utils/image';
 
 const typeLabels: Record<PromotionType, { icon: string; className: string }> = {
   HERO: { icon: '🎞️', className: 'bg-purple-100 text-purple-700' },
@@ -29,7 +28,6 @@ type FormState = {
   badge_text_ar: string;
   button_text_en: string;
   button_text_ar: string;
-  image_url: string;
   link_url: string;
   background_color: string;
   text_color: string;
@@ -53,7 +51,6 @@ const defaultForm: FormState = {
   badge_text_ar: '',
   button_text_en: '',
   button_text_ar: '',
-  image_url: '',
   link_url: '',
   background_color: '#111827',
   text_color: '#ffffff',
@@ -138,7 +135,6 @@ export default function AdminAdsPage() {
         badge_text_ar: promotion.badge_text_ar ?? '',
         button_text_en: promotion.button_text_en ?? '',
         button_text_ar: promotion.button_text_ar ?? '',
-        image_url: promotion.image_url ?? '',
         link_url: promotion.link_url ?? '',
         background_color: promotion.background_color ?? '#111827',
         text_color: promotion.text_color ?? '#ffffff',
@@ -172,7 +168,6 @@ export default function AdminAdsPage() {
       badge_text_ar: form.badge_text_ar || null,
       button_text_en: form.button_text_en || null,
       button_text_ar: form.button_text_ar || null,
-      image_url: form.image_url || null,
       link_url: form.link_url || null,
       background_color: form.background_color || null,
       text_color: form.text_color || null,
@@ -226,7 +221,6 @@ export default function AdminAdsPage() {
     const description = lang === 'ar' ? promotion.description_ar : promotion.description_en;
     const badge = lang === 'ar' ? promotion.badge_text_ar : promotion.badge_text_en;
     const buttonLabel = lang === 'ar' ? promotion.button_text_ar : promotion.button_text_en;
-    const image = promotion.image_url ? resolveImageUrl(promotion.image_url) : null;
 
     if (promotion.type === 'STRIP') {
       return (
@@ -245,11 +239,6 @@ export default function AdminAdsPage() {
     if (promotion.type === 'FLOATING') {
       return (
         <div className="rounded-2xl p-4 flex gap-3 shadow-xl border border-white/20" style={{ backgroundColor: bg, color }}>
-          {image && (
-            <div className="w-16 h-16 rounded-xl overflow-hidden shadow bg-black/10">
-              <img src={image} alt={title ?? ''} className="w-full h-full object-cover" />
-            </div>
-          )}
           <div className="space-y-1">
             <h4 className="font-semibold">{title}</h4>
             {description && <p className="text-sm opacity-90 line-clamp-2">{description}</p>}
@@ -264,7 +253,7 @@ export default function AdminAdsPage() {
     }
 
     return (
-      <div className="rounded-3xl overflow-hidden shadow-lg grid grid-cols-1 md:grid-cols-2" style={{ backgroundColor: bg, color }}>
+      <div className="rounded-3xl overflow-hidden shadow-lg" style={{ backgroundColor: bg, color }}>
         <div className="p-6 space-y-3">
           {badge && (
             <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-white/15">
@@ -280,11 +269,6 @@ export default function AdminAdsPage() {
             </button>
           )}
         </div>
-        {image && (
-          <div className="relative">
-            <img src={image} alt={title ?? ''} className="w-full h-full object-cover" />
-          </div>
-        )}
       </div>
     );
   };
@@ -523,16 +507,6 @@ export default function AdminAdsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold mb-1">{t('adminPromotions.imageUrl')}</label>
-                    <input
-                      type="text"
-                      value={form.image_url}
-                      onChange={(e) => setForm((prev) => ({ ...prev, image_url: e.target.value }))}
-                      className="w-full border border-sand rounded-lg px-3 py-2"
-                      placeholder="https://..."
-                    />
-                  </div>
-                  <div>
                     <label className="block text-sm font-semibold mb-1">{t('adminPromotions.linkUrl')}</label>
                     <input
                       type="text"
@@ -673,13 +647,12 @@ export default function AdminAdsPage() {
                   subtitle_en: form.subtitle_en,
                   subtitle_ar: form.subtitle_ar,
                   description_en: form.description_en,
-                  description_ar: form.description_ar,
-                  badge_text_en: form.badge_text_en,
-                  badge_text_ar: form.badge_text_ar,
-                  button_text_en: form.button_text_en,
-                  button_text_ar: form.button_text_ar,
-                  image_url: form.image_url,
-                  link_url: form.link_url,
+                description_ar: form.description_ar,
+                badge_text_en: form.badge_text_en,
+                badge_text_ar: form.badge_text_ar,
+                button_text_en: form.button_text_en,
+                button_text_ar: form.button_text_ar,
+                link_url: form.link_url,
                   background_color: form.background_color,
                   text_color: form.text_color,
                   floating_position: form.floating_position,
