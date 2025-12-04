@@ -15,7 +15,24 @@ const promotionPayloadSchema = z.object({
   badge_text_ar: z.string().optional().nullable(),
   button_text_en: z.string().optional().nullable(),
   button_text_ar: z.string().optional().nullable(),
-  image_url: z.string().url().optional().nullable(),
+  image_url: z
+    .string()
+    .trim()
+    .refine(
+      (value) => {
+        if (!value) return false;
+        if (value.startsWith('/')) return true;
+        try {
+          new URL(value);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Invalid image URL" }
+    )
+    .optional()
+    .nullable(),
   link_url: z.string().optional().nullable(),
   background_color: z.string().optional().nullable(),
   text_color: z.string().optional().nullable(),
