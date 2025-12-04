@@ -63,17 +63,19 @@ export default function FloatingPromotion() {
         </button>
         <div className="p-4 flex gap-3">
           {image && (
-            <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg bg-black/10">
+            <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg bg-black/10 flex-shrink-0">
               <img src={image} alt={title ?? ''} className="w-full h-full object-cover" />
             </div>
           )}
           <div className="flex-1 space-y-2">
-            {badge && (
-              <span className="inline-flex px-2 py-1 rounded-full text-[11px] font-semibold bg-white/20 backdrop-blur">
-                {badge}
-              </span>
-            )}
-            <h4 className="text-lg font-bold">{title}</h4>
+            <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+              <h4 className="text-lg font-bold">{title}</h4>
+              {badge && (
+                <span className="inline-flex px-2 py-1 rounded-full text-[11px] font-semibold bg-white/20 backdrop-blur whitespace-nowrap">
+                  {badge}
+                </span>
+              )}
+            </div>
             {description && <p className="text-sm opacity-90 line-clamp-3">{description}</p>}
             {button && promotion.link_url && (
               <a
