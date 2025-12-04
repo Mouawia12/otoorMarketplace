@@ -68,22 +68,24 @@ export default function FloatingPromotion() {
             </div>
           )}
           <div className="flex-1 space-y-2">
-            <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-              <h4 className="text-lg font-bold">{title}</h4>
-              {badge && (
+            {badge && (
+              <div className={`flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
                 <span className="inline-flex px-2 py-1 rounded-full text-[11px] font-semibold bg-white/20 backdrop-blur whitespace-nowrap">
                   {badge}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
+            <h4 className={`text-lg font-bold ${isRTL ? 'text-right' : 'text-left'}`}>{title}</h4>
             {description && <p className="text-sm opacity-90 line-clamp-3">{description}</p>}
             {button && promotion.link_url && (
-              <a
-                href={promotion.link_url}
-                className="inline-flex mt-1 bg-white text-charcoal font-semibold text-xs px-3 py-1.5 rounded-full hover:opacity-90 transition"
-              >
-                {button}
-              </a>
+              <div className={`flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
+                <a
+                  href={promotion.link_url}
+                  className="inline-flex mt-1 bg-white text-charcoal font-semibold text-xs px-3 py-1.5 rounded-full hover:opacity-90 transition"
+                >
+                  {button}
+                </a>
+              </div>
             )}
           </div>
         </div>
