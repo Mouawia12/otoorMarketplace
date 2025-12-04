@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Promotion, fetchActivePromotions } from '../../services/promotionService';
-import { resolveImageUrl } from '../../utils/image';
 
 export default function FloatingPromotion() {
   const { i18n } = useTranslation();
@@ -26,14 +25,13 @@ export default function FloatingPromotion() {
 
   const lang = i18n.language === 'ar' ? 'ar' : 'en';
   const isRTL = lang === 'ar';
-  const background = promotion.background_color || '#0f172a';
   const color = promotion.text_color || '#ffffff';
+  const backgroundColor = applyTransparency(promotion.background_color || '#0f172a', 0.9);
 
   const title = lang === 'ar' ? promotion.title_ar : promotion.title_en;
   const description = lang === 'ar' ? promotion.description_ar : promotion.description_en;
   const button = lang === 'ar' ? promotion.button_text_ar : promotion.button_text_en;
   const badge = lang === 'ar' ? promotion.badge_text_ar : promotion.badge_text_en;
-  const image = promotion.image_url ? resolveImageUrl(promotion.image_url) : null;
   const alignRight = promotion.floating_position !== 'bottom-left';
 
   const dismiss = () => {
@@ -46,8 +44,8 @@ export default function FloatingPromotion() {
       style={{ direction: lang === 'ar' ? 'rtl' : 'ltr' }}
     >
       <div
-        className="relative max-w-xs sm:max-w-sm rounded-3xl shadow-2xl border border-black/10 overflow-hidden backdrop-blur-lg"
-        style={{ backgroundColor: background, color }}
+        className="relative w-[clamp(260px,25vw,520px)] max-w-full rounded-3xl shadow-2xl border border-white/30 overflow-hidden backdrop-blur-2xl"
+        style={{ color, backgroundColor }}
       >
         <button
           onClick={dismiss}
@@ -62,11 +60,6 @@ export default function FloatingPromotion() {
           ×
         </button>
         <div className="p-4 flex gap-3">
-          {image && (
-            <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg bg-black/10 flex-shrink-0">
-              <img src={image} alt={title ?? ''} className="w-full h-full object-cover" />
-            </div>
-          )}
           <div className="flex-1 space-y-2">
             {badge && (
               <div className={`flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
@@ -93,3 +86,14 @@ export default function FloatingPromotion() {
     </div>
   );
 }
+
+const applyTransparency = (hexColor: string, alpha: number) => {
+  const normalized = hexColor.trim().replace('#', '');
+  const value = normalized.length === 3
+    ? normalized.split('').map((c) => c + c).join('')
+    : normalized.padEnd(6, '0');
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
