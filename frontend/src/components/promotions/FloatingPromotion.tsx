@@ -54,6 +54,7 @@ export default function FloatingPromotion() {
   if (!promotion || hidden) return null;
 
   const lang = i18n.language === 'ar' ? 'ar' : 'en';
+  const isRTL = lang === 'ar';
   const background = promotion.background_color || '#0f172a';
   const color = promotion.text_color || '#ffffff';
 
@@ -80,7 +81,12 @@ export default function FloatingPromotion() {
       >
         <button
           onClick={dismiss}
-          className="absolute top-3 right-3 text-white/80 hover:text-white text-lg leading-none"
+          className="absolute text-white/80 hover:text-white text-lg leading-none"
+          style={{
+            top: '12px',
+            insetInlineEnd: isRTL ? undefined : '12px',
+            insetInlineStart: isRTL ? '12px' : undefined,
+          }}
           aria-label="Dismiss"
         >
           ×
