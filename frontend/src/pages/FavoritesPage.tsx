@@ -108,7 +108,7 @@ export default function FavoritesPage() {
           <p className="text-taupe mb-6">
             {t('favorites.count', { count: favorites.length })}
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="responsive-card-grid responsive-card-grid--roomy">
             {favorites.map((product) => (
               <div key={product.id} className="relative">
                 <ProductCard product={product} />
