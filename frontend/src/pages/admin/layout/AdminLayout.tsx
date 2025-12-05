@@ -61,14 +61,14 @@ export default function AdminLayout() {
         {/* Mobile Overlay */}
         {sidebarOpen && (
           <div
-            className="fixed inset-x-0 top-14 bottom-0 bg-black bg-opacity-50 z-40 md:hidden"
+            className="fixed inset-x-0 top-14 bottom-0 bg-black bg-opacity-50 z-30 md:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
         {/* Sidebar */}
         <aside
-          className={`fixed md:static left-0 top-14 bottom-0 md:top-0 md:bottom-auto z-50 w-72 md:w-64 bg-charcoal text-ivory transform transition-transform duration-300 overflow-y-auto ${
+          className={`fixed md:static left-0 top-14 bottom-0 md:top-0 md:bottom-auto z-30 w-72 md:w-64 bg-charcoal text-ivory transform transition-transform duration-300 overflow-y-auto ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
           }`}
         >
