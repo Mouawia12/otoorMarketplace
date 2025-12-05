@@ -5,6 +5,38 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .responsive-card-grid {
+    --grid-min-card-size: 220px;
+    display: grid;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(var(--grid-min-card-size, 220px), 1fr)
+    );
+    gap: 0.75rem;
+  }
+
+  .responsive-card-grid--compact {
+    --grid-min-card-size: 180px;
+  }
+
+  .responsive-card-grid--roomy {
+    --grid-min-card-size: 260px;
+  }
+
+  @media (min-width: 640px) {
+    .responsive-card-grid {
+      gap: 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .responsive-card-grid {
+      gap: 1.5rem;
+    }
+  }
+}
+
 @layer base {
   html[dir="rtl"] body {
     direction: rtl;

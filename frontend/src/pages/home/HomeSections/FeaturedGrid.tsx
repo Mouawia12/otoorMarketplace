@@ -40,8 +40,8 @@ export default function FeaturedGrid({
         </Link>
       </div>
 
-      {/* 👇 الشبكة: 2 (موبايل) / 3 (تابلت) / 6 (لابتوب+) */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
+      {/* 👇 الشبكة تستجيب تلقائياً مع الحفاظ على حجم بطاقة مريح */}
+      <div className="responsive-card-grid responsive-card-grid--compact">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} type={type} />
         ))}

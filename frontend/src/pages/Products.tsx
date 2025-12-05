@@ -101,7 +101,7 @@ export default function Products() {
       </div>
 
       {/* شبكة المنتجات — بدون aside، تملأ العرض */}
-      <div className="grid [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))] gap-3 md:gap-6">
+      <div className="responsive-card-grid">
         {loading &&
           Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={`sk-${i}`} />)}
 

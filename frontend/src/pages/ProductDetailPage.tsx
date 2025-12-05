@@ -376,7 +376,7 @@ export default function ProductDetailPage() {
       {relatedProducts.length > 0 && (
         <div className="border-t border-gray-200 pt-12">
           <h2 className="text-h2 text-charcoal mb-6">{t('productDetail.relatedProducts')}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="responsive-card-grid responsive-card-grid--roomy">
             {relatedProducts.map((relatedProduct) => (
               <ProductCard key={relatedProduct.id} product={relatedProduct} type="new" />
             ))}

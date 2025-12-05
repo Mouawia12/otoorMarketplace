@@ -229,7 +229,7 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
         </div>
       ) : (
         <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+              <div className="responsive-card-grid responsive-card-grid--roomy">
                 {catalogType === 'auctions'
                   ? auctionItems.map(({ auction, product }) => (
                       <ProductCard
