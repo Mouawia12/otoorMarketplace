@@ -17,7 +17,7 @@
   }
 
   .responsive-card-grid--compact {
-    --grid-min-card-size: 180px;
+    --grid-min-card-size: 132px;
   }
 
   .responsive-card-grid--roomy {

@@ -34,7 +34,7 @@ export default function Hero({ slides }: HeroProps) {
 
   return (
     <div 
-      className="relative w-full h-[500px] md:h-[600px] overflow-hidden"
+      className="relative w-full h-[380px] sm:h-[460px] md:h-[600px] overflow-hidden rounded-b-[32px]"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -51,18 +51,18 @@ export default function Hero({ slides }: HeroProps) {
             className="w-full h-full object-cover"
             loading={index === 0 ? 'eager' : 'lazy'}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-charcoal/80 to-charcoal/40" />
+          <div className="absolute inset-0 bg-gradient-to-b from-charcoal/85 via-charcoal/50 to-transparent md:bg-gradient-to-r md:from-charcoal/80 md:via-charcoal/60 md:to-transparent" />
         </div>
       ))}
 
       <div className="absolute inset-0 flex items-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 w-full">
-          <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-ivory mb-4 animate-fade-in">
+          <div className="max-w-2xl text-center md:text-left space-y-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-ivory leading-tight animate-fade-in">
               {slide.title[lang]}
             </h1>
-            <p className="text-lg md:text-xl text-sand mb-8 animate-fade-in-delay flex items-center gap-2 flex-wrap">
-              <span>{slide.subtitle[lang]}</span>
+            <p className="text-base sm:text-lg md:text-xl text-sand animate-fade-in-delay flex items-center gap-2 flex-wrap justify-center md:justify-start">
+              <span className="text-ivory/85">{slide.subtitle[lang]}</span>
               {slide.priceInfo && (
                 <span className="inline-flex items-center gap-1 text-ivory font-semibold">
                   {slide.priceInfo.prefix?.[lang] && (
@@ -76,17 +76,17 @@ export default function Hero({ slides }: HeroProps) {
                 </span>
               )}
             </p>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center sm:items-stretch justify-center md:justify-start">
               <Link
                 to={slide.primaryCta.link}
-                className="bg-gold text-charcoal px-8 py-3 rounded-lg font-semibold hover:bg-gold-light transition-colors shadow-luxury"
+                className="bg-gold text-charcoal px-8 py-3 rounded-lg font-semibold hover:bg-gold-light transition-colors shadow-luxury w-full sm:w-auto text-center"
               >
                 {slide.primaryCta.text[lang]}
               </Link>
               {slide.secondaryCta && (
                 <Link
                   to={slide.secondaryCta.link}
-                  className="bg-transparent border-2 border-ivory text-ivory px-8 py-3 rounded-lg font-semibold hover:bg-ivory/10 transition-colors"
+                  className="bg-transparent border-2 border-ivory text-ivory px-8 py-3 rounded-lg font-semibold hover:bg-ivory/10 transition-colors w-full sm:w-auto text-center"
                 >
                   {slide.secondaryCta.text[lang]}
                 </Link>
