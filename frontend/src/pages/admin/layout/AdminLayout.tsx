@@ -50,6 +50,7 @@ export default function AdminLayout() {
     { path: '/admin/ads',       label: t('admin.ads'),       icon: '📢' },
     { path: '/admin/support',   label: t('admin.support'),   icon: '💬' },
     { path: '/admin/reports',   label: t('admin.reports'),   icon: '📈' },
+    { path: '/admin/pages',     label: t('admin.pagesManager.menuLabel', 'صفحات الموقع'), icon: '📑' },
     { path: '/admin/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
     { path: '/admin/settings',  label: t('admin.settings'),  icon: '⚙️' },
     { path: '/admin/audit',     label: t('admin.audit'),     icon: '🔍' },

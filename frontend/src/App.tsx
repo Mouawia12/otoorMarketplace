@@ -54,6 +54,7 @@ import AdminSellerProfilesPage from './pages/AdminSellerProfilesPage';
 import AdminProductLibraryPage from './pages/AdminProductLibraryPage';
 import AdminChangePassword from './pages/admin/AdminChangePassword';
 import AdminCouponsPage from './pages/AdminCouponsPage';
+import AdminSitePagesPage from './pages/AdminSitePagesPage';
 
 // ✅ صفحات الفوتر الثابتة (صفحة واحدة تُستخدم لكل المسارات)
 import InfoPage from './pages/static/InfoPage';
@@ -194,6 +195,7 @@ function App() {
             <Route path="support" element={<AdminSupportPage />} />
             <Route path="reports" element={<AdminReportsPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="pages" element={<AdminSitePagesPage />} />
             <Route path="audit" element={<AdminAuditPage />} />
           </Route>
         </Route>
