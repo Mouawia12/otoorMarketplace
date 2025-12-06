@@ -360,13 +360,6 @@
     "contact": "اتصل بنا",
     "followUs": "تابعونا",
     "sectionLabel": "روابط مختارة",
-    "supportHeadline": "الدعم",
-    "supportTitle": "فريق خدمة العملاء",
-    "supportDesc": "نحن معك لأي أسئلة عن الطلبات والمزادات والتوثيق.",
-    "adminCtaLabel": "لوحة التحكم",
-    "adminCtaTitle": "إدارة صفحات الفوتر",
-    "adminCtaDesc": "حرر محتوى الصفحات التعريفية من مكان واحد.",
-    "managePages": "إدارة صفحات الفوتر",
     "copyright": "© {{year}} عالم العطور. جميع الحقوق محفوظة."
   },
   "auth": {

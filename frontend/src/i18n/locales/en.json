@@ -358,13 +358,6 @@
     "contact": "Contact Us",
     "followUs": "Follow us",
     "sectionLabel": "Featured links",
-    "supportHeadline": "Support",
-    "supportTitle": "Client Success Team",
-    "supportDesc": "We are here for any question around orders, auctions, or authenticity.",
-    "adminCtaLabel": "Admins",
-    "adminCtaTitle": "Manage footer pages",
-    "adminCtaDesc": "Update every informational page from a single workspace.",
-    "managePages": "Manage footer pages",
     "copyright": "© {{year}} Aalam Al-Otoor. All rights reserved."
   },
   "auth": {

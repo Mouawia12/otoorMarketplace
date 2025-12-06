@@ -103,41 +103,6 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8">
-            <p className="text-xs uppercase tracking-[0.3em] text-gold/80 mb-2">{t('footer.supportHeadline')}</p>
-            <h3 className="text-2xl font-bold mb-3">{t('footer.supportTitle')}</h3>
-            <p className="text-sm text-ivory/80 mb-6">{t('footer.supportDesc')}</p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                to="/contact"
-                className="flex-1 text-center bg-gold text-charcoal font-semibold rounded-full py-3 hover:bg-gold-hover transition"
-              >
-                {t('footer.contact')}
-              </Link>
-              <Link
-                to="/help"
-                className="flex-1 text-center border border-white/20 rounded-full py-3 font-semibold hover:bg-white/10 transition"
-              >
-                {t('footer.helpCenter')}
-              </Link>
-            </div>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 flex flex-col gap-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-gold/80">{t('footer.adminCtaLabel')}</p>
-            <h3 className="text-xl font-bold">{t('footer.adminCtaTitle')}</h3>
-            <p className="text-sm text-ivory/80">{t('footer.adminCtaDesc')}</p>
-            <Link
-              to="/admin/pages"
-              className="inline-flex items-center justify-center gap-2 bg-white text-charcoal font-semibold rounded-full py-3 hover:bg-ivory transition"
-            >
-              <span>⚙️</span>
-              {t('footer.managePages')}
-            </Link>
-          </div>
-        </div>
-
         <div className="border-t border-white/10 pt-6 text-center text-xs text-ivory/70">
           {t('footer.copyright', { year: new Date().getFullYear() })}
         </div>
