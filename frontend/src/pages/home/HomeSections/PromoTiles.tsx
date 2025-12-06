@@ -36,7 +36,7 @@ export default function PromoTiles() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 md:py-12">
       {/* الجوال: أزرار في الوسط مع التفاف عند ضيق العرض */}
       <div className="sm:hidden">
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {promoTiles.map((tile) => (
             <Link
               key={tile.id}
@@ -46,8 +46,8 @@ export default function PromoTiles() {
                 tile.bgColor,
                 tile.textColor,
                 'inline-flex items-center justify-center',
-                'px-4 h-11 rounded-luxury font-semibold',
-                'text-sm whitespace-nowrap w-auto max-w-none',
+                'px-2 h-11 rounded-luxury font-semibold',
+                'text-xs whitespace-nowrap',
                 'shadow-sm hover:shadow transition active:scale-95',
               ].join(' ')}
             >

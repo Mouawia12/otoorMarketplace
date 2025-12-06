@@ -28,13 +28,18 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
     }).format(v || 0);
 
   return (
-    <section className="bg-charcoal-light py-5 md:py-8">
+    <section className="bg-charcoal-light py-6 md:py-8 rounded-t-[32px]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
         {/* العنوان ورابط مشاهدة الكل */}
-        <div className="flex justify-between items-center mb-4 md:mb-6">
-          <h2 className="text-xl md:text-2xl font-extrabold text-ivory">
-            {t('home.liveAuctions')}
-          </h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-gold/70">
+              {t('home.liveNow', 'مزادات مباشرة')}
+            </p>
+            <h2 className="text-2xl font-extrabold text-ivory">
+              {t('home.liveAuctions')}
+            </h2>
+          </div>
           <Link
             to="/auctions"
             className="text-gold hover:text-gold-light font-semibold flex items-center gap-2 text-sm md:text-base"
@@ -52,8 +57,8 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
         </div>
 
         {/* شريط أفقي ببطاقات أصغر على الجوال، وشبكة على الشاشات الأكبر */}
-        <div className="-mx-3 px-3 overflow-x-auto pb-2 md:overflow-visible md:mx-0 md:px-0">
-          <div className="flex gap-3 md:grid md:grid-cols-3 lg:grid-cols-5 md:gap-4 min-w-max md:min-w-0">
+        <div className="-mx-3 px-3 overflow-x-auto pb-2 md:overflow-visible md:mx-0 md:px-0 snap-x snap-mandatory">
+          <div className="flex gap-4 md:grid md:grid-cols-3 lg:grid-cols-5 md:gap-4 min-w-max md:min-w-0">
             {visibleAuctions.slice(0, 8).map((auction) => {
               const title = lang === 'ar' ? auction.product.name_ar : auction.product.name_en;
               const current = auction.current_price ?? auction.starting_price ?? 0;
@@ -65,7 +70,7 @@ export default function AuctionsStrip({ auctions }: AuctionsStripProps) {
                   key={auction.id}
                   to={`/auction/${auction.id}`}
                   className="group bg-charcoal rounded-lg overflow-hidden shadow-luxury hover:shadow-gold transition-all
-                             min-w-[210px] w-[210px] md:min-w-0 md:w-auto flex-shrink-0"
+                             min-w-[230px] w-[230px] md:min-w-0 md:w-auto flex-shrink-0 snap-start"
                 >
                   {/* الصورة */}
                   <div className="aspect-[3/4] overflow-hidden bg-sand">

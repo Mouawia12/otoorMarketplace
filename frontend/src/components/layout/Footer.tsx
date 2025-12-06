@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import BrandLogo from '../brand/BrandLogo';
@@ -14,6 +15,7 @@ export default function Footer() {
   const { t, i18n } = useTranslation();
   const { pages } = usePagesStore();
   const lang = (i18n.language === 'ar' ? 'ar' : 'en') as LocaleCode;
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   const groups: Array<{ title: string; description: string; pages: FooterPageKey[] }> = [
     {
@@ -49,17 +51,17 @@ export default function Footer() {
             <p className="text-sm text-ivory/80">{t('footer.tagline')}</p>
             <div className="w-full flex flex-col gap-3">
               <p className="text-xs uppercase tracking-[0.3em] text-gold/80">{t('footer.followUs')}</p>
-              <div className="flex gap-3 flex-nowrap overflow-x-auto no-scrollbar justify-center">
+              <div className="flex gap-2 sm:gap-3 flex-nowrap justify-center">
                 {socialLinks.map(({ label, href, icon: Icon }) => (
                   <a
                     key={label}
                     href={href}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 transition whitespace-nowrap"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 transition text-xs sm:text-sm whitespace-nowrap"
                   >
-                    <Icon className="w-5 h-5 text-gold" />
-                    <span className="text-sm font-semibold">{label}</span>
+                    <Icon className="w-4 h-4 text-gold" />
+                    <span className="font-semibold">{label}</span>
                   </a>
                 ))}
               </div>
@@ -67,38 +69,52 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-3">
           {groups.map((group) => (
-            <div key={group.title} className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-gold/80 mb-1">{t('footer.sectionLabel')}</p>
-                <h3 className="text-xl font-bold">{group.title}</h3>
-                <p className="text-sm text-ivory/80 mt-1">{group.description}</p>
+            <div key={group.title} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+              <button
+                onClick={() => setOpenGroup((prev) => (prev === group.title ? null : group.title))}
+                className="w-full px-5 md:px-6 py-4 flex items-center justify-between text-left"
+              >
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-gold/80 mb-1">{t('footer.sectionLabel')}</p>
+                  <h3 className="text-xl font-bold">{group.title}</h3>
+                </div>
+                <span className="text-2xl text-gold font-semibold">{openGroup === group.title ? '−' : '+'}</span>
+              </button>
+              <div
+                className={`grid transition-all duration-300 ${
+                  openGroup === group.title ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                }`}
+              >
+                <div className="overflow-hidden px-5 md:px-6 pb-5 flex flex-col gap-4">
+                  <p className="text-sm text-ivory/80">{group.description}</p>
+                  <ul className="space-y-2">
+                    {group.pages.map((slug) => {
+                      const page = pages[slug];
+                      if (!page) return null;
+                      return (
+                        <li key={slug}>
+                          <Link
+                            to={`/${slug.replace('help-', 'help/')}`}
+                            className="flex items-center gap-3 px-3 py-2 rounded-2xl bg-white/0 hover:bg-white/10 transition"
+                          >
+                            <span className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-lg">
+                              {page.icon}
+                            </span>
+                            <div>
+                              <p className="text-sm font-semibold">{page.label[lang]}</p>
+                              <p className="text-xs text-ivory/70 line-clamp-1">
+                                {page.heroSubtitle[lang]}
+                              </p>
+                            </div>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               </div>
-              <ul className="space-y-2">
-                {group.pages.map((slug) => {
-                  const page = pages[slug];
-                  if (!page) return null;
-                  return (
-                    <li key={slug}>
-                      <Link
-                        to={`/${slug.replace('help-', 'help/')}`}
-                        className="flex items-center gap-3 px-3 py-2 rounded-2xl bg-white/0 hover:bg-white/10 transition"
-                      >
-                        <span className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-lg">
-                          {page.icon}
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold">{page.label[lang]}</p>
-                          <p className="text-xs text-ivory/70 line-clamp-1">
-                            {page.heroSubtitle[lang]}
-                          </p>
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
             </div>
           ))}
         </div>

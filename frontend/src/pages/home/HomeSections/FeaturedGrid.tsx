@@ -25,9 +25,9 @@ export default function FeaturedGrid({
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 md:py-12">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-2xl md:text-3xl font-bold text-charcoal">{title[lang]}</h2>
-        <Link to={ctaLink} className="text-gold hover:text-gold-dark font-semibold flex items-center gap-2">
+        <Link to={ctaLink} className="text-gold hover:text-gold-dark font-semibold flex items-center gap-2 text-sm sm:text-base">
           {ctaText[lang]}
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
