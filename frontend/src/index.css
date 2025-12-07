@@ -7,7 +7,7 @@
 
 @layer components {
   .responsive-card-grid {
-    --grid-min-card-size: 220px;
+    --grid-min-card-size: 200px;
     display: grid;
     grid-template-columns: repeat(
       auto-fit,
@@ -22,12 +22,18 @@
     }
   }
 
+  @media (min-width: 1280px) {
+    .responsive-card-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+
   .responsive-card-grid--compact {
     --grid-min-card-size: 132px;
   }
 
   .responsive-card-grid--roomy {
-    --grid-min-card-size: 260px;
+    --grid-min-card-size: 240px;
   }
 
   @media (min-width: 640px) {
