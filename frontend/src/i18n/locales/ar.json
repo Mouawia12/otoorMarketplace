@@ -459,7 +459,12 @@
     "participantLabel": "مزايد #{{id}}",
     "maskedEmail": "البريد مخفي",
     "noBids": "لا توجد مزايدات بعد",
-    "bidsCount": "{{count}} مزايدة"
+    "bidsCount": "{{count}} مزايدة",
+    "liveBadge": "مباشر",
+    "liveConnected": "متصل بالتحديثات الفورية",
+    "liveConnecting": "جاري الاتصال بالتحديثات الفورية...",
+    "liveDisconnected": "انقطع الاتصال بالتحديثات المباشرة",
+    "bidRejected": "تم تسجيل مزايدة أعلى قبل لحظات، الرجاء رفع عرضك."
   },
   "account": {
     "myAccount": "حسابي",

@@ -9,6 +9,7 @@ import {
 } from "../services/auctionService";
 import { authenticate } from "../middleware/auth";
 import { AppError } from "../utils/errors";
+import { broadcastBidUpdate } from "../realtime/auctionRealtime";
 
 const router = Router();
 
@@ -60,11 +61,14 @@ router.get("/:id/bids", async (req, res, next) => {
   }
 });
 
-router.post("/:id/bids", authenticate({ roles: ["BUYER", "SELLER", "ADMIN", "SUPER_ADMIN"] }), async (req, res, next) => {
-  try {
-    if (!req.user) {
-      throw AppError.unauthorized();
-    }
+router.post(
+  "/:id/bids",
+  authenticate({ roles: ["BUYER", "SELLER", "ADMIN", "SUPER_ADMIN"] }),
+  async (req, res, next) => {
+    try {
+      if (!req.user) {
+        throw AppError.unauthorized();
+      }
     const id = Number(req.params.id);
     if (Number.isNaN(id)) {
       throw AppError.badRequest("Invalid auction id");
@@ -75,16 +79,25 @@ router.post("/:id/bids", authenticate({ roles: ["BUYER", "SELLER", "ADMIN", "SUP
       throw AppError.badRequest("Invalid bid amount");
     }
 
-    const bid = await placeBid({
+    const { bid, auction } = await placeBid({
       auctionId: id,
       bidderId: req.user.id,
       amount,
     });
 
     res.status(201).json(bid);
+
+    broadcastBidUpdate({
+      auctionId: auction.id,
+      bid,
+      currentPrice: auction.current_price,
+      totalBids: auction.total_bids ?? 0,
+      placedAt: bid.created_at,
+    });
   } catch (error) {
     next(error);
   }
-});
+  }
+);
 
 export default router;

@@ -155,16 +155,28 @@ declare const placeBidSchema: z.ZodObject<{
     amount: z.ZodNumber;
 }, z.core.$strip>;
 export declare const placeBid: (input: z.infer<typeof placeBidSchema>) => Promise<{
-    id: any;
-    auction_id: any;
-    bidder_id: any;
-    amount: any;
-    created_at: any;
-    bidder: {
+    bid: {
         id: any;
-        full_name: any;
-        email: any;
-    } | undefined;
+        auction_id: any;
+        bidder_id: any;
+        amount: any;
+        created_at: any;
+        bidder: {
+            id: any;
+            full_name: any;
+            email: any;
+        } | undefined;
+    };
+    auction: {
+        id: number;
+        seller_id: number;
+        product_id: number;
+        current_price: number;
+        minimum_increment: number;
+        end_time: Date;
+        status: import(".prisma/client").$Enums.AuctionStatus;
+        total_bids: number;
+    };
 }>;
 export declare const getAuctionBids: (auctionId: number) => Promise<{
     id: any;

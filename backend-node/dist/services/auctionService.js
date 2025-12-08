@@ -197,43 +197,81 @@ const placeBidSchema = zod_1.z.object({
 });
 const placeBid = async (input) => {
     const data = placeBidSchema.parse(input);
-    const auction = await client_2.prisma.auction.findUnique({
-        where: { id: data.auctionId },
-    });
-    if (!auction) {
-        throw errors_1.AppError.notFound("Auction not found");
-    }
-    if (auction.status !== client_1.AuctionStatus.ACTIVE) {
-        throw errors_1.AppError.badRequest("Auction is not active");
-    }
-    const minAccepted = auction.currentPrice.plus(auction.minimumIncrement);
-    if (data.amount < minAccepted.toNumber()) {
-        throw errors_1.AppError.badRequest(`Bid must be at least ${minAccepted.toNumber().toFixed(2)}`);
-    }
-    const bid = await client_2.prisma.bid.create({
-        data: {
-            auctionId: data.auctionId,
-            bidderId: data.bidderId,
-            amount: new client_1.Prisma.Decimal(data.amount),
-        },
-        include: {
-            bidder: {
-                select: {
-                    id: true,
-                    fullName: true,
-                    email: true,
+    const now = new Date();
+    const result = await client_2.prisma.$transaction(async (tx) => {
+        const auction = await tx.auction.findUnique({
+            where: { id: data.auctionId },
+            select: {
+                id: true,
+                status: true,
+                endTime: true,
+                currentPrice: true,
+                minimumIncrement: true,
+            },
+        });
+        if (!auction) {
+            throw errors_1.AppError.notFound("Auction not found");
+        }
+        if (auction.status !== client_1.AuctionStatus.ACTIVE) {
+            throw errors_1.AppError.badRequest("Auction is not active");
+        }
+        if (auction.endTime <= now) {
+            throw errors_1.AppError.badRequest("Auction has ended");
+        }
+        const minAccepted = auction.currentPrice.plus(auction.minimumIncrement);
+        if (data.amount < minAccepted.toNumber()) {
+            throw errors_1.AppError.badRequest(`Bid must be at least ${minAccepted.toNumber().toFixed(2)}`);
+        }
+        const bidRecord = await tx.bid.create({
+            data: {
+                auctionId: data.auctionId,
+                bidderId: data.bidderId,
+                amount: new client_1.Prisma.Decimal(data.amount),
+            },
+            include: {
+                bidder: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                    },
                 },
             },
-        },
-    });
-    await client_2.prisma.auction.update({
-        where: { id: data.auctionId },
-        data: {
-            currentPrice: new client_1.Prisma.Decimal(data.amount),
-            updatedAt: new Date(),
-        },
-    });
-    return normalizeBid(bid);
+        });
+        const [updatedAuction, totalBids] = await Promise.all([
+            tx.auction.update({
+                where: { id: data.auctionId },
+                data: {
+                    currentPrice: new client_1.Prisma.Decimal(data.amount),
+                    updatedAt: now,
+                },
+                select: {
+                    id: true,
+                    sellerId: true,
+                    productId: true,
+                    currentPrice: true,
+                    minimumIncrement: true,
+                    endTime: true,
+                    status: true,
+                },
+            }),
+            tx.bid.count({ where: { auctionId: data.auctionId } }),
+        ]);
+        return {
+            bid: normalizeBid(bidRecord),
+            auction: {
+                id: updatedAuction.id,
+                seller_id: updatedAuction.sellerId,
+                product_id: updatedAuction.productId,
+                current_price: updatedAuction.currentPrice.toNumber(),
+                minimum_increment: updatedAuction.minimumIncrement.toNumber(),
+                end_time: updatedAuction.endTime,
+                status: updatedAuction.status,
+                total_bids: totalBids,
+            },
+        };
+    }, { isolationLevel: client_1.Prisma.TransactionIsolationLevel.Serializable });
+    return result;
 };
 exports.placeBid = placeBid;
 const getAuctionBids = async (auctionId) => {

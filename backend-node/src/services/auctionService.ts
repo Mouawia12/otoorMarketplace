@@ -215,52 +215,95 @@ const placeBidSchema = z.object({
 
 export const placeBid = async (input: z.infer<typeof placeBidSchema>) => {
   const data = placeBidSchema.parse(input);
+  const now = new Date();
 
-  const auction = await prisma.auction.findUnique({
-    where: { id: data.auctionId },
-  });
-
-  if (!auction) {
-    throw AppError.notFound("Auction not found");
-  }
-
-  if (auction.status !== AuctionStatus.ACTIVE) {
-    throw AppError.badRequest("Auction is not active");
-  }
-
-  const minAccepted = auction.currentPrice.plus(auction.minimumIncrement);
-  if (data.amount < minAccepted.toNumber()) {
-    throw AppError.badRequest(
-      `Bid must be at least ${minAccepted.toNumber().toFixed(2)}`
-    );
-  }
-
-  const bid = await prisma.bid.create({
-    data: {
-      auctionId: data.auctionId,
-      bidderId: data.bidderId,
-      amount: new Prisma.Decimal(data.amount),
-    },
-    include: {
-      bidder: {
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const auction = await tx.auction.findUnique({
+        where: { id: data.auctionId },
         select: {
           id: true,
-          fullName: true,
-          email: true,
+          status: true,
+          endTime: true,
+          currentPrice: true,
+          minimumIncrement: true,
         },
-      },
-    },
-  });
+      });
 
-  await prisma.auction.update({
-    where: { id: data.auctionId },
-    data: {
-      currentPrice: new Prisma.Decimal(data.amount),
-      updatedAt: new Date(),
-    },
-  });
+      if (!auction) {
+        throw AppError.notFound("Auction not found");
+      }
 
-  return normalizeBid(bid);
+      if (auction.status !== AuctionStatus.ACTIVE) {
+        throw AppError.badRequest("Auction is not active");
+      }
+
+      if (auction.endTime <= now) {
+        throw AppError.badRequest("Auction has ended");
+      }
+
+      const minAccepted = auction.currentPrice.plus(auction.minimumIncrement);
+      if (data.amount < minAccepted.toNumber()) {
+        throw AppError.badRequest(
+          `Bid must be at least ${minAccepted.toNumber().toFixed(2)}`
+        );
+      }
+
+      const bidRecord = await tx.bid.create({
+        data: {
+          auctionId: data.auctionId,
+          bidderId: data.bidderId,
+          amount: new Prisma.Decimal(data.amount),
+        },
+        include: {
+          bidder: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      const [updatedAuction, totalBids] = await Promise.all([
+        tx.auction.update({
+          where: { id: data.auctionId },
+          data: {
+            currentPrice: new Prisma.Decimal(data.amount),
+            updatedAt: now,
+          },
+          select: {
+            id: true,
+            sellerId: true,
+            productId: true,
+            currentPrice: true,
+            minimumIncrement: true,
+            endTime: true,
+            status: true,
+          },
+        }),
+        tx.bid.count({ where: { auctionId: data.auctionId } }),
+      ]);
+
+      return {
+        bid: normalizeBid(bidRecord),
+        auction: {
+          id: updatedAuction.id,
+          seller_id: updatedAuction.sellerId,
+          product_id: updatedAuction.productId,
+          current_price: updatedAuction.currentPrice.toNumber(),
+          minimum_increment: updatedAuction.minimumIncrement.toNumber(),
+          end_time: updatedAuction.endTime,
+          status: updatedAuction.status,
+          total_bids: totalBids,
+        },
+      };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+  );
+
+  return result;
 };
 
 export const getAuctionBids = async (auctionId: number) => {
