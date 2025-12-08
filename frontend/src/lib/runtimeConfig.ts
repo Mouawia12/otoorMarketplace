@@ -59,5 +59,52 @@ const resolveAssetBase = () => {
 
 const assetBaseUrl = resolveAssetBase();
 
+type ImageOptimizationConfig = {
+  enabled: boolean;
+  template?: string;
+  bypassHosts: Set<string>;
+};
+
+const parseBoolean = (value: string | undefined, fallback: boolean) => {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  return !['false', '0', 'no', 'off'].includes(normalized);
+};
+
+const parseHosts = (value?: string) =>
+  value
+    ? value
+        .split(',')
+        .map((host) => host.trim().toLowerCase())
+        .filter(Boolean)
+    : [];
+
+const defaultOptimizerTemplate =
+  'https://wsrv.nl/?url={{url}}&w=900&h=900&fit=cover&output=webp&q=80';
+
+const imageOptimizerConfig: ImageOptimizationConfig = (() => {
+  const enabled = parseBoolean(
+    import.meta.env.VITE_IMAGE_OPTIMIZER_ENABLED,
+    true
+  );
+  const template =
+    import.meta.env.VITE_IMAGE_OPTIMIZER_TEMPLATE?.trim() ||
+    defaultOptimizerTemplate;
+  const bypassHosts = new Set(parseHosts(import.meta.env.VITE_IMAGE_OPTIMIZER_BYPASS));
+
+  if (!enabled || !template.includes('{{url}}')) {
+    return { enabled: false, template: undefined, bypassHosts };
+  }
+
+  return {
+    enabled: true,
+    template,
+    bypassHosts,
+  };
+})();
+
 export const getResolvedApiBaseUrl = () => apiBaseUrl;
 export const getResolvedAssetBaseUrl = () => assetBaseUrl;
+export const getImageOptimizationConfig = () => imageOptimizerConfig;

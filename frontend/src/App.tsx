@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense, ReactNode } from 'react';
 
 import Layout from './components/layout/Layout';
 import AccountLayout from './components/layout/AccountLayout';
@@ -38,23 +38,31 @@ import SellerOrdersPage from './pages/SellerOrdersPage';
 import SellerEarningsPage from './pages/SellerEarningsPage';
 import SellerSupportPage from './pages/SellerSupportPage';
 
-import AdminLayout from './pages/admin/layout/AdminLayout';
-import AdminDashboardPage from './pages/AdminDashboardPage';
-import AdminProductsPage from './pages/AdminProductsPage';
-import AdminAuctionsPage from './pages/AdminAuctionsPage';
-import AdminOrdersPage from './pages/AdminOrdersPage';
-import AdminUsersPage from './pages/AdminUsersPage';
-import AdminAuthRequestsPage from './pages/AdminAuthRequestsPage';
-import AdminAdsPage from './pages/AdminAdsPage';
-import AdminSupportPage from './pages/AdminSupportPage';
-import AdminReportsPage from './pages/AdminReportsPage';
-import AdminSettingsPage from './pages/AdminSettingsPage';
-import AdminAuditPage from './pages/AdminAuditPage';
-import AdminSellerProfilesPage from './pages/AdminSellerProfilesPage';
-import AdminProductLibraryPage from './pages/AdminProductLibraryPage';
-import AdminChangePassword from './pages/admin/AdminChangePassword';
-import AdminCouponsPage from './pages/AdminCouponsPage';
-import AdminSitePagesPage from './pages/AdminSitePagesPage';
+const AdminLayout = lazy(() => import('./pages/admin/layout/AdminLayout'));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
+const AdminAuctionsPage = lazy(() => import('./pages/AdminAuctionsPage'));
+const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const AdminAuthRequestsPage = lazy(() => import('./pages/AdminAuthRequestsPage'));
+const AdminAdsPage = lazy(() => import('./pages/AdminAdsPage'));
+const AdminSupportPage = lazy(() => import('./pages/AdminSupportPage'));
+const AdminReportsPage = lazy(() => import('./pages/AdminReportsPage'));
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
+const AdminAuditPage = lazy(() => import('./pages/AdminAuditPage'));
+const AdminSellerProfilesPage = lazy(() => import('./pages/AdminSellerProfilesPage'));
+const AdminProductLibraryPage = lazy(() => import('./pages/AdminProductLibraryPage'));
+const AdminChangePassword = lazy(() => import('./pages/admin/AdminChangePassword'));
+const AdminCouponsPage = lazy(() => import('./pages/AdminCouponsPage'));
+const AdminSitePagesPage = lazy(() => import('./pages/AdminSitePagesPage'));
+const AdminBlogList = lazy(() => import('./pages/admin/blog/AdminBlogList'));
+const AdminBlogEdit = lazy(() => import('./pages/admin/blog/AdminBlogEdit'));
+
+const BlogIndex = lazy(() => import('./pages/blog/BlogIndex'));
+const BlogPost = lazy(() => import('./pages/blog/BlogPost'));
+const CategoryPage = lazy(() => import('./pages/blog/CategoryPage'));
+const TagPage = lazy(() => import('./pages/blog/TagPage'));
+const AuthorPage = lazy(() => import('./pages/blog/AuthorPage'));
 
 // ✅ صفحات الفوتر الثابتة (صفحة واحدة تُستخدم لكل المسارات)
 import InfoPage from './pages/static/InfoPage';
@@ -64,21 +72,20 @@ import WishlistPage from './pages/WishlistPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 
-import BlogIndex from './pages/blog/BlogIndex';
-import BlogPost from './pages/blog/BlogPost';
-import CategoryPage from './pages/blog/CategoryPage';
-import TagPage from './pages/blog/TagPage';
-import AuthorPage from './pages/blog/AuthorPage';
-
-// ✅ إدارة المدونة داخل لوحة الإدارة
-import AdminBlogList from './pages/admin/blog/AdminBlogList';
-import AdminBlogEdit from './pages/admin/blog/AdminBlogEdit';
 import SellerCouponsPage from './pages/SellerCouponsPage';
 
 import { useAuthStore } from './store/authStore';
 import { useUIStore } from './store/uiStore';
 import i18n from './i18n/config';
 import { ScrollToTop } from './components/ScrollToTop';
+
+const suspenseFallback = (
+  <div className="py-20 text-center text-taupe font-semibold">Loading...</div>
+);
+
+const withSuspense = (node: ReactNode) => (
+  <Suspense fallback={suspenseFallback}>{node}</Suspense>
+);
 
 function App() {
   const { isAuthenticated, fetchUser, user } = useAuthStore();
@@ -127,11 +134,11 @@ function App() {
           <Route path="order/success" element={<OrderSuccessPage />} />
 
           {/* Blog (public) */}
-          <Route path="blog" element={<BlogIndex />} />
-          <Route path="blog/:slug" element={<BlogPost />} />
-          <Route path="blog/category/:category" element={<CategoryPage />} />
-          <Route path="blog/tag/:tag" element={<TagPage />} />
-          <Route path="blog/author/:name" element={<AuthorPage />} />
+          <Route path="blog" element={withSuspense(<BlogIndex />)} />
+          <Route path="blog/:slug" element={withSuspense(<BlogPost />)} />
+          <Route path="blog/category/:category" element={withSuspense(<CategoryPage />)} />
+          <Route path="blog/tag/:tag" element={withSuspense(<TagPage />)} />
+          <Route path="blog/author/:name" element={withSuspense(<AuthorPage />)} />
 
           {/* Static pages used by footer links */}
           <Route path="about" element={<InfoPage />} />
@@ -174,29 +181,29 @@ function App() {
           </Route>
 
           {/* Admin */}
-          <Route path="admin" element={<AdminLayout />}>
-            <Route path="dashboard" element={<AdminDashboardPage />} />
-            <Route path="products" element={<AdminProductsPage />} />
-            <Route path="library" element={<AdminProductLibraryPage />} />
-            <Route path="auctions" element={<AdminAuctionsPage />} />
-            <Route path="orders" element={<AdminOrdersPage />} />
-            <Route path="users" element={<AdminUsersPage />} />
-            <Route path="auth-requests" element={<AdminAuthRequestsPage />} />
-            <Route path="seller-profiles" element={<AdminSellerProfilesPage />} />
-            <Route path="coupons" element={<AdminCouponsPage />} />
+          <Route path="admin" element={withSuspense(<AdminLayout />)}>
+            <Route path="dashboard" element={withSuspense(<AdminDashboardPage />)} />
+            <Route path="products" element={withSuspense(<AdminProductsPage />)} />
+            <Route path="library" element={withSuspense(<AdminProductLibraryPage />)} />
+            <Route path="auctions" element={withSuspense(<AdminAuctionsPage />)} />
+            <Route path="orders" element={withSuspense(<AdminOrdersPage />)} />
+            <Route path="users" element={withSuspense(<AdminUsersPage />)} />
+            <Route path="auth-requests" element={withSuspense(<AdminAuthRequestsPage />)} />
+            <Route path="seller-profiles" element={withSuspense(<AdminSellerProfilesPage />)} />
+            <Route path="coupons" element={withSuspense(<AdminCouponsPage />)} />
 
             {/* Blog (Admin) */}
-            <Route path="blog" element={<AdminBlogList />} />
-            <Route path="blog/new" element={<AdminBlogEdit mode="create" />} />
-            <Route path="blog/:id" element={<AdminBlogEdit mode="edit" />} />
+            <Route path="blog" element={withSuspense(<AdminBlogList />)} />
+            <Route path="blog/new" element={withSuspense(<AdminBlogEdit mode="create" />)} />
+            <Route path="blog/:id" element={withSuspense(<AdminBlogEdit mode="edit" />)} />
 
-            <Route path="change-password" element={<AdminChangePassword />} />
-            <Route path="ads" element={<AdminAdsPage />} />
-            <Route path="support" element={<AdminSupportPage />} />
-            <Route path="reports" element={<AdminReportsPage />} />
-            <Route path="settings" element={<AdminSettingsPage />} />
-            <Route path="pages" element={<AdminSitePagesPage />} />
-            <Route path="audit" element={<AdminAuditPage />} />
+            <Route path="change-password" element={withSuspense(<AdminChangePassword />)} />
+            <Route path="ads" element={withSuspense(<AdminAdsPage />)} />
+            <Route path="support" element={withSuspense(<AdminSupportPage />)} />
+            <Route path="reports" element={withSuspense(<AdminReportsPage />)} />
+            <Route path="settings" element={withSuspense(<AdminSettingsPage />)} />
+            <Route path="pages" element={withSuspense(<AdminSitePagesPage />)} />
+            <Route path="audit" element={withSuspense(<AdminAuditPage />)} />
           </Route>
         </Route>
       </Routes>

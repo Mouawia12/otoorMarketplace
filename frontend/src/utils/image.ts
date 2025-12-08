@@ -1,7 +1,8 @@
-import { getResolvedAssetBaseUrl } from '../lib/runtimeConfig';
+import { getResolvedAssetBaseUrl, getImageOptimizationConfig } from '../lib/runtimeConfig';
 import { resolveStaticAssetUrl } from './staticAssets';
 
 let cachedBaseUrl: string | null = null;
+let cachedOptimizerConfig: ReturnType<typeof getImageOptimizationConfig> | null = null;
 
 export const getAssetBaseUrl = () => {
   if (!cachedBaseUrl) {
@@ -10,8 +11,38 @@ export const getAssetBaseUrl = () => {
   return cachedBaseUrl;
 };
 
+const getOptimizerConfig = () => {
+  if (!cachedOptimizerConfig) {
+    cachedOptimizerConfig = getImageOptimizationConfig();
+  }
+  return cachedOptimizerConfig;
+};
+
 const isLocalhostUrl = (url: string) =>
   /^http:\/\/(localhost|127\.0\.0\.1)/i.test(url);
+
+const applyImageOptimization = (url: string) => {
+  const config = getOptimizerConfig();
+  if (!config.enabled || !config.template) {
+    return url;
+  }
+
+  if (!/^https?:\/\//i.test(url) || /^data:/i.test(url)) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (config.bypassHosts.has(host)) {
+      return url;
+    }
+  } catch {
+    return url;
+  }
+
+  return config.template.replace('{{url}}', encodeURIComponent(url));
+};
 
 export const resolveImageUrl = (input?: string | null) => {
   if (!input) return '';
@@ -27,16 +58,18 @@ export const resolveImageUrl = (input?: string | null) => {
     if (isLocalhostUrl(value)) {
       try {
         const parsed = new URL(value);
-        return `${getAssetBaseUrl()}${parsed.pathname}`;
+        const resolved = `${getAssetBaseUrl()}${parsed.pathname}`;
+        return applyImageOptimization(resolved);
       } catch {
-        return value;
+        return applyImageOptimization(value);
       }
     }
-    return value;
+    return applyImageOptimization(value);
   }
 
   const prefix = value.startsWith('/') ? '' : '/';
-  return `${getAssetBaseUrl()}${prefix}${value}`;
+  const resolved = `${getAssetBaseUrl()}${prefix}${value}`;
+  return applyImageOptimization(resolved);
 };
 
 export const normalizeImagePathForStorage = (input?: string | null) => {
