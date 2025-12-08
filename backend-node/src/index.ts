@@ -1,3 +1,4 @@
+import http from "http";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -9,8 +10,10 @@ import { prisma } from "./prisma/client";
 import apiRouter from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { getUploadRoot } from "./utils/uploads";
+import { initAuctionRealtime, shutdownAuctionRealtime } from "./realtime/auctionRealtime";
 
 const app = express();
+const httpServer = http.createServer(app);
 
 const corsOptions: CorsOptions =
   config.allowedOrigins.length === 1 && config.allowedOrigins[0] === "*"
@@ -52,13 +55,16 @@ app.get("/health", async (_req, res) => {
 
 app.use(errorHandler);
 
-const server = app.listen(config.port, () => {
+initAuctionRealtime(httpServer, corsOptions);
+
+const server = httpServer.listen(config.port, () => {
   console.log(`🚀 API server running on http://localhost:${config.port}`);
 });
 
 const gracefulShutdown = async (signal: string) => {
   console.log(`\nReceived ${signal}. Shutting down gracefully...`);
   server.close(async () => {
+    shutdownAuctionRealtime();
     await prisma.$disconnect();
     process.exit(0);
   });

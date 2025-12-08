@@ -457,7 +457,12 @@
     "participantLabel": "Bidder #{{id}}",
     "maskedEmail": "Email hidden",
     "noBids": "No bids yet",
-    "bidsCount": "{{count}} bids"
+    "bidsCount": "{{count}} bids",
+    "liveBadge": "LIVE",
+    "liveConnected": "Live updates connected",
+    "liveConnecting": "Connecting to live updates...",
+    "liveDisconnected": "Live updates paused",
+    "bidRejected": "A higher bid was submitted moments ago. Please increase your offer."
   },
   "account": {
     "myAccount": "My Account",

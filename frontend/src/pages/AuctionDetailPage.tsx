@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../store/uiStore';
@@ -9,8 +9,8 @@ import { formatPrice } from '../utils/currency';
 import { resolveImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import Countdown from '../components/common/Countdown';
-import { useMemo } from 'react';
 import ProductImageCarousel from '../components/products/ProductImageCarousel';
+import { getAuctionRealtimeSocket, type AuctionRealtimePayload } from '../lib/realtime';
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +25,7 @@ export default function AuctionDetailPage() {
   const [bidAmount, setBidAmount] = useState(0);
   const [bidError, setBidError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
   const obfuscateName = useCallback(
     (fullName?: string, email?: string, fallbackId?: number) => {
@@ -43,6 +44,23 @@ export default function AuctionDetailPage() {
       }
 
       return t('auction.participantLabel', { id: fallbackId ?? '***' });
+    },
+    [t]
+  );
+
+  const mapBidErrorMessage = useCallback(
+    (detail?: string) => {
+      if (!detail) {
+        return t('common.error');
+      }
+      const normalized = detail.toLowerCase();
+      if (normalized.includes('auction has ended') || normalized.includes('auction is not active')) {
+        return t('auction.ended');
+      }
+      if (normalized.includes('bid must be at least')) {
+        return t('auction.bidRejected');
+      }
+      return detail;
     },
     [t]
   );
@@ -71,21 +89,67 @@ export default function AuctionDetailPage() {
   }, [loadAuction]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      return;
+    }
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const auctionData = await fetchAuctionById(parseInt(id));
-        setAuction(auctionData);
-        
-        const bidsData = await fetchAuctionBids(parseInt(id));
-        setBids(bidsData);
-      } catch (error) {
-        console.error('Error polling auction:', error);
+    const numericId = parseInt(id, 10);
+    if (Number.isNaN(numericId)) {
+      return;
+    }
+
+    const socket = getAuctionRealtimeSocket();
+
+    const joinRoom = () => {
+      socket.emit('auction:join', numericId);
+    };
+
+    const handleConnect = () => {
+      setLiveStatus('connected');
+      joinRoom();
+    };
+
+    const handleDisconnect = () => {
+      setLiveStatus('disconnected');
+    };
+
+    const handleUpdate = (payload: AuctionRealtimePayload) => {
+      if (payload.auctionId !== numericId) {
+        return;
       }
-    }, 5000);
+      setAuction((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          current_price: payload.currentPrice,
+          total_bids: payload.totalBids,
+        };
+      });
+      setBids((prev) => {
+        const filtered = prev.filter((bid) => bid.id !== payload.bid.id);
+        return [payload.bid, ...filtered].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
+    };
 
-    return () => clearInterval(pollInterval);
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('auction:update', handleUpdate);
+
+    if (socket.connected) {
+      setLiveStatus('connected');
+      joinRoom();
+    } else {
+      setLiveStatus('connecting');
+    }
+
+    return () => {
+      socket.emit('auction:leave', numericId);
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('auction:update', handleUpdate);
+    };
   }, [id]);
 
   const participants = useMemo(() => {
@@ -132,6 +196,11 @@ export default function AuctionDetailPage() {
 
     if (!auction) return;
 
+    if (new Date(auction.end_time).getTime() <= Date.now()) {
+      setBidError(t('auction.ended'));
+      return;
+    }
+
     if (bidAmount < minBidValue) {
       setBidError(t('auction.minBid') + ': ' + formatPrice(minBidValue, language));
       return;
@@ -142,12 +211,15 @@ export default function AuctionDetailPage() {
 
     try {
       await placeBid(auction.id, bidAmount);
-      const updatedAuction = await loadAuction();
-      if (updatedAuction) {
-        setBidAmount(updatedAuction.current_price + updatedAuction.minimum_increment);
+      if (liveStatus !== 'connected') {
+        const updatedAuction = await loadAuction();
+        if (updatedAuction) {
+          setBidAmount(updatedAuction.current_price + updatedAuction.minimum_increment);
+        }
       }
     } catch (error: any) {
-      setBidError(error.message || t('common.error'));
+      const detail = error?.response?.data?.detail ?? error?.message;
+      setBidError(mapBidErrorMessage(detail));
     } finally {
       setSubmitting(false);
     }
@@ -155,6 +227,7 @@ export default function AuctionDetailPage() {
 
   const incrementBid = () => {
     if (!auction) return;
+    setBidError('');
     setBidAmount((prev) => {
       const base = Number.isFinite(prev) && prev >= minBidValue ? prev : minBidValue;
       return base + stepValue;
@@ -163,6 +236,7 @@ export default function AuctionDetailPage() {
 
   const decrementBid = () => {
     if (!auction) return;
+    setBidError('');
     setBidAmount((prev) => {
       const base = Number.isFinite(prev) && prev > minBidValue ? prev : minBidValue;
       return Math.max(minBidValue, base - stepValue);
@@ -215,16 +289,34 @@ export default function AuctionDetailPage() {
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isEnded = new Date(auction.end_time).getTime() < new Date().getTime();
   const seller = auction.seller || { id: 0, full_name: 'Unknown', verified_seller: false };
+  const liveBadgeTone =
+    liveStatus === 'connected'
+      ? 'bg-green-100 text-green-800'
+      : liveStatus === 'connecting'
+        ? 'bg-amber-100 text-amber-800'
+        : 'bg-red-100 text-red-700';
+  const liveDotTone =
+    liveStatus === 'connected'
+      ? 'bg-green-500'
+      : liveStatus === 'connecting'
+        ? 'bg-amber-500'
+        : 'bg-red-500';
   return (
     <div className="space-y-12">
       {/* Status Badge */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <span className="inline-block bg-gold text-charcoal px-4 py-1 rounded-luxury text-sm font-semibold">
           {t('catalog.auction')}
         </span>
         {product.condition && (
           <span className="text-sm text-taupe">
             {product.condition === 'new' ? t('catalog.new') : t('catalog.used')}
+          </span>
+        )}
+        {!isEnded && (
+          <span className={`inline-flex items-center gap-2 px-4 py-1 rounded-luxury text-xs font-semibold ${liveBadgeTone}`}>
+            <span className={`h-2 w-2 rounded-full ${liveDotTone}`} />
+            {t('auction.liveBadge')}
           </span>
         )}
       </div>
@@ -294,6 +386,16 @@ export default function AuctionDetailPage() {
                   className="text-charcoal font-bold"
                 />
               </div>
+              <div className="flex items-center gap-2 text-xs text-taupe mt-3">
+                <span className={`h-2 w-2 rounded-full ${liveDotTone}`} />
+                <span>
+                  {liveStatus === 'connected'
+                    ? t('auction.liveConnected')
+                    : liveStatus === 'connecting'
+                      ? t('auction.liveConnecting')
+                      : t('auction.liveDisconnected')}
+                </span>
+              </div>
             </div>
 
             {/* Bid Controls */}
@@ -314,6 +416,7 @@ export default function AuctionDetailPage() {
                     step={stepValue}
                     onChange={(e) => {
                       const next = Number(e.target.value);
+                      setBidError('');
                       setBidAmount(Number.isNaN(next) ? 0 : next);
                     }}
                     onBlur={() => {
