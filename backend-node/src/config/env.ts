@@ -36,6 +36,10 @@ const envSchema = z.object({
     .string()
     .url()
     .default("http://localhost:5173/reset-password"),
+  ADMIN_PROTECTED_EMAIL: z
+    .string()
+    .email()
+    .default("fragreworld@gmail.com"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -69,6 +73,7 @@ const {
   MAIL_FROM_ADDRESS,
   MAIL_FROM_NAME,
   PASSWORD_RESET_URL,
+  ADMIN_PROTECTED_EMAIL,
 } = parsed.data;
 
 const allowedOrigins =
@@ -115,5 +120,8 @@ export const config = {
   },
   auth: {
     passwordResetUrl: PASSWORD_RESET_URL.replace(/\/+$/, ""),
+  },
+  accounts: {
+    protectedAdminEmail: ADMIN_PROTECTED_EMAIL.toLowerCase(),
   },
 };

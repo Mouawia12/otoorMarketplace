@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { usePagesStore } from '../../store/pagesStore';
 import { FooterPageKey, LocaleCode } from '../../types/staticPages';
+import { getDefaultFooterPage } from '../../content/footerPages';
+import { fetchPublishedFooterPage } from '../../services/footerPages';
 
 export default function InfoPage() {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
-  const { pages } = usePagesStore();
   const lang = (i18n.language === 'ar' ? 'ar' : 'en') as LocaleCode;
 
   // نستخرج الـ slug من المسار: نحافظ على المسارات الفرعية المخصصة
@@ -33,7 +33,25 @@ export default function InfoPage() {
     return { slug: resolved, canonicalPath: canonical };
   }, [loc.pathname]);
 
-  const page = pages[slug];
+  const [page, setPage] = useState(getDefaultFooterPage(slug));
+
+  useEffect(() => {
+    let active = true;
+    setPage(getDefaultFooterPage(slug));
+    fetchPublishedFooterPage(slug)
+      .then((response) => {
+        if (!active) return;
+        if (response?.content) {
+          setPage(response.content);
+        }
+      })
+      .catch(() => {
+        /* fallback already set */
+      });
+    return () => {
+      active = false;
+    };
+  }, [slug]);
   const heroTitle = page?.heroTitle?.[lang] || t(`pages.${slug}.title`);
   const heroSubtitle = page?.heroSubtitle?.[lang] || t(`pages.${slug}.desc`);
   const seoDesc = page?.seoDescription?.[lang] || heroSubtitle;

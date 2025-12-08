@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import api from "../lib/api";
 import type { User } from "../types";
@@ -19,6 +19,10 @@ const statusTone = (status: string) => {
     ? "bg-green-100 text-green-700"
     : "bg-red-100 text-red-700";
 };
+
+const PROTECTED_ADMIN_EMAIL =
+  (import.meta.env.VITE_PROTECTED_ADMIN_EMAIL as string | undefined)?.toLowerCase?.() ??
+  "fragreworld@gmail.com";
 
 export default function AdminUsersPage() {
   const { t, i18n } = useTranslation();
@@ -128,7 +132,14 @@ export default function AdminUsersPage() {
     }
   };
 
+  const isProtectedEmail = (email?: string | null) =>
+    email?.toLowerCase() === PROTECTED_ADMIN_EMAIL;
+
   const handleDeleteUser = async (user: User) => {
+    if (isProtectedEmail(user.email)) {
+      alert(t("admin.protectedAdminWarning", "لا يمكنك حذف هذا الحساب المحمي."));
+      return;
+    }
     if (!window.confirm(t("admin.confirmDeleteUser", "هل أنت متأكد من حذف هذا المستخدم؟"))) {
       return;
     }
@@ -140,6 +151,15 @@ export default function AdminUsersPage() {
       alert(err?.response?.data?.detail ?? t("admin.deleteUserFailed", "فشل حذف المستخدم"));
     }
   };
+
+  const usersWithProtection = useMemo(
+    () =>
+      users.map((user) => ({
+        ...user,
+        isProtected: isProtectedEmail(user.email),
+      })),
+    [users]
+  );
 
   if (loading) {
     return (
@@ -254,7 +274,7 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {usersWithProtection.map((user) => (
                 <tr key={user.id} className="border-b border-gray-100 hover:bg-sand">
                   <td className="px-4 py-4 text-charcoal-light">#{user.id}</td>
                   <td className="px-4 py-4 text-charcoal font-medium">{user.full_name}</td>
@@ -306,8 +326,18 @@ export default function AdminUsersPage() {
                       </button>
                       <button
                         onClick={() => handleDeleteUser(user)}
-                        className="text-red-500 hover:text-red-600"
+                        disabled={user.isProtected}
+                        className={`${
+                          user.isProtected
+                            ? "text-charcoal/40 cursor-not-allowed"
+                            : "text-red-500 hover:text-red-600"
+                        }`}
                         aria-label={t("common.delete")}
+                        title={
+                          user.isProtected
+                            ? t("admin.protectedAdminWarning", "لا يمكنك حذف هذا الحساب المحمي.")
+                            : undefined
+                        }
                       >
                         🗑️
                       </button>

@@ -11,6 +11,7 @@ import {
 import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { normalizeProduct } from "./productService";
+import { config } from "../config/env";
 
 export const getAdminDashboardStats = async () => {
   const [totalUsers, totalProducts, pendingProducts, totalOrders, pendingOrders, runningAuctions] =
@@ -208,6 +209,13 @@ export const deleteUserByAdmin = async (
 
   if (!targetUser) {
     throw AppError.notFound("User not found");
+  }
+
+  if (
+    targetUser.email.toLowerCase() ===
+    config.accounts.protectedAdminEmail.toLowerCase()
+  ) {
+    throw AppError.forbidden("Cannot delete protected admin account");
   }
 
   const targetRoles = targetUser.roles.map((r) => r.role.name as RoleName);

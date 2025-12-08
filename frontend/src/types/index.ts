@@ -18,6 +18,7 @@ export interface User {
   } | null;
   seller_profile_submitted?: boolean;
   verified_seller?: boolean;
+  requires_password_reset?: boolean;
 }
 
 export interface Product {

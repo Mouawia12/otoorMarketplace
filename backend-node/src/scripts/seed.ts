@@ -1,34 +1,56 @@
-import { RoleName } from "@prisma/client";
+import { Prisma, PrismaClient, RoleName } from "@prisma/client";
+
 import { prisma } from "../prisma/client";
 import { hashPassword } from "../utils/password";
 
-const ADMIN_EMAIL = "fragreworld@gmail.com";
+const ADMIN_EMAIL = process.env.ADMIN_SEED_EMAIL ?? "fragreworld@gmail.com";
+const ADMIN_PASSWORD_ENV = process.env.ADMIN_SEED_PASSWORD;
+const ADMIN_PASSWORD =
+  ADMIN_PASSWORD_ENV && ADMIN_PASSWORD_ENV.length >= 8
+    ? ADMIN_PASSWORD_ENV
+    : "Admin123!";
 
-async function resetDatabase() {
-  console.log("🧹 Clearing existing data...");
-  await prisma.$transaction([
-    prisma.bid.deleteMany(),
-    prisma.auction.deleteMany(),
-    prisma.orderItem.deleteMany(),
-    prisma.order.deleteMany(),
-    prisma.productReview.deleteMany(),
-    prisma.wishlistItem.deleteMany(),
-    prisma.productImage.deleteMany(),
-    prisma.productTemplateImage.deleteMany(),
-    prisma.productTemplate.deleteMany(),
-    prisma.product.deleteMany(),
-    prisma.address.deleteMany(),
-    prisma.supportReply.deleteMany(),
-    prisma.supportTicket.deleteMany(),
-    prisma.sellerProfile.deleteMany(),
-    prisma.userRole.deleteMany(),
-    prisma.post.deleteMany(),
-    prisma.role.deleteMany(),
-    prisma.user.deleteMany(),
-  ]);
+if (!ADMIN_PASSWORD_ENV) {
+  console.warn(
+    "⚠️  ADMIN_SEED_PASSWORD not set. Using default development password.",
+  );
 }
 
-async function seedRoles() {
+if (ADMIN_PASSWORD_ENV && ADMIN_PASSWORD_ENV.length < 8) {
+  console.warn(
+    "⚠️  ADMIN_SEED_PASSWORD is shorter than 8 characters. Using fallback password.",
+  );
+}
+
+type SeedContext = {
+  prisma: PrismaClient | Prisma.TransactionClient;
+  requirePasswordReset?: boolean;
+};
+
+async function resetDatabase(client: PrismaClient | Prisma.TransactionClient) {
+  console.log("🧹 Clearing existing data...");
+  await client.bid.deleteMany();
+  await client.auction.deleteMany();
+  await client.orderItem.deleteMany();
+  await client.order.deleteMany();
+  await client.productReview.deleteMany();
+  await client.wishlistItem.deleteMany();
+  await client.productImage.deleteMany();
+  await client.productTemplateImage.deleteMany();
+  await client.productTemplate.deleteMany();
+  await client.product.deleteMany();
+  await client.address.deleteMany();
+  await client.supportReply.deleteMany();
+  await client.supportTicket.deleteMany();
+  await client.sellerProfile.deleteMany();
+  await client.userRole.deleteMany();
+  await client.post.deleteMany();
+  await client.footerPage.deleteMany();
+  await client.role.deleteMany();
+  await client.user.deleteMany();
+}
+
+async function seedRoles(client: PrismaClient | Prisma.TransactionClient) {
   const roles = [
     RoleName.SUPER_ADMIN,
     RoleName.ADMIN,
@@ -39,7 +61,7 @@ async function seedRoles() {
   ];
 
   for (const name of roles) {
-    await prisma.role.upsert({
+    await client.role.upsert({
       where: { name },
       create: { name },
       update: {},
@@ -47,16 +69,20 @@ async function seedRoles() {
   }
 }
 
-async function seedAdmin() {
-  const adminPassword = await hashPassword("Admin123!");
+async function seedAdmin(
+  client: PrismaClient | Prisma.TransactionClient,
+  requirePasswordReset: boolean,
+) {
+  const adminPassword = await hashPassword(ADMIN_PASSWORD);
 
-  await prisma.user.upsert({
+  await client.user.upsert({
     where: { email: ADMIN_EMAIL },
     create: {
       email: ADMIN_EMAIL,
       passwordHash: adminPassword,
       fullName: "Platform Admin",
       verifiedSeller: false,
+      requiresPasswordReset: requirePasswordReset,
       roles: {
         create: [
           { role: { connect: { name: RoleName.SUPER_ADMIN } } },
@@ -66,17 +92,43 @@ async function seedAdmin() {
     },
     update: {
       passwordHash: adminPassword,
+      requiresPasswordReset: requirePasswordReset,
     },
   });
 }
 
+export async function runSeed({
+  prisma: client,
+  requirePasswordReset = true,
+}: SeedContext) {
+  await resetDatabase(client);
+  await seedRoles(client);
+  await seedAdmin(client, requirePasswordReset);
+}
+
+const isCheckMode = process.argv.includes("--check");
+const CHECK_SIGNAL = "SEED_CHECK_COMPLETE";
+
 async function main() {
   try {
-    await resetDatabase();
-    await seedRoles();
-    await seedAdmin();
-    console.log("✅ Database seeded with clean admin account.");
+    if (isCheckMode) {
+      console.log("🔍 Running seed check (no data persisted)...");
+      await prisma.$transaction(
+        async (tx) => {
+          await runSeed({ prisma: tx, requirePasswordReset: true });
+          throw new Error(CHECK_SIGNAL);
+        },
+        { maxWait: 10000, timeout: 30000 },
+      );
+    } else {
+      await runSeed({ prisma, requirePasswordReset: true });
+      console.log("✅ Database seeded with clean admin account.");
+    }
   } catch (error) {
+    if (error instanceof Error && error.message === CHECK_SIGNAL) {
+      console.log("✅ Seed check completed successfully.");
+      return;
+    }
     console.error("❌ Seeding failed", error);
     process.exit(1);
   } finally {

@@ -1,21 +1,11 @@
+import { getResolvedAssetBaseUrl } from '../lib/runtimeConfig';
 import { resolveStaticAssetUrl } from './staticAssets';
 
 let cachedBaseUrl: string | null = null;
 
-const computeAssetBaseUrl = () => {
-  const apiBase = import.meta.env.VITE_API_BASE_URL;
-  const apiRoot = apiBase ? apiBase.replace(/\/+api\/?$/, '') : null;
-  const configured =
-    import.meta.env.VITE_ASSET_BASE_URL ||
-    apiRoot ||
-    (typeof window !== 'undefined' ? window.location.origin : '');
-
-  return configured ? configured.replace(/\/+$/, '') : '';
-};
-
 export const getAssetBaseUrl = () => {
   if (!cachedBaseUrl) {
-    cachedBaseUrl = computeAssetBaseUrl();
+    cachedBaseUrl = getResolvedAssetBaseUrl();
   }
   return cachedBaseUrl;
 };

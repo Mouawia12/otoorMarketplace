@@ -51,6 +51,7 @@ const serializeUser = (user) => {
         seller_profile: sellerProfile,
         seller_profile_submitted: Boolean(sellerProfile),
         verified_seller: user.verifiedSeller,
+        requires_password_reset: user.requiresPasswordReset,
     };
 };
 exports.registerSchema = zod_1.z.object({
@@ -313,6 +314,7 @@ const changePassword = async (userId, payload) => {
         where: { id: userId },
         data: {
             passwordHash: newHash,
+            requiresPasswordReset: false,
         },
     });
     return { success: true };

@@ -13,6 +13,7 @@ import blogRouter from "./blog";
 import supportRouter from "./support";
 import couponsRouter from "./coupons";
 import promotionsRouter from "./promotions";
+import footerPagesRouter from "./footerPages";
 
 const router = Router();
 
@@ -29,5 +30,6 @@ router.use("/blog", blogRouter);
 router.use("/support", supportRouter);
 router.use("/coupons", couponsRouter);
 router.use("/promotions", promotionsRouter);
+router.use("/footer-pages", footerPagesRouter);
 
 export default router;

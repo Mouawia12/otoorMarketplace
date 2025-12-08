@@ -22,6 +22,7 @@ model User {
   status         UserStatus @default(ACTIVE)
   avatarUrl      String?    @map("avatar_url")
   verifiedSeller Boolean    @default(false) @map("verified_seller")
+  requiresPasswordReset Boolean @default(false) @map("requires_password_reset")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
@@ -40,6 +41,8 @@ model User {
   sellerStatus      SellerStatus   @default(PENDING) @map("seller_status")
   passwordResetTokens PasswordResetToken[]
   coupons         Coupon[]
+  updatedFooterPages   FooterPage[] @relation("FooterPageUpdatedBy")
+  publishedFooterPages FooterPage[] @relation("FooterPagePublishedBy")
 }
 
 model Role {
@@ -437,6 +440,27 @@ enum PromotionType {
   HERO
   STRIP
   FLOATING
+}
+
+enum FooterPageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model FooterPage {
+  id               Int               @id @default(autoincrement())
+  slug             String            @unique
+  draftContent     Json              @map("draft_content")
+  publishedContent Json?             @map("published_content")
+  status           FooterPageStatus  @default(DRAFT)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  publishedAt      DateTime?         @map("published_at")
+  updatedById      Int?              @map("updated_by_id")
+  publishedById    Int?              @map("published_by_id")
+
+  updatedBy   User? @relation("FooterPageUpdatedBy", fields: [updatedById], references: [id])
+  publishedBy User? @relation("FooterPagePublishedBy", fields: [publishedById], references: [id])
 }
 
 model Promotion {

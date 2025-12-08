@@ -55,6 +55,7 @@ const serializeUser = (user: UserWithRoles) => {
     seller_profile: sellerProfile,
     seller_profile_submitted: Boolean(sellerProfile),
     verified_seller: user.verifiedSeller,
+    requires_password_reset: user.requiresPasswordReset,
   };
 };
 
@@ -389,6 +390,7 @@ export const changePassword = async (
     where: { id: userId },
     data: {
       passwordHash: newHash,
+      requiresPasswordReset: false,
     },
   });
 

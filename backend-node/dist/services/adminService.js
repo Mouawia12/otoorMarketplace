@@ -5,6 +5,7 @@ const client_1 = require("@prisma/client");
 const client_2 = require("../prisma/client");
 const errors_1 = require("../utils/errors");
 const productService_1 = require("./productService");
+const env_1 = require("../config/env");
 const getAdminDashboardStats = async () => {
     const [totalUsers, totalProducts, pendingProducts, totalOrders, pendingOrders, runningAuctions] = await client_2.prisma.$transaction([
         client_2.prisma.user.count(),
@@ -152,6 +153,10 @@ const deleteUserByAdmin = async (userId, actorRoles, actorId) => {
     });
     if (!targetUser) {
         throw errors_1.AppError.notFound("User not found");
+    }
+    if (targetUser.email.toLowerCase() ===
+        env_1.config.accounts.protectedAdminEmail.toLowerCase()) {
+        throw errors_1.AppError.forbidden("Cannot delete protected admin account");
     }
     const targetRoles = targetUser.roles.map((r) => r.role.name);
     if (targetRoles.includes(client_1.RoleName.SUPER_ADMIN) &&

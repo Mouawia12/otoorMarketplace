@@ -17,6 +17,7 @@ const blog_1 = __importDefault(require("./blog"));
 const support_1 = __importDefault(require("./support"));
 const coupons_1 = __importDefault(require("./coupons"));
 const promotions_1 = __importDefault(require("./promotions"));
+const footerPages_1 = __importDefault(require("./footerPages"));
 const router = (0, express_1.Router)();
 router.use("/auth", auth_1.default);
 router.use("/products", products_1.default);
@@ -31,5 +32,6 @@ router.use("/blog", blog_1.default);
 router.use("/support", support_1.default);
 router.use("/coupons", coupons_1.default);
 router.use("/promotions", promotions_1.default);
+router.use("/footer-pages", footerPages_1.default);
 exports.default = router;
 //# sourceMappingURL=index.js.map
