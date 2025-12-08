@@ -37,5 +37,8 @@ export declare const config: {
     auth: {
         passwordResetUrl: string;
     };
+    accounts: {
+        protectedAdminEmail: string;
+    };
 };
 //# sourceMappingURL=env.d.ts.map

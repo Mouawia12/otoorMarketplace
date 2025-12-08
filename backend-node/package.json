@@ -13,6 +13,7 @@
     "db:diff": "npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script",
     "db:migrate:sql": "npm run db:diff",
     "seed": "ts-node-dev --transpile-only src/scripts/seed.ts",
+    "seed:test": "ts-node --transpile-only src/scripts/seed.ts --check",
     "lint": "eslint . --ext ts --max-warnings 0"
   },
   "keywords": [],

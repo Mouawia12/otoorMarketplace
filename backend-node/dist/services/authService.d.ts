@@ -63,6 +63,7 @@ export declare const registerUser: (input: z.infer<typeof registerSchema>) => Pr
         } | null;
         seller_profile_submitted: boolean;
         verified_seller: boolean;
+        requires_password_reset: boolean;
     };
 }>;
 export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginSchema>) => Promise<{
@@ -92,6 +93,7 @@ export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginS
         } | null;
         seller_profile_submitted: boolean;
         verified_seller: boolean;
+        requires_password_reset: boolean;
     };
 }>;
 export declare const requestPasswordReset: (input: z.infer<typeof forgotPasswordSchema>) => Promise<void>;
@@ -123,6 +125,7 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
         } | null;
         seller_profile_submitted: boolean;
         verified_seller: boolean;
+        requires_password_reset: boolean;
     };
 }>;
 export declare const changePassword: (userId: number, payload: z.infer<typeof changePasswordSchema>) => Promise<{

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import BrandLogo from '../brand/BrandLogo';
-import { usePagesStore } from '../../store/pagesStore';
 import { FooterPageKey, LocaleCode } from '../../types/staticPages';
+import { defaultFooterPages } from '../../content/footerPages';
+import { fetchPublishedFooterPages } from '../../services/footerPages';
 
 const socialLinks = [
   { label: 'Instagram', href: 'https://instagram.com', icon: InstagramIcon },
@@ -13,9 +14,32 @@ const socialLinks = [
 
 export default function Footer() {
   const { t, i18n } = useTranslation();
-  const { pages } = usePagesStore();
+  const [pages, setPages] = useState(defaultFooterPages);
   const lang = (i18n.language === 'ar' ? 'ar' : 'en') as LocaleCode;
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchPublishedFooterPages()
+      .then((records) => {
+        if (!mounted) return;
+        setPages((prev) => {
+          const next = { ...prev };
+          records.forEach(({ slug, content }) => {
+            if (content) {
+              next[slug] = content;
+            }
+          });
+          return next;
+        });
+      })
+      .catch(() => {
+        /* silent fallback */
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const groups: Array<{ title: string; description: string; pages: FooterPageKey[] }> = [
     {

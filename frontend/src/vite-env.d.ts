@@ -14,3 +14,11 @@ declare module '*.svg?url' {
   const src: string;
   export default src;
 }
+
+interface ImportMetaEnv {
+  readonly VITE_PROTECTED_ADMIN_EMAIL?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

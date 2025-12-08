@@ -1,12 +1,6 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import arLocale from '../i18n/locales/ar.json';
 import enLocale from '../i18n/locales/en.json';
-import {
-  FooterPageContent,
-  FooterPageKey,
-  LocalizedField,
-} from '../types/staticPages';
+import { FooterPageContent, FooterPageKey, LocalizedField } from '../types/staticPages';
 
 type LocalePages = Record<FooterPageKey, any>;
 
@@ -41,7 +35,7 @@ const heroImages: Record<FooterPageKey, string> = {
   contact: 'https://images.unsplash.com/photo-1525182008055-f88b95ff7980?auto=format&fit=crop&w=1200&q=60',
 };
 
-const pageKeys: FooterPageKey[] = [
+export const footerPageKeys: FooterPageKey[] = [
   'about',
   'authenticity',
   'how-it-works',
@@ -54,8 +48,6 @@ const pageKeys: FooterPageKey[] = [
   'terms',
   'contact',
 ];
-
-const nowISO = () => new Date().toISOString();
 
 const localized = (slug: FooterPageKey, getter: (entry: any) => string): LocalizedField => ({
   ar: getter(localeAr[slug]) ?? '',
@@ -92,7 +84,7 @@ const buildDefaultSection = (slug: FooterPageKey) => {
   };
 };
 
-const defaultFooterPages = pageKeys.reduce<Record<FooterPageKey, FooterPageContent>>(
+export const defaultFooterPages = footerPageKeys.reduce<Record<FooterPageKey, FooterPageContent>>(
   (acc, slug) => {
     acc[slug] = {
       slug,
@@ -103,53 +95,14 @@ const defaultFooterPages = pageKeys.reduce<Record<FooterPageKey, FooterPageConte
       heroImage: heroImages[slug],
       seoDescription: localized(slug, (entry) => entry?.desc ?? ''),
       sections: [buildDefaultSection(slug)],
-      lastUpdated: nowISO(),
+      lastUpdated: new Date().toISOString(),
     };
     return acc;
   },
   {} as Record<FooterPageKey, FooterPageContent>
 );
 
-interface PagesState {
-  pages: Record<FooterPageKey, FooterPageContent>;
-  updatePageContent: (slug: FooterPageKey, updates: Partial<FooterPageContent>) => void;
-  resetPage: (slug: FooterPageKey) => void;
-}
+export const footerPageList = footerPageKeys.map((slug) => defaultFooterPages[slug]);
 
-export const usePagesStore = create<PagesState>()(
-  persist(
-    (set) => ({
-      pages: defaultFooterPages,
-      updatePageContent: (slug, updates) => {
-        set((state) => {
-          const current = state.pages[slug];
-          if (!current) return state;
-          const updated: FooterPageContent = {
-            ...current,
-            ...updates,
-            lastUpdated: nowISO(),
-          };
-          return {
-            pages: {
-              ...state.pages,
-              [slug]: updated,
-            },
-          };
-        });
-      },
-      resetPage: (slug) => {
-        set((state) => ({
-          pages: {
-            ...state.pages,
-            [slug]: { ...defaultFooterPages[slug], lastUpdated: nowISO() },
-          },
-        }));
-      },
-    }),
-    {
-      name: 'otoor-footer-pages',
-    }
-  )
-);
-
-export const footerPageList = pageKeys.map((slug) => defaultFooterPages[slug]);
+export const getDefaultFooterPage = (slug: FooterPageKey): FooterPageContent =>
+  defaultFooterPages[slug];
