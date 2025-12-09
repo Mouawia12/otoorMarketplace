@@ -216,7 +216,7 @@ export default function AdminOrdersPage() {
       </div>
 
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
-        <h2 className="text-h3 text-charcoal mb-4">{t("admin.orderSummary")}</h2>
+        <h2 className="text-h3 text-charcoal mb-4">{t("admin.orderSummary", "ملخص الطلبات")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Object.entries(grouped).map(([status, items]) => (
             <div key={status} className="bg-sand/50 rounded-luxury p-4">

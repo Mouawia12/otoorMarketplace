@@ -176,22 +176,24 @@ export default function AdminProductLibraryPage() {
                     <h3 className="text-lg font-semibold text-charcoal">{name}</h3>
                     <p className="text-sm text-taupe mb-2">{template.brand}</p>
                     <div className="text-sm text-charcoal-light flex flex-col gap-1">
-                      <span>{t('products.category')}: {template.category}</span>
-                      <span>{t('products.type')}: {template.product_type}</span>
-                      <span>{t('products.size')}: {template.size_ml} ml</span>
+                      <span>{t('products.category', 'الفئة')}: {template.category}</span>
+                      <span>{t('products.type', 'النوع')}: {template.product_type}</span>
+                      <span>{t('products.size', 'الحجم')}: {template.size_ml} ml</span>
                     </div>
                     <div className="mt-4 flex gap-2">
                       <button
                         onClick={() => openEditModal(template)}
                         className="flex-1 px-3 py-2 rounded-luxury border border-gold text-charcoal hover:bg-gold/10"
                       >
-                        {t('common.edit')}
+                        {t('common.edit', 'تعديل')}
                       </button>
                       <button
                         onClick={() => handleDelete(template.id)}
                         className="flex-1 px-3 py-2 rounded-luxury border border-red-300 text-red-600 hover:bg-red-50"
                       >
-                        {confirmingId === template.id ? t('common.confirm') : t('common.delete')}
+                        {confirmingId === template.id
+                          ? t('common.confirm', 'تأكيد')
+                          : t('common.delete', 'حذف')}
                       </button>
                     </div>
                   </div>
