@@ -275,12 +275,12 @@ export default function BlogIndex() {
                   className="group bg-ivory rounded-luxury overflow-hidden shadow-sm hover:shadow-luxury transition-all duration-300"
                 >
                   {/* Cover Image */}
-                  <div className="aspect-[16/9] overflow-hidden bg-sand">
+                  <div className="aspect-[16/9] overflow-hidden bg-sand flex items-center justify-center">
                     <img
                       src={coverSrc}
                       alt={post.title}
                       loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).src = BLOG_PLACEHOLDER;
                       }}

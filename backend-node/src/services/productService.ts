@@ -455,6 +455,8 @@ export const updateProduct = async (
     throw AppError.notFound("Product not found");
   }
 
+  const wasPendingReview = product.status === ProductStatus.PENDING_REVIEW;
+
   const updateData: Prisma.ProductUpdateInput = {};
 
   if (data.nameAr !== undefined) updateData.nameAr = data.nameAr;
@@ -470,7 +472,10 @@ export const updateProduct = async (
   if (data.condition !== undefined) updateData.condition = data.condition;
   if (data.stockQuantity !== undefined) updateData.stockQuantity = data.stockQuantity;
   if (data.status !== undefined) {
-    if (typeof data.status === "string" && (data.status === "pending" || data.status === "published")) {
+    if (
+      typeof data.status === "string" &&
+      (data.status.toLowerCase() === "pending" || data.status.toLowerCase() === "published")
+    ) {
       updateData.status = ProductStatus.PENDING_REVIEW;
     } else if (typeof data.status === "string") {
       updateData.status = data.status.toUpperCase() as ProductStatus;
@@ -478,6 +483,8 @@ export const updateProduct = async (
       updateData.status = data.status;
     }
   }
+
+  const willBePendingReview = updateData.status === ProductStatus.PENDING_REVIEW && !wasPendingReview;
 
   const imagesUpdate =
     data.imageUrls !== undefined
@@ -501,8 +508,36 @@ export const updateProduct = async (
     },
     include: {
       images: { orderBy: { sortOrder: "asc" as const } },
+      seller: {
+        select: {
+          id: true,
+          fullName: true,
+        },
+      },
     },
   });
+
+  if (willBePendingReview) {
+    await notifyAdmins({
+      type: NotificationType.PRODUCT_SUBMITTED,
+      title: "تعديلات منتج بانتظار المراجعة",
+      message: `${updated.seller?.fullName ?? "بائع"} عدل المنتج ${updated.nameEn ?? updated.nameAr} ويحتاج موافقة جديدة`,
+      data: {
+        productId: updated.id,
+        sellerId,
+        reason: "update",
+      },
+      fallbackToSupport: true,
+    });
+
+    await createNotificationForUser({
+      userId: sellerId,
+      type: NotificationType.PRODUCT_SUBMITTED,
+      title: "تم إرسال التعديلات للمراجعة",
+      message: `استلمنا تعديلاتك على ${updated.nameEn ?? updated.nameAr}. سيتم إشعارك فور مراجعتها.`,
+      data: { productId: updated.id },
+    });
+  }
 
   return normalizeProduct(updated);
 };
