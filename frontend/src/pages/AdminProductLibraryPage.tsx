@@ -43,6 +43,30 @@ const createInitialFormState = (): TemplateFormState => ({
   image_urls: [],
 });
 
+const convertArabicDigits = (value: string) => {
+  const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  return value.replace(/[٠-٩]/g, (digit) => {
+    const index = arabic.indexOf(digit);
+    return index >= 0 ? String(index) : digit;
+  });
+};
+
+const normalizeNumericInput = (value: string) =>
+  convertArabicDigits(value)
+    .replace(/[٬,]/g, '')
+    .replace(/٫/g, '.')
+    .trim();
+
+const parseDecimalInput = (value: string) => {
+  const normalized = normalizeNumericInput(value);
+  return normalized ? parseFloat(normalized) : NaN;
+};
+
+const parseIntegerInput = (value: string) => {
+  const normalized = normalizeNumericInput(value);
+  return normalized ? parseInt(normalized, 10) : NaN;
+};
+
 export default function AdminProductLibraryPage() {
   const { t, i18n } = useTranslation();
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
@@ -242,12 +266,16 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
 
   const validateForm = () => {
     const nextErrors: Record<string, string> = {};
+    const parsedPrice = parseDecimalInput(formData.base_price);
+    const parsedSize = parseIntegerInput(formData.size_ml);
     if (!formData.name_en.trim()) nextErrors.name_en = t('validation.required', 'هذا الحقل مطلوب');
     if (!formData.name_ar.trim()) nextErrors.name_ar = t('validation.required', 'هذا الحقل مطلوب');
     if (!formData.brand.trim()) nextErrors.brand = t('validation.required', 'هذا الحقل مطلوب');
     if (!formData.category.trim()) nextErrors.category = t('validation.required', 'هذا الحقل مطلوب');
-    if (!formData.base_price || Number(formData.base_price) <= 0) nextErrors.base_price = t('validation.priceInvalid', 'أدخل سعراً صحيحاً');
-    if (!formData.size_ml || Number(formData.size_ml) <= 0) nextErrors.size_ml = t('validation.sizeInvalid', 'أدخل حجماً صحيحاً');
+    if (!formData.base_price.trim() || isNaN(parsedPrice) || parsedPrice <= 0)
+      nextErrors.base_price = t('validation.priceInvalid', 'أدخل سعراً صحيحاً');
+    if (!formData.size_ml.trim() || isNaN(parsedSize) || parsedSize <= 0)
+      nextErrors.size_ml = t('validation.sizeInvalid', 'أدخل حجماً صحيحاً');
     if (!formData.concentration.trim()) nextErrors.concentration = t('validation.required', 'هذا الحقل مطلوب');
     if (!formData.description_en.trim()) nextErrors.description_en = t('validation.required', 'هذا الحقل مطلوب');
     if (!formData.description_ar.trim()) nextErrors.description_ar = t('validation.required', 'هذا الحقل مطلوب');
@@ -262,14 +290,16 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
     try {
       setLoading(true);
       setSubmitError(null);
+      const normalizedPrice = parseDecimalInput(formData.base_price);
+      const normalizedSize = parseIntegerInput(formData.size_ml);
       const payload = {
         nameEn: formData.name_en,
         nameAr: formData.name_ar,
         brand: formData.brand,
         productType: formData.product_type,
         category: formData.category,
-        basePrice: parseFloat(formData.base_price),
-        sizeMl: parseInt(formData.size_ml || '0', 10),
+        basePrice: normalizedPrice,
+        sizeMl: normalizedSize,
         concentration: formData.concentration,
         descriptionEn: formData.description_en,
         descriptionAr: formData.description_ar,
