@@ -464,6 +464,15 @@
     "liveDisconnected": "Live updates paused",
     "bidRejected": "A higher bid was submitted moments ago. Please increase your offer."
   },
+  "notifications": {
+    "title": "Notifications",
+    "recent": "Recent activity",
+    "empty": "No notifications yet",
+    "markAll": "Mark all as read",
+    "loading": "Loading notifications...",
+    "new": "{{count}} new",
+    "viewAll": "View all"
+  },
   "account": {
     "myAccount": "My Account",
     "overview": "Overview",

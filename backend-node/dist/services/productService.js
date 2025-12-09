@@ -8,6 +8,7 @@ const errors_1 = require("../utils/errors");
 const serializer_1 = require("../utils/serializer");
 const slugify_1 = require("../utils/slugify");
 const assets_1 = require("../utils/assets");
+const notificationService_1 = require("./notificationService");
 const normalizeStatus = (status) => {
     if (!status)
         return status ?? "";
@@ -357,6 +358,20 @@ const createProduct = async (input) => {
             },
         },
     });
+    await (0, notificationService_1.createNotificationForUser)({
+        userId: product.sellerId,
+        type: client_1.NotificationType.PRODUCT_SUBMITTED,
+        title: "تم استلام منتجك",
+        message: `نراجع الآن منتجك ${product.nameEn}. سنعلمك فور اتخاذ القرار.`,
+        data: { productId: product.id },
+    });
+    await (0, notificationService_1.notifyAdmins)({
+        type: client_1.NotificationType.PRODUCT_SUBMITTED,
+        title: "منتج جديد بانتظار المراجعة",
+        message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn}.`,
+        data: { productId: product.id, sellerId: product.sellerId },
+        fallbackToSupport: true,
+    });
     return (0, exports.normalizeProduct)(product);
 };
 exports.createProduct = createProduct;
@@ -458,6 +473,17 @@ const moderateProduct = async (productId, action) => {
         include: {
             images: { orderBy: { sortOrder: "asc" } },
         },
+    });
+    await (0, notificationService_1.createNotificationForUser)({
+        userId: product.sellerId,
+        type: action === "approve"
+            ? client_1.NotificationType.PRODUCT_APPROVED
+            : client_1.NotificationType.PRODUCT_REJECTED,
+        title: action === "approve" ? "تم نشر المنتج" : "تم رفض المنتج",
+        message: action === "approve"
+            ? `${product.nameEn ?? "المنتج"} أصبح متاحًا الآن في المتجر.`
+            : `نأسف، تم رفض ${product.nameEn ?? "المنتج"}. راجع المتطلبات وحاول مرة أخرى.`,
+        data: { productId: product.id, status },
     });
     return (0, exports.normalizeProduct)(product);
 };

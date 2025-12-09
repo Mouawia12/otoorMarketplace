@@ -5,6 +5,7 @@ const zod_1 = require("zod");
 const client_1 = require("../prisma/client");
 const serializer_1 = require("../utils/serializer");
 const client_2 = require("@prisma/client");
+const notificationService_1 = require("./notificationService");
 const profileSchema = zod_1.z.object({
     full_name: zod_1.z.string().min(3),
     phone: zod_1.z.string().min(8),
@@ -62,6 +63,20 @@ const upsertSellerProfile = async (userId, input) => {
             },
         },
     });
+    await (0, notificationService_1.createNotificationForUser)({
+        userId,
+        type: client_2.NotificationType.SELLER_APPLICATION_SUBMITTED,
+        title: "تم استلام طلب التاجر",
+        message: "جارٍ مراجعة بياناتك، سيتم إعلامك فور اتخاذ القرار.",
+        data: { sellerProfileId: profile.id },
+    });
+    await (0, notificationService_1.notifyAdmins)({
+        type: client_2.NotificationType.SELLER_APPLICATION_SUBMITTED,
+        title: "طلب تاجر جديد",
+        message: `${profile.user?.fullName ?? "مستخدم"} قدّم طلب بائع.`,
+        data: { userId, sellerProfileId: profile.id },
+        fallbackToSupport: true,
+    });
     return mapProfile(profile);
 };
 exports.upsertSellerProfile = upsertSellerProfile;
@@ -114,6 +129,19 @@ const updateSellerProfileStatus = async (userId, status) => {
                 }
                 : {}),
         },
+    });
+    await (0, notificationService_1.createNotificationForUser)({
+        userId,
+        type: status === client_2.SellerStatus.APPROVED
+            ? client_2.NotificationType.SELLER_APPLICATION_APPROVED
+            : client_2.NotificationType.SELLER_APPLICATION_REJECTED,
+        title: status === client_2.SellerStatus.APPROVED
+            ? "مبروك! تمت الموافقة على حساب التاجر"
+            : "تحديث حالة طلب التاجر",
+        message: status === client_2.SellerStatus.APPROVED
+            ? "يمكنك الآن البدء بعرض منتجاتك وبيعها عبر اللوحة."
+            : "نأسف، لم يتم اعتماد الطلب. راجع البيانات وأعد الإرسال.",
+        data: { sellerProfileId: profile.id, status },
     });
     return mapProfile(profile);
 };

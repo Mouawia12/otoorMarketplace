@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../../store/authStore';
+import NotificationBell from '../../../components/notifications/NotificationBell';
 
 export default function AdminLayout() {
   const { t } = useTranslation();
@@ -111,6 +112,10 @@ export default function AdminLayout() {
             <span>☰</span>
             <span>{t('admin.menu')}</span>
           </button>
+
+          <div className="mb-6 flex justify-end">
+            <NotificationBell />
+          </div>
 
           <Outlet />
         </main>

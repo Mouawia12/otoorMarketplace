@@ -2,7 +2,8 @@ import { z } from "zod";
 import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { toPlainObject } from "../utils/serializer";
-import { RoleName, SellerStatus } from "@prisma/client";
+import { NotificationType, RoleName, SellerStatus } from "@prisma/client";
+import { createNotificationForUser, notifyAdmins } from "./notificationService";
 
 const profileSchema = z.object({
   full_name: z.string().min(3),
@@ -65,6 +66,22 @@ export const upsertSellerProfile = async (userId: number, input: unknown) => {
     },
   });
 
+  await createNotificationForUser({
+    userId,
+    type: NotificationType.SELLER_APPLICATION_SUBMITTED,
+    title: "تم استلام طلب التاجر",
+    message: "جارٍ مراجعة بياناتك، سيتم إعلامك فور اتخاذ القرار.",
+    data: { sellerProfileId: profile.id },
+  });
+
+  await notifyAdmins({
+    type: NotificationType.SELLER_APPLICATION_SUBMITTED,
+    title: "طلب تاجر جديد",
+    message: `${profile.user?.fullName ?? "مستخدم"} قدّم طلب بائع.`,
+    data: { userId, sellerProfileId: profile.id },
+    fallbackToSupport: true,
+  });
+
   return mapProfile(profile);
 };
 
@@ -118,6 +135,23 @@ export const updateSellerProfileStatus = async (userId: number, status: SellerSt
           }
         : {}),
     },
+  });
+
+  await createNotificationForUser({
+    userId,
+    type:
+      status === SellerStatus.APPROVED
+        ? NotificationType.SELLER_APPLICATION_APPROVED
+        : NotificationType.SELLER_APPLICATION_REJECTED,
+    title:
+      status === SellerStatus.APPROVED
+        ? "مبروك! تمت الموافقة على حساب التاجر"
+        : "تحديث حالة طلب التاجر",
+    message:
+      status === SellerStatus.APPROVED
+        ? "يمكنك الآن البدء بعرض منتجاتك وبيعها عبر اللوحة."
+        : "نأسف، لم يتم اعتماد الطلب. راجع البيانات وأعد الإرسال.",
+    data: { sellerProfileId: profile.id, status },
   });
 
   return mapProfile(profile);

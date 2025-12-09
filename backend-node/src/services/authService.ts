@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { Prisma, RoleName } from "@prisma/client";
+import { NotificationType, Prisma, RoleName } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "../prisma/client";
@@ -9,6 +9,7 @@ import { AppError } from "../utils/errors";
 import { signAccessToken } from "../utils/jwt";
 import { config } from "../config/env";
 import { sendMail } from "../utils/mailer";
+import { notifyAdmins } from "./notificationService";
 
 const userWithRolesInclude = Prisma.validator<Prisma.UserInclude>()({
   roles: { include: { role: true } },
@@ -137,6 +138,14 @@ export const registerUser = async (input: z.infer<typeof registerSchema>) => {
   const token = signAccessToken({
     sub: user.id,
     roles: user.roles.map((role) => role.role.name),
+  });
+
+  await notifyAdmins({
+    type: NotificationType.USER_REGISTERED,
+    title: "تسجيل مستخدم جديد",
+    message: `${user.fullName} (${user.email}) انضم إلى المنصة.`,
+    data: { userId: user.id, email: user.email },
+    fallbackToSupport: true,
   });
 
   return {
