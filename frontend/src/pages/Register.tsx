@@ -12,7 +12,7 @@ import { resolvePostAuthRoute } from '../utils/authNavigation';
 const registerSchema = z.object({
   full_name: z.string().min(3),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8, 'كلمة المرور يجب ألا تقل عن 8 أحرف'),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
@@ -42,18 +42,22 @@ export default function Register() {
       setError('');
       // نرسل فقط الحقول المطلوبة
       const user = await registerUser({
-        full_name: data.full_name,
+        fullName: data.full_name,
         email: data.email,
         password: data.password,
         roles: ['BUYER'],
-      } as any);
+      });
       redirectAfterSignup(user);
     } catch (err: any) {
-      const detail = err?.response?.data?.detail;
+      const response = err?.response?.data;
+      const detail = response?.detail;
+      const message = response?.message;
       if (Array.isArray(detail)) {
         setError(detail.map((e: any) => e.msg).join(', '));
       } else if (typeof detail === 'string') {
         setError(detail);
+      } else if (typeof message === 'string') {
+        setError(message);
       } else {
         setError(t('common.error'));
       }

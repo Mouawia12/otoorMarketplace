@@ -6,6 +6,7 @@ const client_2 = require("../prisma/client");
 const errors_1 = require("../utils/errors");
 const productService_1 = require("./productService");
 const env_1 = require("../config/env");
+const notificationService_1 = require("./notificationService");
 const getAdminDashboardStats = async () => {
     const [totalUsers, totalProducts, pendingProducts, totalOrders, pendingOrders, runningAuctions] = await client_2.prisma.$transaction([
         client_2.prisma.user.count(),
@@ -244,6 +245,33 @@ const updateProductStatusAsAdmin = async (productId, status) => {
             },
         },
     });
+    if (product.sellerId) {
+        let notificationType = null;
+        let title = "";
+        let message = "";
+        if (targetStatus === client_1.ProductStatus.PUBLISHED) {
+            notificationType = client_1.NotificationType.PRODUCT_APPROVED;
+            title = "تم نشر المنتج";
+            message = `${product.nameEn ?? "منتجك"} أصبح متاحًا الآن في المتجر.`;
+        }
+        else if (targetStatus === client_1.ProductStatus.REJECTED) {
+            notificationType = client_1.NotificationType.PRODUCT_REJECTED;
+            title = "تم رفض المنتج";
+            message = `نأسف، لم يتم قبول ${product.nameEn ?? "المنتج"}. يمكنك مراجعة المتطلبات وإعادة الإرسال.`;
+        }
+        if (notificationType) {
+            await (0, notificationService_1.createNotificationForUser)({
+                userId: product.sellerId,
+                type: notificationType,
+                title,
+                message,
+                data: {
+                    productId: product.id,
+                    status: targetStatus,
+                },
+            });
+        }
+    }
     return (0, productService_1.normalizeProduct)(product);
 };
 exports.updateProductStatusAsAdmin = updateProductStatusAsAdmin;

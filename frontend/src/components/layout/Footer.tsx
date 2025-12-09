@@ -17,6 +17,10 @@ export default function Footer() {
   const [pages, setPages] = useState(defaultFooterPages);
   const lang = (i18n.language === 'ar' ? 'ar' : 'en') as LocaleCode;
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth < 768;
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -39,6 +43,14 @@ export default function Footer() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const groups: Array<{ title: string; description: string; pages: FooterPageKey[] }> = [
@@ -97,18 +109,23 @@ export default function Footer() {
           {groups.map((group) => (
             <div key={group.title} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
               <button
-                onClick={() => setOpenGroup((prev) => (prev === group.title ? null : group.title))}
-                className="w-full px-5 md:px-6 py-4 flex items-center justify-between text-left"
+                onClick={() => {
+                  if (!isMobile) return;
+                  setOpenGroup((prev) => (prev === group.title ? null : group.title));
+                }}
+                className="w-full px-5 md:px-6 py-4 flex items-center justify-between text-left md:cursor-default md:pointer-events-none"
               >
                 <div>
                   <p className="text-xs uppercase tracking-[0.3em] text-gold/80 mb-1">{t('footer.sectionLabel')}</p>
                   <h3 className="text-xl font-bold">{group.title}</h3>
                 </div>
-                <span className="text-2xl text-gold font-semibold">{openGroup === group.title ? '−' : '+'}</span>
+                <span className="text-2xl text-gold font-semibold md:hidden">
+                  {openGroup === group.title ? '−' : '+'}
+                </span>
               </button>
               <div
                 className={`grid transition-all duration-300 ${
-                  openGroup === group.title ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                  !isMobile || openGroup === group.title ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
                 }`}
               >
                 <div className="overflow-hidden px-5 md:px-6 pb-5 flex flex-col gap-4">

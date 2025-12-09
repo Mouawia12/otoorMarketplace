@@ -10,6 +10,7 @@ import { compressImageFile } from '../utils/imageCompression';
 import { sellerSearchTemplates } from '../services/productTemplateService';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import SARIcon from '../components/common/SARIcon';
+import { useNotificationStore } from '../store/notificationStore';
 
 type StatusFilter = 'all' | 'published' | 'draft' | 'pending' | 'rejected';
 
@@ -65,6 +66,7 @@ const parseNumericInput = (value: string) => {
 export default function SellerProductsPage() {
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
+  const lastNotification = useNotificationStore((state) => state.lastNotification);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,6 +79,13 @@ export default function SellerProductsPage() {
   useEffect(() => {
     fetchProducts();
   }, [statusFilter]);
+
+  useEffect(() => {
+    if (!lastNotification) return;
+    if (['product_approved', 'product_rejected'].includes(lastNotification.type)) {
+      fetchProducts();
+    }
+  }, [lastNotification]);
 
   const fetchProducts = async () => {
     try {
@@ -236,15 +245,23 @@ export default function SellerProductsPage() {
                     )}
                   </td>
                   <td className="px-3 md:px-4 py-4">
-                    <select
-                      value={product.status === 'published' ? 'pending' : product.status}
-                      onChange={(e) => handleStatusChange(product.id, e.target.value)}
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${statusBadgeClass(product.status)} border-none`}
-                    >
-                      <option value="pending">{t('seller.pending', 'Pending review')}</option>
-                      <option value="draft">{t('seller.draft', 'Draft')}</option>
-                      <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
-                    </select>
+                    {product.status === 'published' ? (
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm font-semibold inline-flex items-center ${statusBadgeClass(product.status)}`}
+                      >
+                        {productStatusLabel(product.status, t)}
+                      </span>
+                    ) : (
+                      <select
+                        value={product.status}
+                        onChange={(e) => handleStatusChange(product.id, e.target.value)}
+                        className={`px-3 py-1 rounded-full text-sm font-semibold ${statusBadgeClass(product.status)} border-none`}
+                      >
+                        <option value="pending">{t('seller.pending', 'Pending review')}</option>
+                        <option value="draft">{t('seller.draft', 'Draft')}</option>
+                        <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
+                      </select>
+                    )}
                   </td>
                   <td className="px-3 md:px-4 py-4 text-charcoal-light">
                     {new Date(product.created_at).toLocaleDateString(
@@ -464,7 +481,21 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       }
     } catch (error: any) {
       console.error('Failed to create product', error);
-      const msg = error.response?.data?.message || error.response?.data?.detail;
+      let msg = error.response?.data?.message || error.response?.data?.detail;
+
+      const fieldErrors = error.response?.data?.errors?.fieldErrors;
+      if (!msg && fieldErrors && typeof fieldErrors === 'object') {
+        const firstError = Object.values(fieldErrors)
+          .flat()
+          .find((entry) => typeof entry === 'string');
+        if (firstError) {
+          msg = firstError;
+        }
+      }
+
+      if (!msg && typeof error.message === 'string') {
+        msg = error.message;
+      }
       alert(
         msg ||
           (mode === 'add'

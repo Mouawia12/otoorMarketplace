@@ -3,6 +3,7 @@ import {
   OrderStatus,
   Prisma,
   ProductStatus,
+  NotificationType,
   RoleName,
   SellerStatus,
   UserStatus,
@@ -12,6 +13,7 @@ import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { normalizeProduct } from "./productService";
 import { config } from "../config/env";
+import { createNotificationForUser } from "./notificationService";
 
 export const getAdminDashboardStats = async () => {
   const [totalUsers, totalProducts, pendingProducts, totalOrders, pendingOrders, runningAuctions] =
@@ -317,6 +319,35 @@ export const updateProductStatusAsAdmin = async (
       },
     },
   });
+
+  if (product.sellerId) {
+    let notificationType: NotificationType | null = null;
+    let title = "";
+    let message = "";
+
+    if (targetStatus === ProductStatus.PUBLISHED) {
+      notificationType = NotificationType.PRODUCT_APPROVED;
+      title = "تم نشر المنتج";
+      message = `${product.nameEn ?? "منتجك"} أصبح متاحًا الآن في المتجر.`;
+    } else if (targetStatus === ProductStatus.REJECTED) {
+      notificationType = NotificationType.PRODUCT_REJECTED;
+      title = "تم رفض المنتج";
+      message = `نأسف، لم يتم قبول ${product.nameEn ?? "المنتج"}. يمكنك مراجعة المتطلبات وإعادة الإرسال.`;
+    }
+
+    if (notificationType) {
+      await createNotificationForUser({
+        userId: product.sellerId,
+        type: notificationType,
+        title,
+        message,
+        data: {
+          productId: product.id,
+          status: targetStatus,
+        },
+      });
+    }
+  }
 
   return normalizeProduct(product);
 };
