@@ -251,15 +251,15 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
                 <div className={`w-full rounded-lg border ${errors.cover ? "border-red-500" : "border-sand"} bg-sand/40 overflow-hidden`}>
                   {coverPreview ? (
                     <div className="relative aspect-[4/3]">
-                      <img
-                        src={coverPreview}
-                        alt="Cover preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
+                  <img
+                    src={coverPreview}
+                    alt="Cover preview"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
                       <div className="absolute bottom-2 left-3 right-3 text-white">
                         <p className="text-xs opacity-80">
@@ -343,7 +343,7 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
                   <img
                     src={coverPreview}
                     alt="Cover"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
                       e.currentTarget.style.display = "none";

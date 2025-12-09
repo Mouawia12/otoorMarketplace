@@ -79,11 +79,11 @@ export default function AdminBlogList() {
                       <img
                         src={
                           row.cover
-                            ? resolveImageUrl(row.cover) || BLOG_PLACEHOLDER
+                            ? resolveImageUrl(row.cover, { disableOptimization: true }) || BLOG_PLACEHOLDER
                             : BLOG_PLACEHOLDER
                         }
                         alt={row.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = BLOG_PLACEHOLDER;
