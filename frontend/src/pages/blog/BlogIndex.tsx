@@ -266,7 +266,7 @@ export default function BlogIndex() {
               {paginatedPosts.map((post) => {
                 const coverSrc =
                   post.cover && !post.cover.startsWith('data:') && !post.cover.startsWith('blob:')
-                    ? resolveImageUrl(post.cover) || BLOG_PLACEHOLDER
+                    ? resolveImageUrl(post.cover, { disableOptimization: true }) || BLOG_PLACEHOLDER
                     : post.cover || BLOG_PLACEHOLDER;
                 return (
                 <Link
