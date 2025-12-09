@@ -73,8 +73,8 @@ model Product {
   nameAr        String           @map("name_ar")
   nameEn        String           @map("name_en")
   slug          String           @unique
-  descriptionAr String           @map("description_ar")
-  descriptionEn String           @map("description_en")
+  descriptionAr String           @map("description_ar") @db.Text
+  descriptionEn String           @map("description_en") @db.Text
   productType   String           @map("product_type")
   brand         String
   category      String
@@ -244,8 +244,8 @@ model ProductTemplate {
   id            Int      @id @default(autoincrement())
   nameAr        String   @map("name_ar")
   nameEn        String   @map("name_en")
-  descriptionAr String   @map("description_ar")
-  descriptionEn String   @map("description_en")
+  descriptionAr String   @map("description_ar") @db.Text
+  descriptionEn String   @map("description_en") @db.Text
   productType   String   @map("product_type")
   brand         String
   category      String
@@ -335,12 +335,12 @@ model Post {
   id          Int        @id @default(autoincrement())
   title       String
   slug        String     @unique
-  description String
+  description String   @db.Text
   coverUrl    String     @map("cover_url")
   author      String
   category    String?
   tags        String?
-  content     String
+  content     String   @db.LongText
   status      PostStatus @default(DRAFT)
   lang        PostLang
   createdAt   DateTime   @default(now()) @map("created_at")
