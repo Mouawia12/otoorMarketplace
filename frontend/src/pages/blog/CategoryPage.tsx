@@ -115,12 +115,12 @@ export default function CategoryPage() {
                   to={`/blog/${post.slug}`}
                   className="group bg-ivory rounded-luxury overflow-hidden shadow-sm hover:shadow-luxury transition"
                 >
-                  <div className="aspect-video overflow-hidden bg-sand">
+                  <div className="aspect-video overflow-hidden bg-sand flex items-center justify-center">
                     <img
                       src={coverSrc}
                       alt={post.title}
                       loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
                         e.currentTarget.src = BLOG_PLACEHOLDER;
                       }}

@@ -18,37 +18,62 @@ export default function BlogPost() {
   const [toc, setToc] = useState<{ id: string; text: string; level: number }[]>([]);
   const [copySuccess, setCopySuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [contentLanguage, setContentLanguage] = useState<'ar' | 'en'>(language);
 
   useEffect(() => {
     if (!slug) return;
+    let cancelled = false;
     const load = async () => {
-      const foundPost = await fetchPost(slug, language);
-      if (!foundPost) {
-        navigate('/blog');
-        return;
-      }
-      setPost(foundPost);
-      setToc(extractToc(foundPost.html || ''));
+      setLoading(true);
+      const fetchForLang = (lang: 'ar' | 'en') => fetchPost(slug, lang);
+      try {
+        let langUsed: 'ar' | 'en' = language;
+        let foundPost = await fetchForLang(language);
+        if (!foundPost) {
+          const fallbackLang = language === 'ar' ? 'en' : 'ar';
+          const fallbackPost = await fetchForLang(fallbackLang);
+          if (fallbackPost) {
+            foundPost = fallbackPost;
+            langUsed = fallbackLang;
+          }
+        }
 
-      const all = await fetchPosts(language, 'published');
-      const related = all
-        .filter((p) => p.slug !== slug)
-        .map((p) => ({
-          ...p,
-          score:
-            (p.category === foundPost.category ? 3 : 0) +
-            p.tags.filter((tg) => foundPost.tags.includes(tg)).length,
-        }))
-        .sort((a, b) => {
-          if (b.score !== a.score) return b.score - a.score;
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        })
-        .slice(0, 3)
-        .map(({ score, ...rest }) => rest);
-      setRelatedPosts(related);
-      setLoading(false);
+        if (!foundPost) {
+          navigate('/blog');
+          return;
+        }
+
+        const all = await fetchPosts(langUsed, 'published');
+        const related = all
+          .filter((p) => p.slug !== slug)
+          .map((p) => ({
+            ...p,
+            score:
+              (p.category === foundPost!.category ? 3 : 0) +
+              p.tags.filter((tg) => foundPost!.tags.includes(tg)).length,
+          }))
+          .sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          })
+          .slice(0, 3)
+          .map(({ score, ...rest }) => rest);
+
+        if (cancelled) return;
+        setPost(foundPost);
+        setContentLanguage(langUsed);
+        setToc(extractToc(foundPost.html || ''));
+        setRelatedPosts(related);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     };
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [slug, language, navigate]);
 
   if (loading) {
@@ -199,54 +224,65 @@ export default function BlogPost() {
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-sand py-12 sm:py-16">
-        <div className="container mx-auto px-4">
+      <div className="min-h-screen bg-gradient-to-b from-ivory via-sand/60 to-sand py-12 sm:py-16">
+        <div className="max-w-6xl mx-auto px-4 lg:px-0 relative">
+          <div className="absolute inset-0 -z-10 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.7),_transparent_60%)]" />
+
           {/* Breadcrumbs */}
-          <nav className="text-sm text-taupe mb-6 sm:mb-8 flex items-center gap-2">
-            <Link to="/" className="hover:text-gold">{t('nav.home')}</Link>
-            <span>{i18n.language === 'ar' ? '←' : '→'}</span>
-            <Link to="/blog" className="hover:text-gold">{t('blog.title')}</Link>
-            <span>{i18n.language === 'ar' ? '←' : '→'}</span>
-            <span className="text-charcoal">{post.title}</span>
+          <nav className="text-sm text-taupe mb-6 sm:mb-10 flex items-center gap-2">
+            <Link to="/" className="hover:text-gold transition">{t('nav.home')}</Link>
+            <span className="text-charcoal/50">{i18n.language === 'ar' ? '←' : '→'}</span>
+            <Link to="/blog" className="hover:text-gold transition">{t('blog.title')}</Link>
+            <span className="text-charcoal/50">{i18n.language === 'ar' ? '←' : '→'}</span>
+            <span className="text-charcoal font-semibold line-clamp-1">{post.title}</span>
           </nav>
 
-          <div className="grid lg:grid-cols-12 gap-6 sm:gap-8">
+          {contentLanguage !== language && (
+            <div className="mb-6 rounded-2xl border border-gold/40 bg-gold/10 text-sm text-charcoal px-4 py-3">
+              {language === 'en'
+                ? t('blog.languageFallbackEn', 'This article is only available in Arabic for now. Showing the Arabic version.')
+                : t('blog.languageFallbackAr', 'هذه التدوينة متاحة بالإنجليزية فقط حالياً. نعرض النسخة الإنجليزية.')}
+            </div>
+          )}
+
+          <div className="relative grid lg:grid-cols-[minmax(0,3fr)_minmax(280px,1fr)] gap-6 sm:gap-8">
             {/* Main Content */}
-            <article className="lg:col-span-8">
-              {/* Header */}
-              <header className="mb-8">
-                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-taupe mb-3 sm:mb-4">
-                  <span className="bg-gold text-charcoal px-3 py-1 rounded-full font-semibold">
+            <article className="bg-white/95 border border-ivory/70 rounded-[32px] shadow-[0_25px_80px_rgba(15,23,42,0.08)] p-6 sm:p-10 backdrop-blur">
+              <header className="mb-8 sm:mb-10 space-y-4">
+                <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-taupe">
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 text-gold font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gold"></span>
                     {post.category}
                   </span>
-                  <span>{new Date(post.date).toLocaleDateString(
-                    i18n.language === 'ar' ? 'ar-SA' : 'en-US',
-                    { year: 'numeric', month: 'long', day: 'numeric' }
-                  )}</span>
-                  <span>•</span>
-                  <span>{post.readingTime || 2} {t('blog.minRead')}</span>
+                  <span className="text-charcoal/70">
+                    {new Date(post.date).toLocaleDateString(
+                      i18n.language === 'ar' ? 'ar-SA' : 'en-US',
+                      { year: 'numeric', month: 'long', day: 'numeric' }
+                    )}
+                  </span>
+                  <span className="text-charcoal/30">•</span>
+                  <span className="text-charcoal/70">{post.readingTime || 2} {t('blog.minRead')}</span>
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-charcoal mb-3 sm:mb-4 leading-tight">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-charcoal leading-tight">
                   {post.title}
                 </h1>
 
-                <p className="text-base sm:text-lg text-taupe mb-5 sm:mb-6">
+                <p className="text-lg sm:text-xl text-charcoal/75 leading-relaxed max-w-3xl break-words">
                   {post.description}
                 </p>
 
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="text-taupe">{t('blog.by')} {post.author}</span>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-taupe">
+                  <span className="font-medium text-charcoal">{t('blog.by')} {post.author}</span>
                 </div>
               </header>
 
-              {/* Cover Image */}
-              <div className="aspect-video rounded-luxury overflow-hidden mb-6 sm:mb-8 bg-ivory">
+              <div className="rounded-[28px] overflow-hidden mb-10 bg-ivory min-h-[220px] flex items-center justify-center">
                 <img
                   src={coverSrc}
                   alt={post.title}
                   loading="lazy"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
                     e.currentTarget.src = BLOG_PLACEHOLDER;
@@ -254,83 +290,74 @@ export default function BlogPost() {
                 />
               </div>
 
-              {/* Content */}
               <div
-                className={`prose prose-base sm:prose-lg max-w-none mb-10 sm:mb-12 ${i18n.language === 'ar' ? 'prose-rtl' : ''}`}
+                className={`prose prose-base sm:prose-lg prose-headings:text-charcoal prose-a:text-gold prose-strong:text-charcoal break-words max-w-none mb-8 sm:mb-10 ${i18n.language === 'ar' ? 'prose-rtl' : ''}`}
                 dangerouslySetInnerHTML={{ __html: post.html || '' }}
-                style={{
-                  direction: i18n.language === 'ar' ? 'rtl' : 'ltr',
-                }}
+                style={{ direction: i18n.language === 'ar' ? 'rtl' : 'ltr' }}
               />
 
-              {/* Tags */}
-              {post.tags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 mb-6 sm:mb-8">
-                  <span className="text-taupe font-semibold">{t('blog.tags')}:</span>
-                  {post.tags.map(tag => (
-                    <Link
-                      key={tag}
-                      to={`/blog/tag/${tag}`}
-                      className="px-3 py-1 bg-ivory text-taupe rounded-full text-xs sm:text-sm hover:bg-gold hover:text-charcoal transition"
+              <div className="space-y-6">
+                {post.tags.length > 0 && (
+                  <div className="bg-ivory/70 border border-ivory/60 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-2">
+                    <span className="text-taupe font-semibold">{t('blog.tags')}:</span>
+                    {post.tags.map(tag => (
+                      <Link
+                        key={tag}
+                        to={`/blog/tag/${tag}`}
+                        className="px-3 py-1 rounded-full bg-white text-charcoal/80 text-xs sm:text-sm border border-sand hover:border-gold hover:text-gold transition"
+                      >
+                        #{tag}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                <div className="bg-ivory/80 border border-ivory/60 rounded-2xl p-4 sm:p-6">
+                  <p className="text-taupe font-semibold mb-3">{t('blog.share')}</p>
+                  <div className="flex flex-wrap gap-3 sm:gap-4">
+                    <button
+                      onClick={() => handleShare('copy')}
+                      className="px-4 py-2 sm:px-5 sm:py-3 text-sm bg-white rounded-xl border border-sand hover:border-gold transition flex items-center gap-2"
                     >
-                      #{tag}
-                    </Link>
-                  ))}
-                </div>
-              )}
-
-              {/* Share Buttons */}
-              <div className="border-t border-charcoal-light pt-6 sm:pt-8">
-                <p className="text-taupe font-semibold mb-4">{t('blog.share')}:</p>
-                <div className="flex flex-wrap gap-3 sm:gap-4">
-                  <button
-                    onClick={() => handleShare('copy')}
-                    className="px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base bg-ivory hover:bg-charcoal-light transition rounded-lg flex items-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    {copySuccess ? t('blog.copied') : t('blog.copyLink')}
-                  </button>
-
-                  <button
-                    onClick={() => handleShare('whatsapp')}
-                    className="px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white transition rounded-lg flex items-center gap-2"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12.05 2C6.53 2 2 6.25 2 11.72c0 1.7.45 3.3 1.32 4.75L2 22l5.43-1.42a9.95 9.95 0 0 0 4.62 1.14c5.52 0 10.05-4.25 10.05-9.72C22.1 6.25 17.57 2 12.05 2Zm0 17.26c-1.43 0-2.82-.38-4.05-1.12l-.29-.17-3.32.86.88-3.04-.19-.3a7.42 7.42 0 0 1-1.16-3.97c0-4.1 3.4-7.42 7.74-7.42 4.25 0 7.71 3.32 7.71 7.42 0 4.1-3.46 7.42-7.71 7.42Zm4.02-5.5c-.22-.11-1.35-.67-1.57-.75-.22-.08-.38-.11-.54.11-.16.22-.61.75-.75.91-.14.16-.28.18-.52.06-.24-.11-1-.37-1.9-1.21-.7-.62-1.18-1.38-1.32-1.62-.14-.24-.02-.37.1-.49.1-.1.24-.26.34-.39.12-.14.14-.24.22-.4.08-.16.04-.3 0-.42-.04-.12-.52-1.25-.72-1.72-.18-.45-.37-.39-.52-.4-.14-.01-.3-.02-.46-.02-.16 0-.42.06-.64.3-.22.24-.85.83-.85 2.03 0 1.2.87 2.36 1 .25.12.16 1.7 2.6 4.1 3.66.58.26 1.02.41 1.38.53.58.18 1.1.17 1.52.1.47-.07 1.43-.55 1.64-1.1.22-.55.22-1.02.14-1.12-.06-.1-.22-.16-.45-.28Z" />
-                    </svg>
-                    {t('blog.whatsapp')}
-                  </button>
-
-                  <button
-                    onClick={() => handleShare('twitter')}
-                    className="px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base bg-black text-white hover:bg-charcoal transition rounded-lg flex items-center gap-2"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <path d="M4 3h4.3l4 5.4L17.7 3H21l-6.6 7.4L21.5 21H17.2l-4.4-5.8L7.9 21H3.5l6.9-7.7L4 3Zm2.3 1.4 9.5 12.7h1.1L7.4 4.4H6.3Z" />
-                    </svg>
-                    {t('blog.twitterX')}
-                  </button>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      {copySuccess ? t('blog.copied') : t('blog.copyLink')}
+                    </button>
+                    <button
+                      onClick={() => handleShare('whatsapp')}
+                      className="px-4 py-2 sm:px-5 sm:py-3 text-sm rounded-xl bg-green-500 text-white hover:bg-green-600 transition flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12.05 2C6.53 2 2 6.25 2 11.72c0 1.7.45 3.3 1.32 4.75L2 22l5.43-1.42a9.95 9.95 0 0 0 4.62 1.14c5.52 0 10.05-4.25 10.05-9.72C22.1 6.25 17.57 2 12.05 2Zm0 17.26c-1.43 0-2.82-.38-4.05-1.12l-.29-.17-3.32.86.88-3.04-.19-.3a7.42 7.42 0 0 1-1.16-3.97c0-4.1 3.4-7.42 7.74-7.42 4.25 0 7.71 3.32 7.71 7.42 0 4.1-3.46 7.42-7.71 7.42Zm4.02-5.5c-.22-.11-1.35-.67-1.57-.75-.22-.08-.38-.11-.54.11-.16.22-.61.75-.75.91-.14.16-.28.18-.52.06-.24-.11-1-.37-1.9-1.21-.7-.62-1.18-1.38-1.32-1.62-.14-.24-.02-.37.1-.49.1-.1.24-.26.34-.39.12-.14.14-.24.22-.4.08-.16.04-.3 0-.42-.04-.12-.52-1.25-.72-1.72-.18-.45-.37-.39-.52-.4-.14-.01-.3-.02-.46-.02-.16 0-.42.06-.64.3-.22.24-.85.83-.85 2.03 0 1.2.87 2.36 1 .25.12.16 1.7 2.6 4.1 3.66.58.26 1.02.41 1.38.53.58.18 1.1.17 1.52.1.47-.07 1.43-.55 1.64-1.1.22-.55.22-1.02.14-1.12-.06-.1-.22-.16-.45-.28Z" />
+                      </svg>
+                      {t('blog.whatsapp')}
+                    </button>
+                    <button
+                      onClick={() => handleShare('twitter')}
+                      className="px-4 py-2 sm:px-5 sm:py-3 text-sm rounded-xl bg-black text-white hover:bg-charcoal transition flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <path d="M4 3h4.3l4 5.4L17.7 3H21l-6.6 7.4L21.5 21H17.2l-4.4-5.8L7.9 21H3.5l6.9-7.7L4 3Zm2.3 1.4 9.5 12.7h1.1L7.4 4.4H6.3Z" />
+                      </svg>
+                      {t('blog.twitterX')}
+                    </button>
+                  </div>
                 </div>
               </div>
             </article>
 
             {/* Sidebar */}
-            <aside className="lg:col-span-4">
-              {/* TOC */}
+            <aside className="space-y-6 lg:sticky lg:top-24 h-max">
               {toc.length > 0 && (
-                <div className="bg-ivory rounded-luxury p-5 sm:p-6 mb-8 sticky top-24">
-                  <h3 className="text-lg sm:text-xl font-bold text-charcoal mb-3 sm:mb-4">
+                <div className="bg-white/95 rounded-[28px] border border-ivory/70 shadow-lg p-5 sm:p-6">
+                  <h3 className="text-lg sm:text-xl font-bold text-charcoal mb-4">
                     {t('blog.toc')}
                   </h3>
                   <nav>
                     <ul className="space-y-2 text-sm sm:text-base">
                       {toc.map(item => (
-                        <li
-                          key={item.id}
-                          className={item.level === 3 ? 'ms-4' : ''}
-                        >
+                        <li key={item.id} className={item.level === 3 ? (i18n.language === 'ar' ? 'me-4' : 'ms-4') : ''}>
                           <a
                             href={`#${item.id}`}
                             className="text-taupe hover:text-gold transition block py-1"
@@ -343,56 +370,77 @@ export default function BlogPost() {
                   </nav>
                 </div>
               )}
+
+              <div className="bg-gradient-to-br from-gold/15 to-white rounded-[28px] border border-gold/30 p-6 shadow-lg">
+                <p className="text-charcoal font-semibold mb-2">{t('blog.keepReading', 'استكشف المزيد من المقالات')}</p>
+                <p className="text-sm text-taupe mb-4">
+                  {t('blog.keepReadingDesc', 'نحدث المدونة باستمرار بقصص ونصائح حول عالم العطور.')} 
+                </p>
+                <Link
+                  to="/blog"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-gold hover:text-charcoal transition"
+                >
+                  {t('blog.viewAll', 'عرض جميع التدوينات')}
+                  <span>{i18n.language === 'ar' ? '←' : '→'}</span>
+                </Link>
+              </div>
             </aside>
           </div>
 
-          {/* Related Posts */}
           {relatedPosts.length > 0 && (
-            <section className="mt-14 sm:mt-16">
-              <h2 className="text-2xl sm:text-3xl font-bold text-charcoal mb-6 sm:mb-8">
-                {t('blog.related')}
-              </h2>
-              <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
-                {relatedPosts.map(related => {
-                  const relatedCover = buildCoverSrc(related.cover);
-                  return (
-                  <Link
-                    key={related.slug}
-                    to={`/blog/${related.slug}`}
-                    className="group bg-ivory rounded-luxury overflow-hidden shadow-sm hover:shadow-luxury transition"
-                  >
-                    <div className="aspect-video overflow-hidden bg-sand">
-                      <img
-                        src={relatedCover}
-                        alt={related.title}
-                        loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src = BLOG_PLACEHOLDER;
-                        }}
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-bold text-charcoal mb-2 group-hover:text-gold transition line-clamp-2 text-base sm:text-lg">
-                        {related.title}
-                      </h3>
-                      <p className="text-sm text-taupe line-clamp-2">
-                        {related.description}
-                      </p>
-                    </div>
+            <section className="mt-16 sm:mt-20">
+              <div className="bg-white/90 rounded-[32px] border border-ivory/60 shadow-xl p-6 sm:pt-8 sm:px-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-charcoal">{t('blog.related')}</h2>
+                  <Link to="/blog" className="text-sm text-gold hover:text-charcoal transition">
+                    {t('blog.viewAll', 'عرض جميع التدوينات')}
                   </Link>
-                  );
-                })}
+                </div>
+                <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+                  {relatedPosts.map(related => {
+                    const relatedCover = buildCoverSrc(related.cover);
+                    return (
+                      <Link
+                        key={related.slug}
+                        to={`/blog/${related.slug}`}
+                        className="group rounded-2xl border border-ivory/60 overflow-hidden bg-ivory/60 hover:shadow-xl transition"
+                      >
+                        <div className="aspect-video overflow-hidden bg-sand flex items-center justify-center">
+                          <img
+                            src={relatedCover}
+                            alt={related.title}
+                            loading="lazy"
+                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = BLOG_PLACEHOLDER;
+                            }}
+                          />
+                        </div>
+                        <div className="p-4">
+                          <p className="text-xs text-taupe mb-2">
+                            {new Date(related.date).toLocaleDateString(
+                              i18n.language === 'ar' ? 'ar-SA' : 'en-US',
+                              { year: 'numeric', month: 'short', day: 'numeric' }
+                            )}
+                          </p>
+                          <h3 className="font-semibold text-charcoal mb-2 line-clamp-2 group-hover:text-gold transition">
+                            {related.title}
+                          </h3>
+                          <p className="text-sm text-taupe line-clamp-2">{related.description}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             </section>
           )}
 
-          {/* Back to Blog */}
-          <div className="mt-10 sm:mt-12 text-center">
+          <div className="mt-12 sm:mt-16 text-center">
             <Link
               to="/blog"
-              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-gold text-charcoal rounded-luxury hover:bg-gold-hover transition font-semibold text-sm sm:text-base"
+              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-gold text-charcoal rounded-full hover:bg-gold-hover transition font-semibold text-sm sm:text-base shadow-lg"
             >
               <span>{i18n.language === 'ar' ? '→' : '←'}</span>
               {t('blog.back')}
