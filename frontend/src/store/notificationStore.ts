@@ -15,6 +15,7 @@ type NotificationState = {
   loading: boolean;
   socketBound: boolean;
   error?: string;
+  lastNotification: Notification | null;
   fetchInitial: () => Promise<void>;
   bindSocket: () => void;
   markAsRead: (id: number) => Promise<void>;
@@ -31,6 +32,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   loading: false,
   socketBound: false,
   error: undefined,
+  lastNotification: null,
   fetchInitial: async () => {
     if (get().loading || get().initialized) {
       return;
@@ -63,6 +65,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         return {
           notifications: updated,
           unreadCount: unread,
+          lastNotification: notification,
         };
       });
     });
@@ -97,6 +100,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       initialized: false,
       loading: false,
       error: undefined,
+      lastNotification: null,
     });
   },
 }));

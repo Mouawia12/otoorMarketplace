@@ -33,7 +33,7 @@ interface AuthState {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
   loginWithGoogle: (idToken: string, role?: 'buyer' | 'seller') => Promise<User>;
-  register: (data: { email: string; password: string; full_name: string; phone?: string; roles?: string[] }) => Promise<User>;
+  register: (data: { email: string; password: string; fullName: string; phone?: string; roles?: string[] }) => Promise<User>;
   updateProfile: (data: { full_name?: string; phone?: string; avatar_url?: string }) => Promise<User>;
   logout: () => void;
   fetchUser: () => Promise<void>;
@@ -64,7 +64,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       register: async (data) => {
-        const response = await api.post('/auth/register', data);
+        const payload = {
+          email: data.email,
+          password: data.password,
+          fullName: data.fullName,
+          ...(data.phone ? { phone: data.phone } : {}),
+          ...(data.roles ? { roles: data.roles } : {}),
+        };
+        const response = await api.post('/auth/register', payload);
         const { access_token, user } = response.data;
         localStorage.setItem('auth_token', access_token);
         set({ token: access_token, user, isAuthenticated: true });

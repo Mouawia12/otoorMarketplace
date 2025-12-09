@@ -24,6 +24,8 @@ export default function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const { isAuthenticated } = useAuthStore();
+  const isRTL = i18n.language === 'ar';
+
   const {
     notifications,
     unreadCount,
@@ -103,7 +105,10 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-3 w-80 max-w-[90vw] rounded-2xl border border-gray-100 bg-white shadow-lg">
+        <div
+          className={`absolute ${isRTL ? 'left-0' : 'right-0'} z-40 mt-3 w-80 max-w-[90vw] rounded-2xl border border-gray-100 bg-white shadow-lg`}
+          dir={isRTL ? 'rtl' : 'ltr'}
+        >
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-charcoal">{t('notifications.recent')}</p>
