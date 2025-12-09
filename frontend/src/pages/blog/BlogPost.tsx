@@ -100,7 +100,7 @@ export default function BlogPost() {
   const buildCoverSrc = (src?: string | null) => {
     if (!src) return BLOG_PLACEHOLDER;
     if (src.startsWith('data:') || src.startsWith('blob:')) return src;
-    return resolveImageUrl(src) || BLOG_PLACEHOLDER;
+    return resolveImageUrl(src, { disableOptimization: true }) || BLOG_PLACEHOLDER;
   };
 
   const coverSrc = buildCoverSrc(post.cover);

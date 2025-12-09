@@ -21,7 +21,14 @@ const getOptimizerConfig = () => {
 const isLocalhostUrl = (url: string) =>
   /^http:\/\/(localhost|127\.0\.0\.1)/i.test(url);
 
-const applyImageOptimization = (url: string) => {
+type ResolveImageOptions = {
+  disableOptimization?: boolean;
+};
+
+const applyImageOptimization = (url: string, options?: ResolveImageOptions) => {
+  if (options?.disableOptimization) {
+    return url;
+  }
   const config = getOptimizerConfig();
   if (!config.enabled || !config.template) {
     return url;
@@ -44,7 +51,7 @@ const applyImageOptimization = (url: string) => {
   return config.template.replace('{{url}}', encodeURIComponent(url));
 };
 
-export const resolveImageUrl = (input?: string | null) => {
+export const resolveImageUrl = (input?: string | null, options?: ResolveImageOptions) => {
   if (!input) return '';
   const value = input.trim();
   if (!value) return '';
@@ -59,17 +66,17 @@ export const resolveImageUrl = (input?: string | null) => {
       try {
         const parsed = new URL(value);
         const resolved = `${getAssetBaseUrl()}${parsed.pathname}`;
-        return applyImageOptimization(resolved);
+        return applyImageOptimization(resolved, options);
       } catch {
-        return applyImageOptimization(value);
+        return applyImageOptimization(value, options);
       }
     }
-    return applyImageOptimization(value);
+    return applyImageOptimization(value, options);
   }
 
   const prefix = value.startsWith('/') ? '' : '/';
   const resolved = `${getAssetBaseUrl()}${prefix}${value}`;
-  return applyImageOptimization(resolved);
+  return applyImageOptimization(resolved, options);
 };
 
 export const normalizeImagePathForStorage = (input?: string | null) => {
