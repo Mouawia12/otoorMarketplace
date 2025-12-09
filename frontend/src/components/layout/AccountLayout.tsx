@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { hasSubmittedSellerProfile } from '../../utils/authNavigation';
+import NotificationBell from '../notifications/NotificationBell';
 
 export default function AccountLayout() {
   const { t } = useTranslation();
@@ -91,7 +92,10 @@ export default function AccountLayout() {
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 min-w-0">
+          <main className="flex-1 min-w-0 space-y-4">
+            <div className="flex justify-end">
+              <NotificationBell />
+            </div>
             <Outlet />
           </main>
         </div>

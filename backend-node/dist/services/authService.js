@@ -14,6 +14,7 @@ const errors_1 = require("../utils/errors");
 const jwt_1 = require("../utils/jwt");
 const env_1 = require("../config/env");
 const mailer_1 = require("../utils/mailer");
+const notificationService_1 = require("./notificationService");
 const userWithRolesInclude = client_1.Prisma.validator()({
     roles: { include: { role: true } },
     sellerProfile: true,
@@ -119,6 +120,13 @@ const registerUser = async (input) => {
     const token = (0, jwt_1.signAccessToken)({
         sub: user.id,
         roles: user.roles.map((role) => role.role.name),
+    });
+    await (0, notificationService_1.notifyAdmins)({
+        type: client_1.NotificationType.USER_REGISTERED,
+        title: "تسجيل مستخدم جديد",
+        message: `${user.fullName} (${user.email}) انضم إلى المنصة.`,
+        data: { userId: user.id, email: user.email },
+        fallbackToSupport: true,
     });
     return {
         token,

@@ -4,6 +4,7 @@ const express_1 = require("express");
 const auctionService_1 = require("../services/auctionService");
 const auth_1 = require("../middleware/auth");
 const errors_1 = require("../utils/errors");
+const auctionRealtime_1 = require("../realtime/auctionRealtime");
 const router = (0, express_1.Router)();
 router.get("/", async (req, res, next) => {
     try {
@@ -66,12 +67,19 @@ router.post("/:id/bids", (0, auth_1.authenticate)({ roles: ["BUYER", "SELLER", "
         if (Number.isNaN(amount)) {
             throw errors_1.AppError.badRequest("Invalid bid amount");
         }
-        const bid = await (0, auctionService_1.placeBid)({
+        const { bid, auction } = await (0, auctionService_1.placeBid)({
             auctionId: id,
             bidderId: req.user.id,
             amount,
         });
         res.status(201).json(bid);
+        (0, auctionRealtime_1.broadcastBidUpdate)({
+            auctionId: auction.id,
+            bid,
+            currentPrice: auction.current_price,
+            totalBids: auction.total_bids ?? 0,
+            placedAt: bid.created_at,
+        });
     }
     catch (error) {
         next(error);

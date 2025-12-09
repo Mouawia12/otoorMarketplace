@@ -2,9 +2,12 @@ import type { Server as HTTPServer } from "http";
 import type { CorsOptions } from "cors";
 import { Server } from "socket.io";
 
+import { verifyAccessToken } from "../utils/jwt";
+
 let io: Server | null = null;
 
 const AUCTION_ROOM_PREFIX = "auction:";
+const USER_ROOM_PREFIX = "user:";
 
 type BidderPayload =
   | {
@@ -29,6 +32,19 @@ export type AuctionBidUpdatePayload = {
   currentPrice: number;
   totalBids: number;
   placedAt: string;
+};
+
+export type NotificationRealtimePayload = {
+  userId: number;
+  notification: {
+    id: number;
+    type: string;
+    title: string;
+    message: string;
+    data: unknown;
+    read_at: string | null;
+    created_at: string;
+  };
 };
 
 const resolveCorsOrigins = (corsOptions: CorsOptions) => {
@@ -57,7 +73,33 @@ export const initAuctionRealtime = (server: HTTPServer, corsOptions: CorsOptions
     serveClient: false,
   });
 
+  io.use((socket, next) => {
+    const tokenRaw =
+      (typeof socket.handshake.auth?.token === "string" && socket.handshake.auth.token.trim().length > 0
+        ? socket.handshake.auth.token
+        : undefined) ||
+      (typeof socket.handshake.query?.token === "string" ? (socket.handshake.query.token as string) : undefined) ||
+      (typeof socket.handshake.headers?.authorization === "string"
+        ? socket.handshake.headers.authorization.replace(/^Bearer\s+/i, "")
+        : undefined);
+
+    if (tokenRaw) {
+      try {
+        const payload = verifyAccessToken(tokenRaw);
+        socket.data.userId = payload.sub;
+        socket.data.roles = payload.roles;
+      } catch (error) {
+        console.warn("Failed to authenticate realtime socket:", error instanceof Error ? error.message : error);
+      }
+    }
+    next();
+  });
+
   io.on("connection", (socket) => {
+    if (socket.data.userId) {
+      socket.join(getUserRoom(socket.data.userId));
+    }
+
     socket.on("auction:join", (maybeId: unknown) => {
       const auctionId = Number(maybeId);
       if (!Number.isFinite(auctionId) || auctionId <= 0) {
@@ -95,8 +137,14 @@ const getIo = () => {
 };
 
 const getAuctionRoom = (auctionId: number | string) => `${AUCTION_ROOM_PREFIX}${auctionId}`;
+const getUserRoom = (userId: number | string) => `${USER_ROOM_PREFIX}${userId}`;
 
 export const broadcastBidUpdate = (payload: AuctionBidUpdatePayload) => {
   const instance = getIo();
   instance.to(getAuctionRoom(payload.auctionId)).emit("auction:update", payload);
+};
+
+export const broadcastUserNotification = (payload: NotificationRealtimePayload) => {
+  const instance = getIo();
+  instance.to(getUserRoom(payload.userId)).emit("notification:new", payload.notification);
 };

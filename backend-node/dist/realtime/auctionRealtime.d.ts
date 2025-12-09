@@ -21,8 +21,21 @@ export type AuctionBidUpdatePayload = {
     totalBids: number;
     placedAt: string;
 };
+export type NotificationRealtimePayload = {
+    userId: number;
+    notification: {
+        id: number;
+        type: string;
+        title: string;
+        message: string;
+        data: unknown;
+        read_at: string | null;
+        created_at: string;
+    };
+};
 export declare const initAuctionRealtime: (server: HTTPServer, corsOptions: CorsOptions) => Server<import("socket.io").DefaultEventsMap, import("socket.io").DefaultEventsMap, import("socket.io").DefaultEventsMap, any>;
 export declare const shutdownAuctionRealtime: () => void;
 export declare const broadcastBidUpdate: (payload: AuctionBidUpdatePayload) => void;
+export declare const broadcastUserNotification: (payload: NotificationRealtimePayload) => void;
 export {};
 //# sourceMappingURL=auctionRealtime.d.ts.map

@@ -1,4 +1,4 @@
-import { Prisma, ProductCondition, ProductStatus } from "@prisma/client";
+import { NotificationType, Prisma, ProductCondition, ProductStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "../prisma/client";
@@ -6,6 +6,7 @@ import { AppError } from "../utils/errors";
 import { toPlainObject } from "../utils/serializer";
 import { makeSlug } from "../utils/slugify";
 import { normalizeImagePathForStorage, toPublicAssetUrl } from "../utils/assets";
+import { createNotificationForUser, notifyAdmins } from "./notificationService";
 
 const normalizeStatus = (status: string | null | undefined) => {
   if (!status) return status ?? "";
@@ -398,6 +399,22 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
     },
   });
 
+  await createNotificationForUser({
+    userId: product.sellerId,
+    type: NotificationType.PRODUCT_SUBMITTED,
+    title: "تم استلام منتجك",
+    message: `نراجع الآن منتجك ${product.nameEn}. سنعلمك فور اتخاذ القرار.`,
+    data: { productId: product.id },
+  });
+
+  await notifyAdmins({
+    type: NotificationType.PRODUCT_SUBMITTED,
+    title: "منتج جديد بانتظار المراجعة",
+    message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn}.`,
+    data: { productId: product.id, sellerId: product.sellerId },
+    fallbackToSupport: true,
+  });
+
   return normalizeProduct(product);
 };
 
@@ -503,6 +520,20 @@ export const moderateProduct = async (
     include: {
       images: { orderBy: { sortOrder: "asc" } },
     },
+  });
+
+  await createNotificationForUser({
+    userId: product.sellerId,
+    type:
+      action === "approve"
+        ? NotificationType.PRODUCT_APPROVED
+        : NotificationType.PRODUCT_REJECTED,
+    title: action === "approve" ? "تم نشر المنتج" : "تم رفض المنتج",
+    message:
+      action === "approve"
+        ? `${product.nameEn ?? "المنتج"} أصبح متاحًا الآن في المتجر.`
+        : `نأسف، تم رفض ${product.nameEn ?? "المنتج"}. راجع المتطلبات وحاول مرة أخرى.`,
+    data: { productId: product.id, status },
   });
 
   return normalizeProduct(product);

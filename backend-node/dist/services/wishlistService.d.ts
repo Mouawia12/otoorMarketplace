@@ -15,9 +15,9 @@ export declare const addToWishlist: (input: z.infer<typeof wishlistInputSchema>)
             altText: string | null;
         }[];
         id: number;
-        status: import(".prisma/client").$Enums.ProductStatus;
         createdAt: Date;
         updatedAt: Date;
+        status: import(".prisma/client").$Enums.ProductStatus;
         nameAr: string;
         nameEn: string;
         slug: string;
@@ -34,8 +34,8 @@ export declare const addToWishlist: (input: z.infer<typeof wishlistInputSchema>)
         sellerId: number;
     };
     id: number;
-    createdAt: Date;
     userId: number;
+    createdAt: Date;
     productId: number;
 }>;
 export declare const removeFromWishlist: (input: z.infer<typeof wishlistInputSchema>) => Promise<void>;
@@ -51,9 +51,9 @@ export declare const listWishlist: (userId: number) => Promise<{
             altText: string | null;
         }[];
         id: number;
-        status: import(".prisma/client").$Enums.ProductStatus;
         createdAt: Date;
         updatedAt: Date;
+        status: import(".prisma/client").$Enums.ProductStatus;
         nameAr: string;
         nameEn: string;
         slug: string;
@@ -70,8 +70,8 @@ export declare const listWishlist: (userId: number) => Promise<{
         sellerId: number;
     };
     id: number;
-    createdAt: Date;
     userId: number;
+    createdAt: Date;
     productId: number;
 }[]>;
 export {};

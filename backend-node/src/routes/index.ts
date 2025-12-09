@@ -14,6 +14,7 @@ import supportRouter from "./support";
 import couponsRouter from "./coupons";
 import promotionsRouter from "./promotions";
 import footerPagesRouter from "./footerPages";
+import notificationsRouter from "./notifications";
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use("/support", supportRouter);
 router.use("/coupons", couponsRouter);
 router.use("/promotions", promotionsRouter);
 router.use("/footer-pages", footerPagesRouter);
+router.use("/notifications", notificationsRouter);
 
 export default router;

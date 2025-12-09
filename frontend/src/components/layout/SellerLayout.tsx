@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { hasSubmittedSellerProfile } from '../../utils/authNavigation';
+import NotificationBell from '../notifications/NotificationBell';
 
 export default function SellerLayout() {
   const { t } = useTranslation();
@@ -97,7 +98,10 @@ export default function SellerLayout() {
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 min-w-0">
+          <main className="flex-1 min-w-0 space-y-4">
+            <div className="flex justify-end">
+              <NotificationBell />
+            </div>
             <Outlet />
           </main>
         </div>
