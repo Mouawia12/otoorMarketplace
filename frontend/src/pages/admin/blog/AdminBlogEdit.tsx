@@ -61,7 +61,7 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
           if (existing.cover) {
             const previewUrl = existing.cover.startsWith("data:") || existing.cover.startsWith("blob:")
               ? existing.cover
-              : resolveImageUrl(existing.cover) || existing.cover;
+              : resolveImageUrl(existing.cover, { disableOptimization: true }) || existing.cover;
             setCoverPreview(previewUrl);
           }
         } catch (error) {
