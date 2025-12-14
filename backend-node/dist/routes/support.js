@@ -94,7 +94,7 @@ router.post("/:id/replies", (0, auth_1.authenticate)(), async (req, res, next) =
             ticketId: id,
             userId: req.user.id,
             message,
-        });
+        }, { actorIsAdmin: isAdmin });
         res.status(201).json(reply);
     }
     catch (error) {

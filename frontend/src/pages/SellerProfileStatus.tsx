@@ -17,7 +17,7 @@ export default function SellerProfileStatus() {
         const st = res.data?.profile?.status ?? user?.seller_status ?? "pending";
         setStatus(st);
         await fetchUser();
-      } catch (e) {
+      } catch (_error) {
         // ignore
       } finally {
         setLoading(false);

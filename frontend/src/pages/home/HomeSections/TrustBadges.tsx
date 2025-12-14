@@ -29,7 +29,7 @@ const trustItems = [
       </svg>
     ),
     title: { ar: 'شحن سريع', en: 'Fast Shipping' },
-    description: { ar: 'توصيل خلال 2-3 أيام', en: 'Delivery in 2-3 Days' }
+    description: { ar: 'توصيل خلال 2-7 أيام', en: 'Delivery in 2-7 Days' }
   },
   {
     id: 'returns',

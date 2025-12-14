@@ -10,7 +10,6 @@ export default function AccountProfilePage() {
   const [fullName, setFullName] = useState(user?.full_name ?? '');
   const [email] = useState(user?.email ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
-  const [avatar, setAvatar] = useState(user?.avatar_url ?? '');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +23,6 @@ export default function AccountProfilePage() {
       await updateProfile({
         full_name: fullName,
         phone: phone || undefined,
-        avatar_url: avatar || undefined,
       });
       setMessage(t('common.saved', 'تم الحفظ بنجاح'));
     } catch (err: any) {
@@ -60,27 +58,15 @@ export default function AccountProfilePage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-charcoal mb-1">{t('account.phone', 'رقم الهاتف')}</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full border border-sand/60 rounded-luxury px-3 py-3 focus:ring-2 focus:ring-gold focus:border-gold outline-none"
-              placeholder="+9665xxxxxxx"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-charcoal mb-1">{t('account.avatar', 'رابط الصورة')}</label>
-            <input
-              type="url"
-              value={avatar}
-              onChange={(e) => setAvatar(e.target.value)}
-              className="w-full border border-sand/60 rounded-luxury px-3 py-3 focus:ring-2 focus:ring-gold focus:border-gold outline-none"
-              placeholder="https://..."
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-semibold text-charcoal mb-1">{t('account.phone', 'رقم الهاتف')}</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full border border-sand/60 rounded-luxury px-3 py-3 focus:ring-2 focus:ring-gold focus:border-gold outline-none"
+            placeholder="+9665xxxxxxx"
+          />
         </div>
 
         {message && <p className="text-sm text-success font-semibold">{message}</p>}

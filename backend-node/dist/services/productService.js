@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.moderateProduct = exports.updateProduct = exports.createProduct = exports.getProductFiltersMeta = exports.getRelatedProducts = exports.getProductById = exports.listProducts = exports.normalizeProduct = void 0;
+exports.moderateProduct = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductFiltersMeta = exports.getRelatedProducts = exports.getProductById = exports.listProducts = exports.normalizeProduct = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
@@ -27,6 +27,7 @@ const normalizeStatus = (status) => {
 };
 const normalizeProduct = (product) => {
     const plain = (0, serializer_1.toPlainObject)(product);
+    const auctions = Array.isArray(plain.auctions) ? plain.auctions : [];
     const rawImages = Array.isArray(plain.images)
         ? plain.images.map((image) => image.url)
         : plain.image_urls ?? [];
@@ -34,6 +35,10 @@ const normalizeProduct = (product) => {
         .map((url) => (typeof url === "string" ? url : null))
         .filter((url) => Boolean(url))
         .map((url) => (0, assets_1.toPublicAssetUrl)(url));
+    const hasActiveAuction = auctions.some((auction) => {
+        const status = typeof auction?.status === "string" ? auction.status.toUpperCase() : "";
+        return status === client_1.AuctionStatus.ACTIVE || status === client_1.AuctionStatus.SCHEDULED;
+    });
     return {
         id: plain.id,
         seller_id: plain.sellerId,
@@ -62,6 +67,8 @@ const normalizeProduct = (product) => {
                 verified_seller: plain.seller.verifiedSeller,
             }
             : undefined,
+        is_auction_product: auctions.length > 0,
+        has_active_auction: hasActiveAuction,
     };
 };
 exports.normalizeProduct = normalizeProduct;
@@ -101,6 +108,13 @@ const listProducts = async (query) => {
     }
     const { search, brand, category, condition, status, min_price, max_price, sort, page = 1, page_size = 12, seller, } = listProductsSchema.parse(normalizedQuery);
     const filters = {};
+    const now = new Date();
+    filters.auctions = {
+        none: {
+            status: { in: [client_1.AuctionStatus.ACTIVE, client_1.AuctionStatus.SCHEDULED] },
+            endTime: { gt: now },
+        },
+    };
     if (status) {
         if (typeof status === "string") {
             if (status === "pending") {
@@ -307,11 +321,12 @@ const productInputSchema = zod_1.z.object({
     concentration: zod_1.z.string().min(1),
     condition: zod_1.z.nativeEnum(client_1.ProductCondition),
     stockQuantity: zod_1.z.coerce.number().int().nonnegative(),
-    status: zod_1.z.nativeEnum(client_1.ProductStatus).default(client_1.ProductStatus.PENDING_REVIEW),
+    status: zod_1.z.nativeEnum(client_1.ProductStatus).default(client_1.ProductStatus.PUBLISHED),
     imageUrls: zod_1.z.array(imageUrlSchema).default([]),
 });
 const createProduct = async (input) => {
     const data = productInputSchema.parse(input);
+    const initialStatus = client_1.ProductStatus.PUBLISHED;
     const slugBase = (0, slugify_1.makeSlug)(data.nameEn);
     const existingSlug = await client_2.prisma.product.findFirst({
         where: { slug: slugBase },
@@ -339,7 +354,7 @@ const createProduct = async (input) => {
             concentration: data.concentration,
             condition: data.condition,
             stockQuantity: data.stockQuantity,
-            status: data.status,
+            status: initialStatus,
             images: {
                 create: sanitizedImages.map((url, index) => ({
                     url,
@@ -349,6 +364,7 @@ const createProduct = async (input) => {
         },
         include: {
             images: true,
+            auctions: true,
             seller: {
                 select: {
                     id: true,
@@ -360,16 +376,16 @@ const createProduct = async (input) => {
     });
     await (0, notificationService_1.createNotificationForUser)({
         userId: product.sellerId,
-        type: client_1.NotificationType.PRODUCT_SUBMITTED,
-        title: "تم استلام منتجك",
-        message: `نراجع الآن منتجك ${product.nameEn}. سنعلمك فور اتخاذ القرار.`,
-        data: { productId: product.id },
+        type: client_1.NotificationType.PRODUCT_APPROVED,
+        title: "تم نشر منتجك",
+        message: `${product.nameEn ?? product.nameAr} متاح الآن في المتجر ويمكنك مراقبته من لوحة البائع.`,
+        data: { productId: product.id, status: initialStatus },
     });
     await (0, notificationService_1.notifyAdmins)({
         type: client_1.NotificationType.PRODUCT_SUBMITTED,
-        title: "منتج جديد بانتظار المراجعة",
-        message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn}.`,
-        data: { productId: product.id, sellerId: product.sellerId },
+        title: "منتج جديد تم نشره تلقائياً",
+        message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn ?? product.nameAr} وتم نشره مباشرة.`,
+        data: { productId: product.id, sellerId: product.sellerId, status: initialStatus },
         fallbackToSupport: true,
     });
     return (0, exports.normalizeProduct)(product);
@@ -404,6 +420,7 @@ const updateProduct = async (productId, sellerId, payload) => {
     if (!product || product.sellerId !== sellerId) {
         throw errors_1.AppError.notFound("Product not found");
     }
+    const wasPendingReview = product.status === client_1.ProductStatus.PENDING_REVIEW;
     const updateData = {};
     if (data.nameAr !== undefined)
         updateData.nameAr = data.nameAr;
@@ -430,7 +447,8 @@ const updateProduct = async (productId, sellerId, payload) => {
     if (data.stockQuantity !== undefined)
         updateData.stockQuantity = data.stockQuantity;
     if (data.status !== undefined) {
-        if (typeof data.status === "string" && (data.status === "pending" || data.status === "published")) {
+        if (typeof data.status === "string" &&
+            (data.status.toLowerCase() === "pending" || data.status.toLowerCase() === "published")) {
             updateData.status = client_1.ProductStatus.PENDING_REVIEW;
         }
         else if (typeof data.status === "string") {
@@ -440,6 +458,7 @@ const updateProduct = async (productId, sellerId, payload) => {
             updateData.status = data.status;
         }
     }
+    const willBePendingReview = updateData.status === client_1.ProductStatus.PENDING_REVIEW && !wasPendingReview;
     const imagesUpdate = data.imageUrls !== undefined
         ? {
             deleteMany: {},
@@ -460,11 +479,68 @@ const updateProduct = async (productId, sellerId, payload) => {
         },
         include: {
             images: { orderBy: { sortOrder: "asc" } },
+            auctions: true,
+            seller: {
+                select: {
+                    id: true,
+                    fullName: true,
+                },
+            },
         },
     });
+    if (willBePendingReview) {
+        await (0, notificationService_1.notifyAdmins)({
+            type: client_1.NotificationType.PRODUCT_SUBMITTED,
+            title: "تعديلات منتج بانتظار المراجعة",
+            message: `${updated.seller?.fullName ?? "بائع"} عدل المنتج ${updated.nameEn ?? updated.nameAr} ويحتاج موافقة جديدة`,
+            data: {
+                productId: updated.id,
+                sellerId,
+                reason: "update",
+            },
+            fallbackToSupport: true,
+        });
+        await (0, notificationService_1.createNotificationForUser)({
+            userId: sellerId,
+            type: client_1.NotificationType.PRODUCT_SUBMITTED,
+            title: "تم إرسال التعديلات للمراجعة",
+            message: `استلمنا تعديلاتك على ${updated.nameEn ?? updated.nameAr}. سيتم إشعارك فور مراجعتها.`,
+            data: { productId: updated.id },
+        });
+    }
     return (0, exports.normalizeProduct)(updated);
 };
 exports.updateProduct = updateProduct;
+const deleteProduct = async (productId, sellerId) => {
+    const product = await client_2.prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+            id: true,
+            sellerId: true,
+            auctions: { select: { id: true, status: true } },
+        },
+    });
+    if (!product || product.sellerId !== sellerId) {
+        throw errors_1.AppError.notFound("Product not found");
+    }
+    if (product.auctions.length > 0) {
+        const hasActive = product.auctions.some((auction) => auction.status === client_1.AuctionStatus.ACTIVE || auction.status === client_1.AuctionStatus.SCHEDULED);
+        const message = hasActive
+            ? "Cannot delete a product with an active or scheduled auction"
+            : "Cannot delete a product that has participated in auctions";
+        throw errors_1.AppError.badRequest(message);
+    }
+    try {
+        await client_2.prisma.product.delete({ where: { id: productId } });
+    }
+    catch (error) {
+        if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+            throw errors_1.AppError.badRequest("Cannot delete a product that is part of existing orders");
+        }
+        throw error;
+    }
+};
+exports.deleteProduct = deleteProduct;
 const moderateProduct = async (productId, action) => {
     const status = action === "approve" ? client_1.ProductStatus.PUBLISHED : client_1.ProductStatus.REJECTED;
     const product = await client_2.prisma.product.update({

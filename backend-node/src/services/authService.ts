@@ -276,24 +276,29 @@ export const requestPasswordReset = async (
   });
 
   const resetUrl = `${config.auth.passwordResetUrl}?token=${encodeURIComponent(rawToken)}`;
+  const brandSignature = "FragraWorld | عالم العطور";
+  const contactEmail = config.mail.from.address || "fragreworld@gmail.com";
   const plainText = [
-    "مرحباً،",
+    `مرحباً ${user.fullName ?? ''}`.trim(),
     "",
-    "لقد طلبت إعادة تعيين كلمة المرور الخاصة بك في منصة أطور.",
-    `لإعادة التعيين اضغط على الرابط التالي (صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة):`,
+    `تم إرسال هذه الرسالة من ${brandSignature} لتأكيد طلب إعادة تعيين كلمة المرور الخاص بك على منصتنا.`,
+    `اضغط على الرابط التالي لإعادة التعيين (صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة):`,
     resetUrl,
     "",
-    "إذا لم تطلب هذه العملية فيرجى تجاهل الرسالة.",
+    `إذا لم تطلب هذه العملية فتجاهل الرسالة أو راسلنا على ${contactEmail} للمساعدة.`,
+    "",
+    brandSignature,
   ].join("\n");
 
   const html = `
     <p>مرحباً ${user.fullName ?? ""}</p>
-    <p>لقد استلمنا طلباً لإعادة تعيين كلمة المرور الخاصة بك.</p>
+    <p>هذه الرسالة مرسلة من فريق ${brandSignature}. لقد استلمنا طلباً لإعادة تعيين كلمة المرور الخاصة بك.</p>
     <p>
       <a href="${resetUrl}" style="color:#a67c52;font-weight:bold;">إعادة تعيين كلمة المرور</a>
     </p>
     <p>الرابط صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة واحدة فقط.</p>
-    <p>إذا لم تطلب هذه العملية يمكنك تجاهل هذه الرسالة.</p>
+    <p>إذا لم تطلب هذه العملية يمكنك تجاهل هذه الرسالة أو مراسلتنا عبر <a href="mailto:${contactEmail}" style="color:#a67c52;">${contactEmail}</a>.</p>
+    <p style="margin-top:16px;font-weight:bold;">${brandSignature}</p>
   `;
 
   await sendMail({
@@ -354,7 +359,7 @@ export const authenticateUser = async (input: z.infer<typeof loginSchema>) => {
 
   if (user.status === "SUSPENDED") {
     throw AppError.forbidden(
-      `Your account is suspended. Please contact support at ${config.support.email}`,
+      `Your account is suspended. Please contact support at fragreworld@gmail.com`,
     );
   }
 

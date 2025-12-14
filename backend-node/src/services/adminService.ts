@@ -14,6 +14,7 @@ import { AppError } from "../utils/errors";
 import { normalizeProduct } from "./productService";
 import { config } from "../config/env";
 import { createNotificationForUser } from "./notificationService";
+import { safeRecordAdminAuditLog } from "./auditLogService";
 
 export const getAdminDashboardStats = async () => {
   const [totalUsers, totalProducts, pendingProducts, totalOrders, pendingOrders, runningAuctions] =
@@ -79,10 +80,22 @@ type AdminUserUpdatePayload = {
   roles?: string[];
 };
 
+type AdminUserUpdateAuditContext = {
+  actorId: number;
+  ipAddress?: string;
+};
+
+type AdminUserChangeRecord = {
+  field: "status" | "seller_status" | "roles";
+  from: unknown;
+  to: unknown;
+};
+
 export const updateUserStatus = async (
   userId: number,
   updates: AdminUserUpdatePayload,
-  allowedRoles: RoleName[]
+  allowedRoles: RoleName[],
+  auditContext?: AdminUserUpdateAuditContext
 ) => {
   if (!allowedRoles.some((role) => role === RoleName.ADMIN || role === RoleName.SUPER_ADMIN)) {
     throw AppError.forbidden();
@@ -106,17 +119,23 @@ export const updateUserStatus = async (
     updateData.sellerStatus = normalizedSellerStatus as SellerStatus;
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    if (Object.keys(updateData).length > 0) {
-      await tx.user.update({
-        where: { id: userId },
-        data: updateData,
-      });
-    } else {
-      const exists = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
-      if (!exists) {
-        throw AppError.notFound("User not found");
-      }
+  const { updatedUser, changes } = await prisma.$transaction(async (tx) => {
+    const existing = await tx.user.findUnique({
+      where: { id: userId },
+      include: {
+        roles: { include: { role: true } },
+        sellerProfile: { select: { status: true } },
+      },
+    });
+    if (!existing) {
+      throw AppError.notFound("User not found");
+    }
+
+    const changeDetails: Record<string, { from: unknown; to: unknown }> = {};
+    const previousRoles = existing.roles.map((relation) => relation.role.name as RoleName);
+
+    if (Object.keys(updateData).length === 0 && !updates.roles) {
+      return { updatedUser: existing, changes: changeDetails };
     }
 
     if (updates.roles) {
@@ -161,8 +180,40 @@ export const updateUserStatus = async (
         data: roleRecords.map((role) => ({ userId, roleId: role.id })),
         skipDuplicates: true,
       });
+
+      const sortedPrevRoles = [...previousRoles].sort();
+      const sortedNewRoles = [...normalizedRoles].sort();
+      const rolesChanged =
+        sortedPrevRoles.length !== sortedNewRoles.length ||
+        sortedNewRoles.some((role, idx) => sortedPrevRoles[idx] !== role);
+      if (rolesChanged) {
+        changeDetails.roles = {
+          from: previousRoles.map((role) => role.toLowerCase()),
+          to: normalizedRoles.map((role) => role.toLowerCase()),
+        };
+      }
     }
 
+    if (Object.keys(updateData).length > 0) {
+      await tx.user.update({
+        where: { id: userId },
+        data: updateData,
+      });
+
+      if (updateData.status && existing.status !== updateData.status) {
+        changeDetails.status = {
+          from: existing.status.toLowerCase(),
+          to: (updateData.status as UserStatus).toLowerCase(),
+        };
+      }
+
+      if (updateData.sellerStatus && existing.sellerStatus !== updateData.sellerStatus) {
+        changeDetails.seller_status = {
+          from: existing.sellerStatus?.toLowerCase(),
+          to: (updateData.sellerStatus as SellerStatus).toLowerCase(),
+        };
+      }
+    }
     const refreshed = await tx.user.findUnique({
       where: { id: userId },
       include: {
@@ -175,17 +226,69 @@ export const updateUserStatus = async (
       throw AppError.notFound("User not found");
     }
 
-    return refreshed;
+    return { updatedUser: refreshed, changes: changeDetails };
   });
 
+  if (auditContext?.actorId) {
+    const entries: AdminUserChangeRecord[] = Object.entries(changes).map(([field, diff]) => ({
+      field: field as AdminUserChangeRecord["field"],
+      from: diff.from,
+      to: diff.to,
+    }));
+
+    const auditBase = {
+      actorId: auditContext.actorId,
+    };
+    const withIp = (payload: Parameters<typeof safeRecordAdminAuditLog>[0]) =>
+      auditContext.ipAddress
+        ? { ...payload, ipAddress: auditContext.ipAddress }
+        : payload;
+
+    if (entries.length === 0) {
+      await safeRecordAdminAuditLog(
+        withIp({
+          ...auditBase,
+          action: "user.update",
+          targetType: "user",
+          targetId: userId,
+          description: `Updated user ${userId} (no field changes detected)`,
+          metadata: { submitted: updates },
+        })
+      );
+    } else {
+      const actionsMap: Record<AdminUserChangeRecord["field"], string> = {
+        status: "user.status",
+        seller_status: "user.seller_status",
+        roles: "user.roles",
+      };
+
+      await Promise.all(
+        entries.map((entry) =>
+          safeRecordAdminAuditLog(
+            withIp({
+              ...auditBase,
+              action: actionsMap[entry.field],
+              targetType: "user",
+              targetId: userId,
+              description: `Updated ${entry.field} for user ${userId}: ${entry.from ?? "-"} -> ${
+                entry.to ?? "-"
+              }`,
+              metadata: { field: entry.field, from: entry.from, to: entry.to },
+            })
+          )
+        )
+      );
+    }
+  }
+
   return {
-    id: result.id,
-    email: result.email,
-    full_name: result.fullName,
-    status: result.status,
-    roles: result.roles.map((relation) => relation.role.name.toLowerCase()),
-    seller_status: result.sellerStatus?.toLowerCase?.() ?? "pending",
-    seller_profile_status: result.sellerProfile?.status?.toLowerCase?.(),
+    id: updatedUser.id,
+    email: updatedUser.email,
+    full_name: updatedUser.fullName,
+    status: updatedUser.status,
+    roles: updatedUser.roles.map((relation) => relation.role.name.toLowerCase()),
+    seller_status: updatedUser.sellerStatus?.toLowerCase?.() ?? "pending",
+    seller_profile_status: updatedUser.sellerProfile?.status?.toLowerCase?.(),
   };
 };
 

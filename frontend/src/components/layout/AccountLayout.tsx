@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
@@ -8,7 +7,6 @@ import NotificationBell from '../notifications/NotificationBell';
 
 export default function AccountLayout() {
   const { t } = useTranslation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user } = useAuthStore();
   const { language } = useUIStore();
 
@@ -38,6 +36,7 @@ export default function AccountLayout() {
       : 'Register as Seller';
 
   const navItems = [
+    { path: '/', label: t('common.home', 'الرئيسية'), icon: '🏠' },
     { path: '/account', label: t('account.overview'), icon: '👤' },
     { path: '/account/profile', label: t('account.editProfile'), icon: '✏️' },
     { path: '/account/orders', label: t('account.orders'), icon: '📦' },
@@ -52,20 +51,8 @@ export default function AccountLayout() {
     <div className="min-h-screen bg-ivory">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-8">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 md:gap-8">
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden bg-charcoal text-ivory px-4 py-3 rounded-luxury min-h-[44px] font-semibold"
-          >
-            {sidebarOpen ? t('common.close') : t('account.menu')}
-          </button>
-
           {/* Sidebar Navigation */}
-          <aside
-            className={`${
-              sidebarOpen ? 'block' : 'hidden'
-            } lg:block w-full lg:w-64 flex-shrink-0`}
-          >
+          <aside className="hidden lg:block w-full lg:w-64 flex-shrink-0">
             <div className="bg-white rounded-luxury p-4 sm:p-6 shadow-luxury">
               <h2 className="text-lg sm:text-xl font-semibold text-charcoal mb-4 sm:mb-6">{t('account.myAccount')}</h2>
               <nav className="space-y-1 sm:space-y-2">
@@ -74,7 +61,6 @@ export default function AccountLayout() {
                     key={item.path}
                     to={item.path}
                     end={item.path === '/account'}
-                    onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-3 sm:px-4 py-3 rounded-luxury transition min-h-[44px] ${
                         isActive

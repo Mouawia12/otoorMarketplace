@@ -80,7 +80,6 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     loadOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const grouped = useMemo(() => {

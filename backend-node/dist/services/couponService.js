@@ -270,7 +270,7 @@ const incrementUsageCount = async (tx, coupon) => {
         },
     });
     if (updated.count === 0) {
-        throw errors_1.AppError.badRequest("تم الوصول إلى الحد الأقصى لاستخدام هذا الكوبون");
+        throw errors_1.AppError.badRequest("الكوبون غير صالح للاستخدام");
     }
 };
 const prepareCouponForOrder = async (tx, code, items) => {

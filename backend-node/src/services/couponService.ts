@@ -326,7 +326,7 @@ const incrementUsageCount = async (
   });
 
   if (updated.count === 0) {
-    throw AppError.badRequest("تم الوصول إلى الحد الأقصى لاستخدام هذا الكوبون");
+    throw AppError.badRequest("الكوبون غير صالح للاستخدام");
   }
 };
 

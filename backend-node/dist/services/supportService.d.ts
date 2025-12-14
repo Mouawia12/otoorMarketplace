@@ -122,7 +122,9 @@ declare const replySchema: z.ZodObject<{
     userId: z.ZodNumber;
     message: z.ZodString;
 }, z.core.$strip>;
-export declare const addSupportReply: (input: z.infer<typeof replySchema>) => Promise<{
+export declare const addSupportReply: (input: z.infer<typeof replySchema>, options?: {
+    actorIsAdmin?: boolean;
+}) => Promise<{
     id: number;
     ticket_id: number;
     user_id: number;

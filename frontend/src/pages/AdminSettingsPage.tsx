@@ -1,48 +1,205 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import SARIcon from '../components/common/SARIcon';
 
-interface Settings {
-  commissionNew: number;
-  commissionUsed: number;
-  commissionAuction: number;
-  authenticityFee: number;
-  notificationsEnabled: boolean;
-  language: 'ar' | 'en';
-  theme: 'light' | 'dark';
-}
+import SARIcon from '../components/common/SARIcon';
+import api from '../lib/api';
+import type { BankTransferSettings, PlatformSettings, SocialLinks } from '../types';
+import { DEFAULT_SOCIAL_LINKS } from '../services/settingsService';
 
 export default function AdminSettingsPage() {
   const { t } = useTranslation();
-  const [settings, setSettings] = useState<Settings>({
-    commissionNew: 10,
-    commissionUsed: 5,
-    commissionAuction: 5,
-    authenticityFee: 25,
-    notificationsEnabled: true,
-    language: 'ar',
-    theme: 'light',
-  });
-  const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
+
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
+  const [platformLoading, setPlatformLoading] = useState(true);
+  const [platformError, setPlatformError] = useState<string | null>(null);
+  const [platformSaved, setPlatformSaved] = useState(false);
+  const [savingPlatform, setSavingPlatform] = useState(false);
+
+  const [bankSettings, setBankSettings] = useState<BankTransferSettings | null>(null);
+  const [bankLoading, setBankLoading] = useState(true);
+  const [bankError, setBankError] = useState<string | null>(null);
+  const [bankSaved, setBankSaved] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
+
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>(DEFAULT_SOCIAL_LINKS);
+  const [socialLoading, setSocialLoading] = useState(true);
+  const [socialError, setSocialError] = useState<string | null>(null);
+  const [socialSaved, setSocialSaved] = useState(false);
+  const [savingSocial, setSavingSocial] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
+    fetchPlatformSettings();
+    fetchBankSettings();
+    fetchSocialLinks();
   }, []);
 
-  const fetchSettings = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setLoading(false);
+  const fetchPlatformSettings = async () => {
+    try {
+      setPlatformLoading(true);
+      const response = await api.get<PlatformSettings>('/admin/settings/platform');
+      setPlatformSettings(response.data);
+      setPlatformError(null);
+    } catch (error: any) {
+      console.error('Failed to load platform settings', error);
+      setPlatformError(error?.response?.data?.detail || t('common.error'));
+    } finally {
+      setPlatformLoading(false);
+    }
   };
 
-  const handleSave = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const fetchBankSettings = async () => {
+    try {
+      setBankLoading(true);
+      const response = await api.get<BankTransferSettings>('/admin/settings/bank-transfer');
+      setBankSettings(response.data);
+      setBankError(null);
+    } catch (error: any) {
+      console.error('Failed to load bank settings', error);
+      setBankError(error?.response?.data?.detail || t('common.error'));
+    } finally {
+      setBankLoading(false);
+    }
   };
 
-  if (loading) {
-    return <div className="text-center py-12"><p className="text-taupe">{t('common.loading')}</p></div>;
+  const fetchSocialLinks = async () => {
+    try {
+      setSocialLoading(true);
+      const response = await api.get<SocialLinks>('/admin/settings/social-links');
+      setSocialLinks({ ...DEFAULT_SOCIAL_LINKS, ...(response.data ?? {}) });
+      setSocialError(null);
+    } catch (error: any) {
+      console.error('Failed to load social links', error);
+      setSocialError(error?.response?.data?.detail || t('common.error'));
+      setSocialLinks(DEFAULT_SOCIAL_LINKS);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const updatePlatformField = <K extends keyof PlatformSettings>(field: K, value: PlatformSettings[K]) => {
+    setPlatformSettings((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  const handleSavePlatform = async () => {
+    if (!platformSettings) return;
+    try {
+      setSavingPlatform(true);
+      setPlatformError(null);
+      await api.put('/admin/settings/platform', platformSettings);
+      setPlatformSaved(true);
+      setTimeout(() => setPlatformSaved(false), 2500);
+    } catch (error: any) {
+      console.error('Failed to save platform settings', error);
+      setPlatformError(error?.response?.data?.detail || t('common.error'));
+    } finally {
+      setSavingPlatform(false);
+    }
+  };
+
+  const handleSaveBank = async () => {
+    if (!bankSettings) return;
+    try {
+      setSavingBank(true);
+      setBankError(null);
+      await api.put('/admin/settings/bank-transfer', bankSettings);
+      setBankSaved(true);
+      setTimeout(() => setBankSaved(false), 2500);
+    } catch (error: any) {
+      console.error('Failed to save bank settings', error);
+      setBankError(error?.response?.data?.detail || t('common.error'));
+    } finally {
+      setSavingBank(false);
+    }
+  };
+
+  const socialFields = [
+    {
+      key: 'instagram' as const,
+      icon: '📸',
+      label: t('admin.social.instagram', 'Instagram'),
+      placeholder: 'https://instagram.com/username',
+    },
+    {
+      key: 'tiktok' as const,
+      icon: '🎵',
+      label: t('admin.social.tiktok', 'TikTok'),
+      placeholder: 'https://www.tiktok.com/@username',
+    },
+    {
+      key: 'facebook' as const,
+      icon: '📘',
+      label: t('admin.social.facebook', 'Facebook'),
+      placeholder: 'https://facebook.com/page',
+    },
+    {
+      key: 'twitter' as const,
+      icon: '🐦',
+      label: t('admin.social.twitter', 'Twitter / X'),
+      placeholder: 'https://twitter.com/username',
+    },
+    {
+      key: 'youtube' as const,
+      icon: '▶️',
+      label: t('admin.social.youtube', 'YouTube'),
+      placeholder: 'https://youtube.com/@channel',
+    },
+    {
+      key: 'snapchat' as const,
+      icon: '👻',
+      label: t('admin.social.snapchat', 'Snapchat'),
+      placeholder: 'https://www.snapchat.com/add/username',
+    },
+    {
+      key: 'linkedin' as const,
+      icon: '💼',
+      label: t('admin.social.linkedin', 'LinkedIn'),
+      placeholder: 'https://www.linkedin.com/company/slug',
+    },
+    {
+      key: 'whatsapp' as const,
+      icon: '💬',
+      label: t('admin.social.whatsapp', 'WhatsApp'),
+      placeholder: 'https://wa.me/966XXXXXXXXX',
+    },
+  ];
+
+  const handleSocialFieldChange = (field: keyof SocialLinks, value: string) => {
+    setSocialLinks((prev) => ({
+      ...(prev ?? DEFAULT_SOCIAL_LINKS),
+      [field]: value,
+    }));
+  };
+
+  const handleSaveSocialLinks = async () => {
+    try {
+      setSavingSocial(true);
+      setSocialError(null);
+      const payload: Record<string, string> = {};
+      (Object.keys(DEFAULT_SOCIAL_LINKS) as Array<keyof SocialLinks>).forEach((field) => {
+        const value = socialLinks?.[field];
+        const trimmed = value?.trim();
+        if (trimmed) {
+          payload[field] = trimmed;
+        }
+      });
+      const response = await api.put<SocialLinks>('/admin/settings/social-links', payload);
+      setSocialLinks({ ...DEFAULT_SOCIAL_LINKS, ...(response.data ?? {}) });
+      setSocialSaved(true);
+      setTimeout(() => setSocialSaved(false), 2500);
+    } catch (error: any) {
+      console.error('Failed to save social links', error);
+      setSocialError(error?.response?.data?.detail || t('common.error'));
+    } finally {
+      setSavingSocial(false);
+    }
+  };
+
+  if (platformLoading && !platformSettings) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t('common.loading')}</p>
+      </div>
+    );
   }
 
   return (
@@ -50,122 +207,280 @@ export default function AdminSettingsPage() {
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-h2 text-charcoal">{t('admin.settings')}</h1>
-          {saved && <span className="text-green-600 font-semibold">✓ {t('admin.saved')}</span>}
+          {platformSaved && <span className="text-green-600 font-semibold">✓ {t('admin.saved')}</span>}
         </div>
 
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-h3 text-charcoal mb-4">{t('admin.commissionRates')}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-charcoal font-semibold mb-2">{t('admin.newProducts')} (%)</label>
-                <input type="number" value={settings.commissionNew} onChange={(e) => setSettings({ ...settings, commissionNew: parseFloat(e.target.value) })} className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-charcoal font-semibold mb-2">{t('admin.usedProducts')} (%)</label>
-                <input type="number" value={settings.commissionUsed} onChange={(e) => setSettings({ ...settings, commissionUsed: parseFloat(e.target.value) })} className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-charcoal font-semibold mb-2">{t('admin.auctionProducts')} (%)</label>
-                <input type="number" value={settings.commissionAuction} onChange={(e) => setSettings({ ...settings, commissionAuction: parseFloat(e.target.value) })} className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none" />
-              </div>
-            </div>
-          </div>
+        {platformError && <p className="text-sm text-alert mb-4">{platformError}</p>}
 
-          <div>
-            <h3 className="text-h3 text-charcoal mb-4">{t('admin.fees')}</h3>
+        {platformSettings && (
+          <div className="space-y-6">
             <div>
-              <label className="block text-charcoal font-semibold mb-2">
-                {t('admin.authenticityFee')} (
-                <SARIcon size={14} className="text-charcoal align-text-bottom" />
-                )
-              </label>
-              <input type="number" value={settings.authenticityFee} onChange={(e) => setSettings({ ...settings, authenticityFee: parseFloat(e.target.value) })} className="w-full md:w-1/3 px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none" />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-h3 text-charcoal mb-4">{t('admin.systemSettings')}</h3>
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" checked={settings.notificationsEnabled} onChange={(e) => setSettings({ ...settings, notificationsEnabled: e.target.checked })} />
-                <label className="text-charcoal font-semibold">{t('admin.enableNotifications')}</label>
+              <h3 className="text-h3 text-charcoal mb-4">{t('admin.commissionRates')}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-charcoal font-semibold mb-2">{t('admin.newProducts')} (%)</label>
+                  <input
+                    type="number"
+                    value={platformSettings.commissionNew}
+                    onChange={(e) => updatePlatformField('commissionNew', parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-charcoal font-semibold mb-2">{t('admin.usedProducts')} (%)</label>
+                  <input
+                    type="number"
+                    value={platformSettings.commissionUsed}
+                    onChange={(e) => updatePlatformField('commissionUsed', parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-charcoal font-semibold mb-2">{t('admin.auctionProducts')} (%)</label>
+                  <input
+                    type="number"
+                    value={platformSettings.commissionAuction}
+                    onChange={(e) => updatePlatformField('commissionAuction', parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  />
+                </div>
               </div>
+            </div>
+
+            <div>
+              <h3 className="text-h3 text-charcoal mb-4">{t('admin.fees')}</h3>
               <div>
-                <label className="block text-charcoal font-semibold mb-2">{t('admin.defaultLanguage')}</label>
-                <select value={settings.language} onChange={(e) => setSettings({ ...settings, language: e.target.value as 'ar' | 'en' })} className="px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none">
-                  <option value="ar">{t('admin.arabic')}</option>
-                  <option value="en">{t('admin.english')}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-charcoal font-semibold mb-2">{t('admin.theme')}</label>
-                <select value={settings.theme} onChange={(e) => setSettings({ ...settings, theme: e.target.value as 'light' | 'dark' })} className="px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none">
-                  <option value="light">{t('admin.light')}</option>
-                  <option value="dark">{t('admin.dark')}</option>
-                </select>
+                <label className="block text-charcoal font-semibold mb-2">
+                  {t('admin.authenticityFee')} (
+                  <SARIcon size={14} className="text-charcoal align-text-bottom" />
+                  )
+                </label>
+                <input
+                  type="number"
+                  value={platformSettings.authenticityFee}
+                  onChange={(e) => updatePlatformField('authenticityFee', parseFloat(e.target.value) || 0)}
+                  className="w-full md:w-1/3 px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                />
               </div>
             </div>
-          </div>
 
+            <div>
+              <h3 className="text-h3 text-charcoal mb-4">{t('admin.systemSettings')}</h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={platformSettings.notificationsEnabled}
+                    onChange={(e) => updatePlatformField('notificationsEnabled', e.target.checked)}
+                  />
+                  <label className="text-charcoal font-semibold">{t('admin.enableNotifications')}</label>
+                </div>
+
+                <div>
+                  <label className="block text-charcoal font-semibold mb-2">{t('admin.defaultLanguage')}</label>
+                  <select
+                    value={platformSettings.language}
+                    onChange={(e) => updatePlatformField('language', e.target.value as 'ar' | 'en')}
+                    className="px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  >
+                    <option value="ar">{t('admin.arabic')}</option>
+                    <option value="en">{t('admin.english')}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-charcoal font-semibold mb-2">{t('admin.theme')}</label>
+                  <select
+                    value={platformSettings.theme}
+                    onChange={(e) => updatePlatformField('theme', e.target.value as 'light' | 'dark')}
+                    className="px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  >
+                    <option value="light">{t('admin.light')}</option>
+                    <option value="dark">{t('admin.dark')}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-h3 text-charcoal mb-4">{t('admin.rbacMatrix')}</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border border-gray-200">
+                  <thead>
+                    <tr className="bg-sand">
+                      <th className="text-right px-4 py-3 text-charcoal font-semibold border-b">{t('admin.permission')}</th>
+                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.admin')}</th>
+                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.moderator')}</th>
+                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.seller')}</th>
+                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.buyer')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b">
+                      <td className="px-4 py-3 text-charcoal">{t('admin.manageUsers')}</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">-</td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="px-4 py-3 text-charcoal">{t('admin.moderateProducts')}</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">-</td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="px-4 py-3 text-charcoal">{t('admin.manageOrders')}</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                      <td className="text-center px-4 py-3">-</td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="px-4 py-3 text-charcoal">{t('admin.placeOrders')}</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-charcoal">{t('admin.viewReports')}</td>
+                      <td className="text-center px-4 py-3">✓</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">-</td>
+                      <td className="text-center px-4 py-3">-</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSavePlatform}
+              disabled={savingPlatform}
+              className="bg-gold text-charcoal px-8 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-60"
+            >
+              {savingPlatform ? t('common.loading') : t('admin.saveSettings')}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-luxury p-6 shadow-luxury">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h3 className="text-h3 text-charcoal mb-4">{t('admin.rbacMatrix')}</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full border border-gray-200">
-                <thead>
-                  <tr className="bg-sand">
-                    <th className="text-right px-4 py-3 text-charcoal font-semibold border-b">{t('admin.permission')}</th>
-                    <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.admin')}</th>
-                    <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.moderator')}</th>
-                    <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.seller')}</th>
-                    <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.buyer')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b">
-                    <td className="px-4 py-3 text-charcoal">{t('admin.manageUsers')}</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">-</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="px-4 py-3 text-charcoal">{t('admin.moderateProducts')}</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">-</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="px-4 py-3 text-charcoal">{t('admin.manageOrders')}</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                    <td className="text-center px-4 py-3">-</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="px-4 py-3 text-charcoal">{t('admin.placeOrders')}</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3 text-charcoal">{t('admin.viewReports')}</td>
-                    <td className="text-center px-4 py-3">✓</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">-</td>
-                    <td className="text-center px-4 py-3">-</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <h2 className="text-h3 text-charcoal">{t('admin.socialLinks')}</h2>
+            <p className="text-sm text-taupe">{t('admin.socialLinksSubtitle', 'Keep customer-facing social profiles up to date.')}</p>
           </div>
-
-          <button onClick={handleSave} className="bg-gold text-charcoal px-8 py-3 rounded-luxury font-semibold hover:bg-gold-hover">
-            {t('admin.saveSettings')}
-          </button>
+          {socialSaved && <span className="text-green-600 font-semibold">✓ {t('admin.saved')}</span>}
         </div>
+
+        {socialError && <p className="text-sm text-alert mb-4">{socialError}</p>}
+
+        {socialLoading ? (
+          <p className="text-sm text-taupe">{t('common.loading')}</p>
+        ) : (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {socialFields.map((field) => (
+                <div key={field.key}>
+                  <label className="block text-charcoal font-semibold mb-2 flex items-center gap-2">
+                    <span>{field.icon}</span>
+                    <span>{field.label}</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={socialLinks?.[field.key] ?? ''}
+                    onChange={(e) => handleSocialFieldChange(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleSaveSocialLinks}
+              disabled={savingSocial}
+              className="bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-60"
+            >
+              {savingSocial ? t('common.loading') : t('admin.saveSocialLinks', 'Save social media links')}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-luxury p-6 shadow-luxury">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-h3 text-charcoal">{t('admin.bankSettings')}</h2>
+          {bankSaved && <span className="text-green-600 font-semibold">✓ {t('admin.saved')}</span>}
+        </div>
+
+        {bankError && <p className="text-sm text-alert mb-4">{bankError}</p>}
+
+        {bankLoading || !bankSettings ? (
+          <p className="text-sm text-taupe">{t('common.loading')}</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-charcoal font-semibold mb-2">{t('admin.bankNameLabel')}</label>
+                <input
+                  type="text"
+                  value={bankSettings.bankName}
+                  onChange={(e) => setBankSettings({ ...bankSettings, bankName: e.target.value })}
+                  className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-charcoal font-semibold mb-2">{t('admin.bankAccountName')}</label>
+                <input
+                  type="text"
+                  value={bankSettings.accountName}
+                  onChange={(e) => setBankSettings({ ...bankSettings, accountName: e.target.value })}
+                  className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-charcoal font-semibold mb-2">{t('admin.bankIban')}</label>
+                <input
+                  type="text"
+                  value={bankSettings.iban}
+                  onChange={(e) => setBankSettings({ ...bankSettings, iban: e.target.value })}
+                  className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none uppercase tracking-wide"
+                />
+              </div>
+              <div>
+                <label className="block text-charcoal font-semibold mb-2">{t('admin.bankSwift')}</label>
+                <input
+                  type="text"
+                  value={bankSettings.swift}
+                  onChange={(e) => setBankSettings({ ...bankSettings, swift: e.target.value })}
+                  className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none uppercase"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-charcoal font-semibold mb-2">{t('admin.bankInstructions')}</label>
+              <textarea
+                value={bankSettings.instructions}
+                onChange={(e) => setBankSettings({ ...bankSettings, instructions: e.target.value })}
+                rows={4}
+                className="w-full px-4 py-3 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none resize-none"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSaveBank}
+                disabled={savingBank}
+                className="bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-60"
+              >
+                {savingBank ? t('common.loading') : t('admin.saveBankSettings')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

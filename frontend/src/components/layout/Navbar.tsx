@@ -15,6 +15,13 @@ export default function Navbar() {
   const normalizedRoles = (user?.roles ?? []).map((role) => role.toUpperCase());
   const isSeller = normalizedRoles.includes('SELLER');
   const isAdmin = normalizedRoles.includes('ADMIN') || normalizedRoles.includes('SUPER_ADMIN');
+  const sellerCTA = t('seller.becomeSeller');
+  const resolvedSellerCTA =
+    sellerCTA && sellerCTA !== 'seller.becomeSeller'
+      ? sellerCTA
+      : language === 'ar'
+      ? 'سجل كتاجر'
+      : 'Register as Seller';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -38,6 +45,49 @@ export default function Navbar() {
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
   const closeMobileSearch = () => setMobileSearchOpen(false);
+
+  const accountMenuItems = [
+    { path: '/account', label: t('account.overview'), icon: '👤' },
+    { path: '/account/profile', label: t('account.editProfile'), icon: '✏️' },
+    { path: '/account/orders', label: t('account.orders'), icon: '📦' },
+    { path: '/account/bids', label: t('account.bids'), icon: '🔨' },
+    { path: '/account/favorites', label: t('account.favorites'), icon: '❤️' },
+    { path: '/account/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
+    { path: '/seller/profile-complete', label: resolvedSellerCTA, icon: '🛍️' },
+    { path: '/account/support', label: t('account.support'), icon: '💬' },
+  ];
+
+  const sellerMenuItems = [
+    { path: '/seller/dashboard', label: t('seller.dashboard'), icon: '📊' },
+    { path: '/seller/products', label: t('seller.products'), icon: '🛍️' },
+    { path: '/seller/auctions', label: t('seller.auctions'), icon: '🔨' },
+    { path: '/seller/orders', label: t('seller.customerOrdersNav', 'طلبات العملاء'), icon: '📦' },
+    { path: '/seller/my-orders', label: t('seller.myOrdersNav', 'طلباتي'), icon: '🧾' },
+    { path: '/seller/coupons', label: t('seller.coupons', 'الكوبونات'), icon: '🏷️' },
+    { path: '/seller/profile-status', label: t('seller.status', 'حالة الطلب'), icon: '📄' },
+    { path: '/seller/earnings', label: t('seller.earnings'), icon: '💰' },
+    { path: '/seller/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
+    { path: '/seller/support', label: t('seller.support'), icon: '💬' },
+  ];
+
+  const adminMenuItems = [
+    { path: '/admin/dashboard', label: t('admin.dashboard'), icon: '📊' },
+    { path: '/admin/products', label: t('admin.products'), icon: '🛍️' },
+    { path: '/admin/library', label: t('admin.productLibrary', 'مكتبة المنتجات'), icon: '📚' },
+    { path: '/admin/auctions', label: t('admin.auctions'), icon: '🔨' },
+    { path: '/admin/orders', label: t('admin.orders'), icon: '📦' },
+    { path: '/admin/coupons', label: t('admin.coupons', 'الكوبونات'), icon: '🏷️' },
+    { path: '/admin/users', label: t('admin.users'), icon: '👥' },
+    { path: '/admin/auth-requests', label: t('admin.authRequests'), icon: '✅' },
+    { path: '/admin/blog', label: t('admin.blog', 'المدونة'), icon: '📝' },
+    { path: '/admin/ads', label: t('admin.ads'), icon: '📢' },
+    { path: '/admin/support', label: t('admin.support'), icon: '💬' },
+    { path: '/admin/reports', label: t('admin.reports'), icon: '📈' },
+    { path: '/admin/pages', label: t('admin.pagesManager.menuLabel', 'صفحات الموقع'), icon: '📑' },
+    { path: '/admin/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
+    { path: '/admin/settings', label: t('admin.settings'), icon: '⚙️' },
+    { path: '/admin/audit', label: t('admin.audit'), icon: '🔍' },
+  ];
 
   return (
     <nav dir={i18n.language === 'ar' ? 'rtl' : 'ltr'} className="sticky top-0 z-50 bg-charcoal text-ivory shadow-lg">
@@ -263,24 +313,52 @@ export default function Navbar() {
 
               {isAuthenticated ? (
                 <>
-                  <div className="border-t border-charcoal-light my-2 pt-2">
+                  <div className="border-t border-charcoal-light my-3 pt-3 space-y-1">
                     {isSeller && (
-                      <Link to="/seller/dashboard" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
-                        {t('nav.sellerDashboard')}
-                      </Link>
+                      <>
+                        <p className="px-4 text-xs uppercase tracking-wide text-taupe">{t('seller.sellerPanel')}</p>
+                        {sellerMenuItems.map((item) => (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={closeMobileMenu}
+                            className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center gap-2"
+                          >
+                            <span>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </Link>
+                        ))}
+                      </>
                     )}
-                    {!isSeller && !isAdmin && (
-                      <Link to="/account" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
-                        {t('nav.dashboard')}
+
+                    <p className="px-4 text-xs uppercase tracking-wide text-taupe">{t('account.myAccount')}</p>
+                    {accountMenuItems.map((item) => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={closeMobileMenu}
+                        className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center gap-2"
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
                       </Link>
-                    )}
-                    <Link to="/account" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
-                      {t('nav.account')}
-                    </Link>
+                    ))}
+
                     {isAdmin && (
-                      <Link to="/admin/dashboard" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
-                        {t('nav.adminDashboard')}
-                      </Link>
+                      <>
+                        <p className="px-4 text-xs uppercase tracking-wide text-taupe">{t('admin.adminPanel', 'لوحة الإدارة')}</p>
+                        {adminMenuItems.map((item) => (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={closeMobileMenu}
+                            className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center gap-2"
+                          >
+                            <span>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </Link>
+                        ))}
+                      </>
                     )}
                   </div>
                   <button

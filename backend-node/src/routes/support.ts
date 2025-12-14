@@ -90,11 +90,14 @@ router.post("/:id/replies", authenticate(), async (req, res, next) => {
       throw AppError.unauthorized();
     }
 
-    const reply = await addSupportReply({
-      ticketId: id,
-      userId: req.user.id,
-      message,
-    });
+    const reply = await addSupportReply(
+      {
+        ticketId: id,
+        userId: req.user.id,
+        message,
+      },
+      { actorIsAdmin: isAdmin }
+    );
     res.status(201).json(reply);
   } catch (error) {
     next(error);

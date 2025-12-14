@@ -33,7 +33,6 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<(User & { created_at?: string }) | null>(null);
   const [editStatus, setEditStatus] = useState<User["status"]>("ACTIVE");
-  const [editSellerStatus, setEditSellerStatus] = useState<string>("pending");
   const [editRoles, setEditRoles] = useState<string[]>([]);
   const [savingUser, setSavingUser] = useState(false);
   const roleOptions = ["buyer", "seller", "admin", "moderator", "support"];
@@ -69,7 +68,6 @@ export default function AdminUsersPage() {
   useEffect(() => {
     loadUsers();
     loadSellerRequests();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSellerDecision = async (userId: number, status: "approved" | "rejected") => {
@@ -85,7 +83,6 @@ export default function AdminUsersPage() {
   const openEditModal = (user: User & { created_at?: string }) => {
     setSelectedUser(user);
     setEditStatus(user.status);
-    setEditSellerStatus(user.seller_status || "pending");
     const normalizedRoles =
       user.roles && user.roles.length > 0
         ? Array.from(new Set(user.roles.map((role) => role.toLowerCase())))
@@ -120,7 +117,6 @@ export default function AdminUsersPage() {
       const normalizedRoles = editRoles.includes("buyer") ? editRoles : [...editRoles, "buyer"];
       await api.patch(`/admin/users/${selectedUser.id}`, {
         status: editStatus,
-        seller_status: editSellerStatus,
         roles: normalizedRoles,
       });
       await loadUsers();
@@ -267,7 +263,6 @@ export default function AdminUsersPage() {
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.name")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.email")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.role")}</th>
-                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("seller.status", "حالة التاجر")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.status")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.joined")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("admin.actions")}</th>
@@ -290,17 +285,6 @@ export default function AdminUsersPage() {
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold border border-sand/70">
-                      {user.seller_status
-                        ? user.seller_status === "approved"
-                          ? t("seller.statusApproved", "مقبول")
-                          : user.seller_status === "rejected"
-                          ? t("seller.statusRejected", "مرفوض")
-                          : t("seller.statusPending", "قيد المراجعة")
-                        : t("seller.statusPending", "قيد المراجعة")}
-                    </span>
                   </td>
                   <td className="px-4 py-4">
                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${statusTone(user.status)}`}>
@@ -383,18 +367,6 @@ export default function AdminUsersPage() {
                 >
                   <option value="ACTIVE">{t("admin.activate", "تفعيل")}</option>
                   <option value="SUSPENDED">{t("admin.suspend", "تعليق")}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">{t("seller.status", "حالة التاجر")}</label>
-                <select
-                  value={editSellerStatus}
-                  onChange={(e) => setEditSellerStatus(e.target.value)}
-                  className="w-full border border-sand rounded-lg px-3 py-2"
-                >
-                  <option value="pending">{t("seller.statusPending", "قيد المراجعة")}</option>
-                  <option value="approved">{t("seller.statusApproved", "مقبول")}</option>
-                  <option value="rejected">{t("seller.statusRejected", "مرفوض")}</option>
                 </select>
               </div>
             </div>

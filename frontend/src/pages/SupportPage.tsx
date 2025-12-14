@@ -92,6 +92,10 @@ export default function SupportPage() {
 
   const handleReply = async () => {
     if (!activeTicket || !replyMessage.trim()) return;
+    if (activeTicket.status === "closed") {
+      alert(t("support.ticketClosedNotice", "تم إغلاق هذه التذكرة. يرجى فتح تذكرة جديدة للتواصل مع الدعم."));
+      return;
+    }
     try {
       const res = await api.post(`/support/${activeTicket.id}/replies`, { message: replyMessage });
       setTickets((prev) =>
@@ -129,6 +133,8 @@ export default function SupportPage() {
       </div>
     );
   }
+
+  const isTicketClosed = activeTicket?.status === "closed";
 
   if (loading) {
     return (
@@ -304,16 +310,28 @@ export default function SupportPage() {
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-sand focus:border-gold focus:outline-none"
-                  placeholder={t("support.replyPlaceholder", "اكتب ردك هنا")}
+                  disabled={isTicketClosed}
+                  className={`w-full px-3 py-2 rounded-lg border border-sand focus:border-gold focus:outline-none ${
+                    isTicketClosed ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""
+                  }`}
+                  placeholder={
+                    isTicketClosed
+                      ? t("support.ticketClosedNotice", "تم إغلاق هذه التذكرة. يرجى فتح تذكرة جديدة للتواصل مع الدعم.")
+                      : t("support.replyPlaceholder", "اكتب ردك هنا")
+                  }
                 />
                 <button
                   onClick={handleReply}
-                  disabled={!replyMessage.trim()}
+                  disabled={isTicketClosed || !replyMessage.trim()}
                   className="mt-2 bg-gold text-charcoal px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-gold-hover transition disabled:opacity-60"
                 >
                   {t("support.sendReply", "إرسال الرد")}
                 </button>
+                {isTicketClosed && (
+                  <p className="text-xs text-alert mt-2">
+                    {t("support.ticketClosedNotice", "تم إغلاق هذه التذكرة. يرجى فتح تذكرة جديدة للتواصل مع الدعم.")}
+                  </p>
+                )}
               </div>
             </div>
           </div>

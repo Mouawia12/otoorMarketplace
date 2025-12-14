@@ -68,6 +68,22 @@ router.patch("/products/:id", sellerOnly, async (req, res, next) => {
         next(error);
     }
 });
+router.delete("/products/:id", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const productId = Number(req.params.id);
+        if (Number.isNaN(productId)) {
+            throw errors_1.AppError.badRequest("Invalid product id");
+        }
+        await (0, productService_1.deleteProduct)(productId, req.user.id);
+        res.status(204).send();
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.get("/orders", sellerOnly, async (req, res, next) => {
     try {
         if (!req.user) {

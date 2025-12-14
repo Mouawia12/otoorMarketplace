@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import type { TouchEvent } from "react";
+import type { TouchEvent, ReactNode } from "react";
 
 interface ProductImageCarouselProps {
   images?: (string | null | undefined)[];
@@ -7,6 +7,7 @@ interface ProductImageCarouselProps {
   fallback: string;
   dir?: "ltr" | "rtl";
   className?: string;
+  overlay?: ReactNode;
 }
 
 const SWIPE_THRESHOLD = 40;
@@ -17,6 +18,7 @@ export default function ProductImageCarousel({
   fallback,
   dir = "ltr",
   className = "",
+  overlay,
 }: ProductImageCarouselProps) {
   const sanitized = useMemo(() => {
     const valid = images.filter((img): img is string => Boolean(img && img.trim().length));
@@ -62,6 +64,8 @@ export default function ProductImageCarousel({
     touchStartX.current = null;
   };
 
+  const indicatorOffset = overlay ? "bottom-16" : "bottom-3";
+
   return (
     <div className={`space-y-4 ${className}`.trim()} dir={dir}>
       <div className="relative group">
@@ -79,7 +83,7 @@ export default function ProductImageCarousel({
                 key={`${img}-${index}`}
                 src={img || fallback}
                 alt={`${name} ${index + 1}`}
-                className="w-full h-full object-cover flex-shrink-0"
+                className="w-full h-full object-contain flex-shrink-0 bg-white"
                 onError={(e) => {
                   e.currentTarget.src = fallback;
                 }}
@@ -126,10 +130,16 @@ export default function ProductImageCarousel({
         )}
 
         {showControls && (
-          <div className="absolute bottom-3 inset-x-0 flex justify-center pointer-events-none">
+          <div className={`absolute ${indicatorOffset} inset-x-0 flex justify-center pointer-events-none`}>
             <span className="bg-black/70 text-white text-xs px-3 py-1 rounded-full">
               {activeIndex + 1} / {sanitized.length}
             </span>
+          </div>
+        )}
+
+        {overlay && (
+          <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pointer-events-none">
+            <div className="pointer-events-auto">{overlay}</div>
           </div>
         )}
       </div>
@@ -149,7 +159,7 @@ export default function ProductImageCarousel({
               <img
                 src={img || fallback}
                 alt={`${name} thumbnail ${index + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain bg-white"
                 onError={(e) => {
                   e.currentTarget.src = fallback;
                 }}

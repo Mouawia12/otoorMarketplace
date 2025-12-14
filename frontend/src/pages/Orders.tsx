@@ -10,7 +10,13 @@ import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import { submitProductReview } from '../services/reviewService';
 import api from '../lib/api';
 
-export default function Orders() {
+type OrdersView = 'buyer' | 'seller';
+
+type OrdersProps = {
+  view?: OrdersView;
+};
+
+export default function Orders({ view }: OrdersProps = {}) {
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
   const { user, isAuthenticated } = useAuthStore();
@@ -25,8 +31,11 @@ export default function Orders() {
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted?: boolean }>>({});
   const [submittingReviewKey, setSubmittingReviewKey] = useState<string | null>(null);
 
-  const isSeller = useMemo(() => user?.roles?.includes('seller'), [user]);
-  const isAdmin = useMemo(() => user?.roles?.some((r) => ['admin', 'super_admin'].includes(r)), [user]);
+  const userIsSeller = useMemo(() => user?.roles?.includes('seller'), [user]);
+  const userIsAdmin = useMemo(() => user?.roles?.some((r) => ['admin', 'super_admin'].includes(r)), [user]);
+
+  const sellerMode = view === 'seller' || (!view && userIsAdmin);
+  const buyerMode = view === 'buyer' || (!sellerMode && !userIsAdmin);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -34,7 +43,6 @@ export default function Orders() {
       return;
     }
     fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, isAuthenticated]);
 
   const fetchOrders = async () => {
@@ -43,11 +51,11 @@ export default function Orders() {
       const params: any = {};
       if (filter !== 'all') params.status = filter;
 
-      const endpoint = isAdmin || isSeller ? '/orders' : '/orders/mine';
+      const endpoint = sellerMode || userIsAdmin ? '/orders' : '/orders/mine';
       const response = await api.get(endpoint, { params });
       let fetched = response.data;
 
-      if (isSeller && !isAdmin) {
+      if (sellerMode && !userIsAdmin) {
         fetched = fetched
           .map((order: Order) => {
             const sellerItems = order.items?.filter((item) => item.product?.seller_id === user?.id) ?? [];
@@ -157,10 +165,16 @@ export default function Orders() {
     }
   };
 
+  const pageTitle = sellerMode && !userIsAdmin
+    ? t('seller.customerOrdersTitle', 'طلبات العملاء')
+    : buyerMode && userIsSeller
+      ? t('seller.myOrdersTitle', 'طلباتي')
+      : t('orders.title');
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-2">
-        <h1 className="text-2xl sm:text-3xl font-bold text-charcoal">{t('orders.title')}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-charcoal">{pageTitle}</h1>
       </div>
 
       <div className="bg-white rounded-luxury shadow-sm border border-sand/60 p-3 sm:p-4">
@@ -241,15 +255,20 @@ export default function Orders() {
                       </span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs sm:text-sm text-charcoal-light">
-                      <span>{t('orders.quantity')}: {qty}</span>
-                      <span>{t('orders.total')}: {formatPrice(order.total_amount, language)}</span>
-                      <span>{t('orders.shippingMethod')}: {getShippingLabel(order.shipping_method)}</span>
-                    </div>
+                    <span>{t('orders.quantity')}: {qty}</span>
+                    <span>{t('orders.total')}: {formatPrice(order.total_amount, language)}</span>
+                    <span>{t('orders.shippingMethod')}: {getShippingLabel(order.shipping_method)}</span>
                   </div>
+                  {(sellerMode || userIsAdmin) && order.shipping_phone && (
+                    <p className="text-xs text-charcoal mt-1">
+                      {t('orders.customerPhone')}: <span className="font-semibold">{order.shipping_phone}</span>
+                    </p>
+                  )}
                 </div>
-              </button>
-            );
-          })}
+              </div>
+            </button>
+          );
+        })}
         </div>
       )}
 
@@ -261,7 +280,7 @@ export default function Orders() {
                 <p className="text-xs text-taupe">{t('orders.orderNumber')}: {activeOrder.id}</p>
                 <h3 className="text-lg font-bold text-charcoal">{t(`orders.statuses.${activeOrder.status}`)}</h3>
               </div>
-              {(isSeller || isAdmin) && (
+              {(sellerMode || userIsAdmin) && (
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedStatus}
@@ -292,7 +311,7 @@ export default function Orders() {
             </div>
 
             <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-charcoal">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 text-sm text-charcoal">
                 <div>
                   <p className="text-taupe text-xs mb-1">{t('orders.total')}</p>
                   <p className="font-semibold">{formatPrice(activeOrder.total_amount, language)}</p>
@@ -311,6 +330,12 @@ export default function Orders() {
                     {new Date(activeOrder.created_at).toLocaleString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
                   </p>
                 </div>
+                {(sellerMode || userIsAdmin) && activeOrder.shipping_phone && (
+                  <div className="col-span-2 sm:col-span-2 md:col-span-1">
+                    <p className="text-taupe text-xs mb-1">{t('orders.customerPhone')}</p>
+                    <p className="font-semibold">{activeOrder.shipping_phone}</p>
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-xl border-sand/70">
@@ -347,7 +372,7 @@ export default function Orders() {
                           <div className="text-sm font-semibold text-charcoal">
                             {formatPrice(item.total_price ?? item.unit_price * (item.quantity ?? 1), language)}
                           </div>
-                          {!isSeller && activeOrder.status === 'completed' && (
+                          {!sellerMode && activeOrder.status === 'completed' && (
                             <div className="w-full border-t border-sand/60 pt-2">
                               <p className="text-xs font-semibold text-charcoal mb-2">{t('reviews.leaveReview')}</p>
                               <div className="flex flex-wrap items-center gap-2">
@@ -412,7 +437,7 @@ export default function Orders() {
                 </div>
               )}
 
-              {!isSeller && activeOrder.status === 'shipped' && (
+              {!sellerMode && activeOrder.status === 'shipped' && (
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="text-sm text-charcoal">{t('orders.confirmDeliveryNote')}</div>
                   <button

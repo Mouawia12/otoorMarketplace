@@ -30,7 +30,6 @@ export default function AdminSellerProfilesPage() {
 
   useEffect(() => {
     loadProfiles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const loadProfiles = async () => {

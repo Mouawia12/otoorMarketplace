@@ -163,5 +163,4 @@ router.post("/:id/confirm-delivery", authenticate(), async (req, res, next) => {
     next(error);
   }
 });
-
 export default router;

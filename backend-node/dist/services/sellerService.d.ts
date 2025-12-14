@@ -34,6 +34,8 @@ export declare const listSellerProductsWithFilters: (sellerId: number, filters?:
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }[]>;
 export declare const listSellerOrders: (sellerId: number, status?: string) => Promise<{
     id: number;
@@ -81,6 +83,8 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     items: {
         id: number;
@@ -114,6 +118,8 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
         } | undefined;
     }[];
 }[]>;

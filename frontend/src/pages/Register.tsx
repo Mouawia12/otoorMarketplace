@@ -7,6 +7,7 @@ import { useAuthStore, User } from '../store/authStore';
 import { useState } from 'react';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import { resolvePostAuthRoute } from '../utils/authNavigation';
+import googleAuthConfig from '../utils/googleAuthConfig';
 
 // نُبقي فقط البريد وكلمة المرور
 const registerSchema = z.object({
@@ -22,7 +23,7 @@ export default function Register() {
   const navigate = useNavigate();
   const { register: registerUser } = useAuthStore();
   const [error, setError] = useState('');
-  const hasGoogleClient = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+  const showGoogleSection = googleAuthConfig.hasClientId;
 
   const {
     register,
@@ -134,7 +135,7 @@ export default function Register() {
           </button>
         </form>
 
-        {hasGoogleClient && (
+        {showGoogleSection && (
           <div className="mt-6 space-y-3">
             <div className="flex items-center gap-2 text-sm text-charcoal-light">
               <span className="flex-1 h-px bg-gray-200" />

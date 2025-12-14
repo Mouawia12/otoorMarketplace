@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { SellerStatus } from "@prisma/client";
+
 import { authenticate } from "../middleware/auth";
 import {
   upsertSellerProfile,
@@ -6,8 +8,8 @@ import {
   listSellerProfiles,
   updateSellerProfileStatus,
 } from "../services/sellerProfileService";
-import { SellerStatus } from "@prisma/client";
 import { AppError } from "../utils/errors";
+import { safeRecordAdminAuditLog } from "../services/auditLogService";
 
 const router = Router();
 
@@ -52,6 +54,24 @@ router.patch("/:userId/status", authenticate({ roles: ["ADMIN", "SUPER_ADMIN"] }
       throw AppError.badRequest("Invalid status");
     }
     const profile = await updateSellerProfileStatus(userId, status);
+
+    if (req.user) {
+      const auditPayload = {
+        actorId: req.user.id,
+        action: "user.seller_status",
+        targetType: "user",
+        targetId: userId,
+        description: `Updated seller status for user ${userId} to ${status}`,
+        metadata: { status },
+      };
+
+      await safeRecordAdminAuditLog(
+        typeof req.ip === "string" && req.ip.length > 0
+          ? { ...auditPayload, ipAddress: req.ip }
+          : auditPayload
+      );
+    }
+
     res.json(profile);
   } catch (error) {
     next(error);

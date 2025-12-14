@@ -68,12 +68,15 @@ export default function Products() {
           ? res.data
           : res.data?.products || res.data?.data || [];
         setProducts(data);
-      } catch (e) {
-        if (!active) return;
+      } catch (_error) {
+        if (!active) {
+          return;
+        }
         setError("تعذّر جلب المنتجات.");
       } finally {
-        if (!active) return;
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     })();
     return () => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../../store/authStore';
@@ -7,7 +7,6 @@ import NotificationBell from '../../../components/notifications/NotificationBell
 export default function AdminLayout() {
   const { t } = useTranslation();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user } = useAuthStore();
 
   const hasAdminAccess = useMemo(() => {
@@ -60,20 +59,8 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-sand">
       <div className="flex flex-col md:flex-row">
-        {/* Mobile Overlay */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-x-0 top-14 bottom-0 bg-black bg-opacity-50 z-30 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
-        {/* Sidebar */}
-        <aside
-          className={`fixed md:static left-0 top-14 bottom-0 md:top-0 md:bottom-auto z-30 w-72 md:w-64 bg-charcoal text-ivory transform transition-transform duration-300 overflow-y-auto ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-          }`}
-        >
+        {/* Sidebar (desktop only, mobile يستخدم درج الهيدر) */}
+        <aside className="hidden md:block w-72 md:w-64 bg-charcoal text-ivory overflow-y-auto">
           <div className="p-4 sm:p-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gold mb-2">
               {t('admin.adminPanel')}
@@ -88,7 +75,6 @@ export default function AdminLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 sm:px-4 py-3 mb-1 rounded-luxury transition min-h-[44px] text-sm sm:text-base ${
                   isActive(item.path)
                     ? 'bg-gold text-charcoal font-semibold'
@@ -104,15 +90,6 @@ export default function AdminLayout() {
 
         {/* Main Content */}
         <main className="flex-1 p-4 sm:p-6 md:p-8">
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="md:hidden mb-4 bg-charcoal text-ivory px-4 py-3 rounded-luxury min-h-[44px] font-semibold flex items-center gap-2"
-          >
-            <span>☰</span>
-            <span>{t('admin.menu')}</span>
-          </button>
-
           <div className="mb-6 flex justify-end">
             <NotificationBell />
           </div>

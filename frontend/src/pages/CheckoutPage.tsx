@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -6,6 +6,24 @@ import { useCartStore } from "../store/cartStore";
 import { useAuthStore } from "../store/authStore";
 import { formatPrice } from "../utils/currency";
 import { clearPendingOrder, savePendingOrder, PendingOrderPayload } from "../utils/pendingOrder";
+import type { BankTransferSettings } from "../types";
+
+const dialCodeOptions = [
+  { code: "+966", country: "Saudi Arabia", label: "🇸🇦 Saudi Arabia (+966)" },
+  { code: "+971", country: "United Arab Emirates", label: "🇦🇪 United Arab Emirates (+971)" },
+  { code: "+965", country: "Kuwait", label: "🇰🇼 Kuwait (+965)" },
+  { code: "+974", country: "Qatar", label: "🇶🇦 Qatar (+974)" },
+  { code: "+973", country: "Bahrain", label: "🇧🇭 Bahrain (+973)" },
+  { code: "+968", country: "Oman", label: "🇴🇲 Oman (+968)" },
+  { code: "+20", country: "Egypt", label: "🇪🇬 Egypt (+20)" },
+  { code: "+962", country: "Jordan", label: "🇯🇴 Jordan (+962)" },
+  { code: "+961", country: "Lebanon", label: "🇱🇧 Lebanon (+961)" },
+  { code: "+90", country: "Turkey", label: "🇹🇷 Turkey (+90)" },
+  { code: "+44", country: "United Kingdom", label: "🇬🇧 United Kingdom (+44)" },
+  { code: "+1", country: "United States", label: "🇺🇸 United States (+1)" },
+];
+
+const normalizeDigits = (value: string) => value.replace(/[^\d]/g, "");
 
 export default function CheckoutPage() {
   const { t, i18n } = useTranslation();
@@ -19,18 +37,52 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState("");
   const [couponSuccess, setCouponSuccess] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
+  const [bankSettings, setBankSettings] = useState<BankTransferSettings | null>(null);
+
+  useEffect(() => {
+    setCoupon(null);
+    setCouponCode("");
+    setCouponError("");
+    setCouponSuccess("");
+  }, [setCoupon]);
+
+  useEffect(() => {
+    const loadBankSettings = async () => {
+      try {
+        const response = await api.get<BankTransferSettings>("/settings/bank-transfer");
+        setBankSettings(response.data);
+      } catch (error) {
+        console.error("Failed to load bank settings", error);
+      }
+    };
+    loadBankSettings();
+  }, []);
 
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
+    phoneCode: "+966",
     city: "",
     address: "",
-    paymentMethod: "cod" as "card" | "applepay" | "mada" | "cod",
+    paymentMethod: "cod" as "card" | "applepay" | "mada" | "cod" | "bank",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placingOrder, setPlacingOrder] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const resolvedBankSettings = {
+    bankName: bankSettings?.bankName ?? t('checkout.bankNameValue', 'مصرف الراجحي'),
+    accountName: bankSettings?.accountName ?? t('checkout.accountNameValue', 'شركة عالم العطور للتجارة'),
+    iban: bankSettings?.iban ?? 'SA00 0000 0000 0000 0000 0000',
+    swift: bankSettings?.swift ?? 'RJHISARI',
+    instructions:
+      bankSettings?.instructions ??
+      t(
+        'checkout.bankInstructions',
+        'يرجى تحويل المبلغ خلال ٢٤ ساعة ومشاركة إيصال التحويل مع فريق الدعم ليتم تأكيد الطلب وشحنه.'
+      ),
+  };
 
   const buildCouponItemsPayload = () =>
     items.map((item) => ({
@@ -82,7 +134,11 @@ export default function CheckoutPage() {
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) newErrors.name = t('checkout.nameRequired');
-    if (!formData.phone.trim()) newErrors.phone = t('checkout.phoneRequired');
+    if (!formData.phone.trim()) {
+      newErrors.phone = t('checkout.phoneRequired');
+    } else if (formData.phone.trim().length < 8) {
+      newErrors.phone = t('checkout.phoneInvalid', 'أدخل رقم هاتف صالح');
+    }
     if (!formData.city.trim()) newErrors.city = t('checkout.cityRequired');
     if (!formData.address.trim()) newErrors.address = t('checkout.addressRequired');
 
@@ -99,7 +155,7 @@ export default function CheckoutPage() {
       payment_method: formData.paymentMethod.toUpperCase(),
       shipping: {
         name: formData.name,
-        phone: formData.phone,
+        phone: `${formData.phoneCode} ${formData.phone}`.trim(),
         city: formData.city,
         region: formData.city,
         address: formData.address,
@@ -189,15 +245,38 @@ export default function CheckoutPage() {
 
                 <div className="sm:col-span-2">
                   <label className="block text-charcoal font-semibold mb-2">{t('checkout.phone')}</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className={`w-full px-4 py-3 rounded-lg border ${
-                      errors.phone ? 'border-red-500' : 'border-charcoal-light'
-                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
-                    placeholder={t('checkout.phonePlaceholder')}
-                  />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="sm:w-40">
+                      <input
+                        list="dial-code-options"
+                        value={formData.phoneCode}
+                        onChange={(e) => {
+                          const inputValue = e.target.value.trim();
+                          const cleaned = inputValue.replace(/[^\d+]/g, "");
+                          const normalized = cleaned.startsWith("+") ? cleaned : `+${cleaned}`;
+                          setFormData((prev) => ({ ...prev, phoneCode: normalized || "+966" }));
+                        }}
+                        className="w-full px-4 py-3 rounded-lg border border-charcoal-light focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]"
+                        placeholder="+966"
+                      />
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, phone: normalizeDigits(e.target.value) }))}
+                      className={`flex-1 px-4 py-3 rounded-lg border ${
+                        errors.phone ? 'border-red-500' : 'border-charcoal-light'
+                      } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
+                      placeholder={t('checkout.phonePlaceholder')}
+                    />
+                  </div>
+                  <datalist id="dial-code-options">
+                    {dialCodeOptions.map((option) => (
+                      <option key={option.code} value={option.code} label={option.label} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-taupe mt-1">{t('checkout.phoneHint', 'اختر رمز الدولة ثم أدخل أرقام الهاتف فقط')}</p>
                   {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
                 </div>
 
@@ -312,6 +391,50 @@ export default function CheckoutPage() {
                     <p className="font-semibold text-charcoal">{t('checkout.mada')}</p>
                     <p className="text-sm text-taupe">{t('checkout.comingSoon')}</p>
                   </div>
+                </label>
+
+                <label
+                  className={`flex flex-col gap-2 p-4 border rounded-lg cursor-pointer transition ${
+                    formData.paymentMethod === "bank" ? "border-gold bg-gold/10" : "border-charcoal-light"
+                  }`}
+                >
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="payment"
+                        checked={formData.paymentMethod === "bank"}
+                        onChange={() => setFormData({ ...formData, paymentMethod: "bank" })}
+                        className="w-5 h-5 text-gold"
+                      />
+                      <div>
+                        <p className="font-semibold text-charcoal">{t("checkout.bankTransfer", "التحويل البنكي")}</p>
+                        <p className="text-xs text-charcoal-light">
+                          {t("checkout.bankTransferEta", "يتم تأكيد الطلب بعد استلام الحوالة المصرفية")}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-sm text-taupe">{t("checkout.noFees", "بدون رسوم إضافية")}</span>
+                  </div>
+                  {formData.paymentMethod === "bank" && (
+                    <div className="text-sm text-charcoal bg-white rounded-xl border border-gold/40 p-3 space-y-1">
+                      <p>
+                        <strong>{t("checkout.bankNameLabel", "اسم البنك")}:</strong> {resolvedBankSettings.bankName}
+                      </p>
+                      <p>
+                        <strong>{t("checkout.accountName", "اسم المستفيد")}:</strong> {resolvedBankSettings.accountName}
+                      </p>
+                      <p>
+                        <strong>{t("checkout.iban", "رقم الآيبان")}:</strong> {resolvedBankSettings.iban}
+                      </p>
+                      <p>
+                        <strong>{t("checkout.swift", "سويفت كود")}:</strong> {resolvedBankSettings.swift}
+                      </p>
+                      <p className="text-[13px] text-taupe leading-5 whitespace-pre-line">
+                        {resolvedBankSettings.instructions}
+                      </p>
+                    </div>
+                  )}
                 </label>
               </div>
             </div>

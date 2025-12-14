@@ -314,6 +314,11 @@ const mapAuctionStatus = (start, end) => {
 };
 const createAuction = async (input) => {
     const data = createAuctionSchema.parse(input);
+    const durationMs = data.endTime.getTime() - data.startTime.getTime();
+    const durationHours = durationMs / (60 * 60 * 1000);
+    if (durationHours < 2 || durationHours > 24) {
+        throw errors_1.AppError.badRequest("Auction duration must be between 2 and 24 hours");
+    }
     const product = await client_2.prisma.product.findUnique({
         where: { id: data.productId },
         select: {

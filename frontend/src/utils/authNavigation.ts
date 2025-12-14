@@ -41,5 +41,5 @@ export const resolvePostAuthRoute = (user: User, redirectParam?: string | null):
       : '/seller/profile-complete';
   }
 
-  return '/account';
+  return '/';
 };

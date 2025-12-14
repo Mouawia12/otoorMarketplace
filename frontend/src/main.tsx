@@ -7,18 +7,26 @@ import './index.css';
 import './i18n/config';
 import i18n from './i18n/config';
 import './pwa/registerPwaAssets';
+import googleAuthConfig from './utils/googleAuthConfig';
 
 // Set initial RTL/LTR direction based on language
 const initialLang = i18n.language || 'ar';
 document.documentElement.setAttribute('dir', initialLang === 'ar' ? 'rtl' : 'ltr');
 document.documentElement.setAttribute('lang', initialLang);
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const googleClientId = googleAuthConfig.clientId;
+const googleLoginEnabled = googleAuthConfig.isEnabled;
+
+if (googleAuthConfig.hasClientId && !googleAuthConfig.originAllowed && googleAuthConfig.currentOrigin) {
+  console.warn(
+    `[google-auth] Current origin (${googleAuthConfig.currentOrigin}) is not listed in VITE_GOOGLE_ALLOWED_ORIGINS. Google login widget disabled.`,
+  );
+}
 
 const Root = () => (
   <React.StrictMode>
     <HelmetProvider>
-      {googleClientId ? (
+      {googleLoginEnabled ? (
         <GoogleOAuthProvider clientId={googleClientId}>
           <App />
         </GoogleOAuthProvider>

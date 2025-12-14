@@ -5,11 +5,19 @@ import BrandLogo from '../brand/BrandLogo';
 import { FooterPageKey, LocaleCode } from '../../types/staticPages';
 import { defaultFooterPages } from '../../content/footerPages';
 import { fetchPublishedFooterPages } from '../../services/footerPages';
+import type { SocialLinks } from '../../types';
+import { DEFAULT_SOCIAL_LINKS, fetchSocialLinks } from '../../services/settingsService';
 
-const socialLinks = [
-  { label: 'Instagram', href: 'https://instagram.com', icon: InstagramIcon },
-  { label: 'Twitter', href: 'https://twitter.com', icon: TwitterIcon },
-  { label: 'YouTube', href: 'https://youtube.com', icon: YoutubeIcon },
+type SocialIconConfig = {
+  key: keyof SocialLinks;
+  label: string;
+  icon: typeof InstagramIcon;
+};
+
+const socialIconConfig: SocialIconConfig[] = [
+  { key: 'instagram', label: 'Instagram', icon: InstagramIcon },
+  { key: 'twitter', label: 'Twitter / X', icon: TwitterIcon },
+  { key: 'youtube', label: 'YouTube', icon: YoutubeIcon },
 ];
 
 export default function Footer() {
@@ -21,6 +29,8 @@ export default function Footer() {
     if (typeof window === 'undefined') return true;
     return window.innerWidth < 768;
   });
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>(DEFAULT_SOCIAL_LINKS);
+  const isArabic = i18n.language === 'ar';
 
   useEffect(() => {
     let mounted = true;
@@ -53,6 +63,34 @@ export default function Footer() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    fetchSocialLinks()
+      .then((links) => {
+        if (mounted) {
+          setSocialLinks(links);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setSocialLinks(DEFAULT_SOCIAL_LINKS);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const resolvedSocialLinks = socialIconConfig.map((config) => {
+    const href = socialLinks?.[config.key];
+    return {
+      ...config,
+      href: href && href.trim().length > 0 ? href.trim() : '#',
+      disabled: !href,
+    };
+  });
+  const hasSocialLinks = resolvedSocialLinks.some((link) => !link.disabled);
+
   const groups: Array<{ title: string; description: string; pages: FooterPageKey[] }> = [
     {
       title: t('footer.about'),
@@ -80,28 +118,38 @@ export default function Footer() {
         <div className="rounded-3xl bg-white/5 border border-white/10 p-6 sm:p-8">
           <div className="max-w-3xl mx-auto flex flex-col items-center gap-4 text-center">
             <BrandLogo size={64} className="mx-auto" />
-            <p className="text-xs uppercase tracking-[0.3em] text-gold/80">
+            <p
+              className={`text-xs text-gold/80 ${isArabic ? '' : 'uppercase tracking-[0.3em]'}`}
+              style={isArabic ? { letterSpacing: 'normal' } : undefined}
+            >
               {t('footer.curatedBadge', 'مختارة بعناية')}
             </p>
             <h2 className="text-2xl sm:text-3xl font-bold">{t('footer.taglineTitle')}</h2>
             <p className="text-sm text-ivory/80">{t('footer.tagline')}</p>
-            <div className="w-full flex flex-col gap-3">
-              <p className="text-xs uppercase tracking-[0.3em] text-gold/80">{t('footer.followUs')}</p>
-              <div className="flex gap-2 sm:gap-3 flex-nowrap justify-center">
-                {socialLinks.map(({ label, href, icon: Icon }) => (
-                  <a
-                    key={label}
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 transition text-xs sm:text-sm whitespace-nowrap"
-                  >
-                    <Icon className="w-4 h-4 text-gold" />
-                    <span className="font-semibold">{label}</span>
-                  </a>
-                ))}
+            {hasSocialLinks && (
+              <div className="w-full flex flex-col gap-3">
+                <p
+                  className={`text-xs text-gold/80 ${isArabic ? '' : 'uppercase tracking-[0.3em]'}`}
+                  style={isArabic ? { letterSpacing: 'normal' } : undefined}
+                >
+                  {t('footer.followUs')}
+                </p>
+                <div className="flex gap-2 sm:gap-3 flex-nowrap justify-center flex-wrap">
+                  {resolvedSocialLinks.map(({ label, href, icon: Icon }) => (
+                    <a
+                      key={label}
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 transition text-xs sm:text-sm whitespace-nowrap"
+                    >
+                      <Icon className="w-4 h-4 text-gold" />
+                      <span className="font-semibold">{label}</span>
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -116,7 +164,12 @@ export default function Footer() {
                 className="w-full px-5 md:px-6 py-4 flex items-center justify-between text-left md:cursor-default md:pointer-events-none"
               >
                 <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-gold/80 mb-1">{t('footer.sectionLabel')}</p>
+                  <p
+                    className={`text-xs mb-1 text-gold/80 ${isArabic ? '' : 'uppercase tracking-[0.3em]'}`}
+                    style={isArabic ? { letterSpacing: 'normal' } : undefined}
+                  >
+                    {t('footer.sectionLabel')}
+                  </p>
                   <h3 className="text-xl font-bold">{group.title}</h3>
                 </div>
                 <span className="text-2xl text-gold font-semibold md:hidden">
@@ -138,17 +191,17 @@ export default function Footer() {
                         <li key={slug}>
                           <Link
                             to={`/${slug.replace('help-', 'help/')}`}
-                            className="flex items-center gap-3 px-3 py-2 rounded-2xl bg-white/0 hover:bg-white/10 transition"
+                            className="block px-3 py-2 rounded-2xl bg-white/0 hover:bg-white/10 transition"
+                            style={
+                              isArabic
+                                ? { fontFamily: "'Cairo','Inter',sans-serif", letterSpacing: 'normal' }
+                                : { fontFamily: "'Inter','Cairo',sans-serif" }
+                            }
                           >
-                            <span className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-lg">
-                              {page.icon}
-                            </span>
-                            <div>
-                              <p className="text-sm font-semibold">{page.label[lang]}</p>
-                              <p className="text-xs text-ivory/70 line-clamp-1">
-                                {page.heroSubtitle[lang]}
-                              </p>
-                            </div>
+                            <p className="text-sm font-semibold">{page.label[lang]}</p>
+                            <p className="text-xs text-ivory/70 line-clamp-1">
+                              {page.heroSubtitle[lang]}
+                            </p>
                           </Link>
                         </li>
                       );

@@ -66,6 +66,8 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     items: {
         id: number;
@@ -99,6 +101,8 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
         } | undefined;
     }[];
 }>;
@@ -148,6 +152,8 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     items: {
         id: number;
@@ -181,6 +187,8 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
         } | undefined;
     }[];
 }[]>;
@@ -230,6 +238,8 @@ export declare const listAllOrders: (status?: string) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     items: {
         id: number;
@@ -263,6 +273,8 @@ export declare const listAllOrders: (status?: string) => Promise<{
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
         } | undefined;
     }[];
 }[]>;
@@ -312,6 +324,8 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     items: {
         id: number;
@@ -345,6 +359,8 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
         } | undefined;
     }[];
 }[]>;
@@ -394,6 +410,8 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     items: {
         id: number;
@@ -427,6 +445,8 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
         } | undefined;
     }[];
 }>;
@@ -476,6 +496,8 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     items: {
         id: number;
@@ -509,6 +531,8 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
         } | undefined;
     }[];
 }>;

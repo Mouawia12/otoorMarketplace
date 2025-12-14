@@ -25,6 +25,8 @@ export declare const normalizeProduct: (product: any) => {
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 };
 export declare const listProducts: (query: unknown) => Promise<{
     products: {
@@ -53,6 +55,8 @@ export declare const listProducts: (query: unknown) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     }[];
     total: number;
     page: number;
@@ -85,6 +89,8 @@ export declare const getProductById: (id: number) => Promise<{
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }>;
 export declare const getRelatedProducts: (productId: number, limit?: number) => Promise<{
     id: any;
@@ -112,6 +118,8 @@ export declare const getRelatedProducts: (productId: number, limit?: number) => 
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }[]>;
 export declare const getProductFiltersMeta: () => Promise<{
     max_price?: number;
@@ -172,6 +180,8 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>) 
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }>;
 export declare const updateProduct: (productId: number, sellerId: number, payload: unknown) => Promise<{
     id: any;
@@ -199,7 +209,10 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }>;
+export declare const deleteProduct: (productId: number, sellerId: number) => Promise<void>;
 export declare const moderateProduct: (productId: number, action: "approve" | "reject") => Promise<{
     id: any;
     seller_id: any;
@@ -226,6 +239,8 @@ export declare const moderateProduct: (productId: number, action: "approve" | "r
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }>;
 export {};
 //# sourceMappingURL=productService.d.ts.map

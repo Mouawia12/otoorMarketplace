@@ -17,6 +17,8 @@ declare module '*.svg?url' {
 
 interface ImportMetaEnv {
   readonly VITE_PROTECTED_ADMIN_EMAIL?: string;
+  readonly VITE_GOOGLE_CLIENT_ID?: string;
+  readonly VITE_GOOGLE_ALLOWED_ORIGINS?: string;
 }
 
 interface ImportMeta {

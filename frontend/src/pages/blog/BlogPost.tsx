@@ -57,7 +57,7 @@ export default function BlogPost() {
             return new Date(b.date).getTime() - new Date(a.date).getTime();
           })
           .slice(0, 3)
-          .map(({ score, ...rest }) => rest);
+          .map(({ score: _score, ...rest }) => rest);
 
         if (cancelled) return;
         setPost(foundPost);

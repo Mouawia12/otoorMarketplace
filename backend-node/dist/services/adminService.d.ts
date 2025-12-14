@@ -23,7 +23,11 @@ type AdminUserUpdatePayload = {
     seller_status?: string;
     roles?: string[];
 };
-export declare const updateUserStatus: (userId: number, updates: AdminUserUpdatePayload, allowedRoles: RoleName[]) => Promise<{
+type AdminUserUpdateAuditContext = {
+    actorId: number;
+    ipAddress?: string;
+};
+export declare const updateUserStatus: (userId: number, updates: AdminUserUpdatePayload, allowedRoles: RoleName[], auditContext?: AdminUserUpdateAuditContext) => Promise<{
     id: number;
     email: string;
     full_name: string;
@@ -61,6 +65,8 @@ export declare const listPendingProducts: () => Promise<{
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }[]>;
 export declare const listProductsForAdmin: (status?: string) => Promise<{
     id: any;
@@ -88,6 +94,8 @@ export declare const listProductsForAdmin: (status?: string) => Promise<{
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }[]>;
 export declare const updateProductStatusAsAdmin: (productId: number, status: string) => Promise<{
     id: any;
@@ -115,6 +123,8 @@ export declare const updateProductStatusAsAdmin: (productId: number, status: str
         full_name: any;
         verified_seller: any;
     } | undefined;
+    is_auction_product: boolean;
+    has_active_auction: any;
 }>;
 type ModerationItem = {
     id: string;

@@ -6,5 +6,6 @@ export declare class AppError extends Error {
     static unauthorized(message?: string): AppError;
     static forbidden(message?: string): AppError;
     static notFound(message?: string): AppError;
+    static internal(message?: string, details?: unknown): AppError;
 }
 //# sourceMappingURL=errors.d.ts.map

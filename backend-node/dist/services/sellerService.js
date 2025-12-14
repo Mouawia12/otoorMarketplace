@@ -81,6 +81,7 @@ const listSellerProductsWithFilters = async (sellerId, filters = {}) => {
         where,
         include: {
             images: { orderBy: { sortOrder: "asc" } },
+            auctions: true,
         },
         orderBy: { createdAt: "desc" },
     });

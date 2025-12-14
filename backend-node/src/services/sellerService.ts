@@ -90,6 +90,7 @@ export const listSellerProductsWithFilters = async (
     where,
     include: {
       images: { orderBy: { sortOrder: "asc" } },
+      auctions: true,
     },
     orderBy: { createdAt: "desc" },
   });

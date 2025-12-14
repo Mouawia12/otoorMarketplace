@@ -2,7 +2,7 @@ import { Router } from "express";
 import { RoleName, AuctionStatus } from "@prisma/client";
 
 import { authenticate } from "../middleware/auth";
-import { createProduct, updateProduct } from "../services/productService";
+import { createProduct, updateProduct, deleteProduct } from "../services/productService";
 import {
   getSellerDashboardStats,
   listSellerProductsWithFilters,
@@ -74,6 +74,23 @@ router.patch("/products/:id", sellerOnly, async (req, res, next) => {
 
     const product = await updateProduct(productId, req.user.id, req.body);
     res.json(product);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/products/:id", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const productId = Number(req.params.id);
+    if (Number.isNaN(productId)) {
+      throw AppError.badRequest("Invalid product id");
+    }
+
+    await deleteProduct(productId, req.user.id);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

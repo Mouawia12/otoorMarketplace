@@ -9,6 +9,7 @@ import api from '../lib/api';
 import { clearPendingOrder, loadPendingOrder } from '../utils/pendingOrder';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import { resolvePostAuthRoute } from '../utils/authNavigation';
+import googleAuthConfig from '../utils/googleAuthConfig';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -24,7 +25,7 @@ export default function Login() {
   const { login } = useAuthStore();
   const [error, setError] = useState('');
   const [processingPending, setProcessingPending] = useState(false);
-  const hasGoogleClient = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+  const showGoogleSection = googleAuthConfig.hasClientId;
   const resetSuccess = new URLSearchParams(location.search).get('reset') === 'success';
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
@@ -68,6 +69,11 @@ export default function Login() {
       const user = await login(data.email, data.password);
       await postLoginNavigation(user);
     } catch (err: any) {
+      const status = err.response?.status;
+      if (status === 401) {
+        setError(t('auth.invalidCredentials'));
+        return;
+      }
       const detail = err.response?.data?.detail;
       if (Array.isArray(detail)) {
         setError(detail.map((e: any) => e.msg).join(', '));
@@ -141,7 +147,7 @@ export default function Login() {
           </button>
         </form>
 
-        {hasGoogleClient && (
+        {showGoogleSection && (
           <div className="mt-6 space-y-3">
             <div className="flex items-center gap-2 text-sm text-charcoal-light">
               <span className="flex-1 h-px bg-gray-200" />

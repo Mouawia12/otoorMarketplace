@@ -44,6 +44,7 @@ model User {
   updatedFooterPages   FooterPage[] @relation("FooterPageUpdatedBy")
   publishedFooterPages FooterPage[] @relation("FooterPagePublishedBy")
   notifications   Notification[]
+  adminAuditLogs  AdminAuditLog[] @relation("AdminAuditLogAdmin")
 }
 
 model Role {
@@ -273,6 +274,34 @@ model ProductTemplateImage {
 
   @@index([templateId])
   @@map("product_template_images")
+}
+
+model Setting {
+  key       String   @id
+  value     Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model AdminAuditLog {
+  id          Int      @id @default(autoincrement())
+  adminId     Int      @map("admin_id")
+  actorType   String   @map("actor_type") @default("admin")
+  action      String
+  targetType  String   @map("target_type")
+  targetId    Int?     @map("target_id")
+  description String?  @db.Text
+  metadata    Json?
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  admin User @relation("AdminAuditLogAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
 }
 
 model ProductReview {

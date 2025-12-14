@@ -43,6 +43,8 @@ export interface Product {
   updated_at: string;
   rating_avg?: number;
   rating_count?: number;
+  is_auction_product?: boolean;
+  has_active_auction?: boolean;
 }
 
 export interface ProductTemplate {
@@ -180,4 +182,33 @@ export interface ModerationQueueItem {
   title_ar: string;
   created_at: string;
   priority: 'low' | 'medium' | 'high';
+}
+
+export interface BankTransferSettings {
+  bankName: string;
+  accountName: string;
+  iban: string;
+  swift: string;
+  instructions: string;
+}
+
+export interface PlatformSettings {
+  commissionNew: number;
+  commissionUsed: number;
+  commissionAuction: number;
+  authenticityFee: number;
+  notificationsEnabled: boolean;
+  language: "ar" | "en";
+  theme: "light" | "dark";
+}
+
+export interface SocialLinks {
+  instagram?: string;
+  tiktok?: string;
+  facebook?: string;
+  twitter?: string;
+  youtube?: string;
+  snapchat?: string;
+  linkedin?: string;
+  whatsapp?: string;
 }

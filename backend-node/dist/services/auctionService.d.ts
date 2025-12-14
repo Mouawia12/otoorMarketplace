@@ -38,6 +38,8 @@ export declare const listAuctions: (query: unknown) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     seller: {
         id: number;
@@ -96,6 +98,8 @@ export declare const getAuctionById: (id: number) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     seller: {
         id: number;
@@ -142,6 +146,8 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     seller: {
         id: number;
@@ -237,6 +243,8 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     seller: {
         id: number;
@@ -283,6 +291,8 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
             full_name: any;
             verified_seller: any;
         } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
     } | undefined;
     seller: {
         id: number;

@@ -35,6 +35,7 @@ import SellerDashboardPage from './pages/SellerDashboardPage';
 import SellerProductsPage from './pages/SellerProductsPage';
 import SellerAuctionsPage from './pages/SellerAuctionsPage';
 import SellerOrdersPage from './pages/SellerOrdersPage';
+import SellerMyOrdersPage from './pages/SellerMyOrdersPage';
 import SellerEarningsPage from './pages/SellerEarningsPage';
 import SellerSupportPage from './pages/SellerSupportPage';
 
@@ -104,7 +105,7 @@ function App() {
   }, [language]);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<Layout />}>
@@ -174,6 +175,7 @@ function App() {
             <Route path="products" element={<SellerProductsPage />} />
             <Route path="auctions" element={<SellerAuctionsPage />} />
             <Route path="orders" element={<SellerOrdersPage />} />
+            <Route path="my-orders" element={<SellerMyOrdersPage />} />
             <Route path="coupons" element={<SellerCouponsPage />} />
             <Route path="earnings" element={<SellerEarningsPage />} />
             <Route path="support" element={<SellerSupportPage />} />

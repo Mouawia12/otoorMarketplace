@@ -75,6 +75,7 @@ export default function SellerProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editPrice, setEditPrice] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -141,6 +142,35 @@ export default function SellerProductsPage() {
       console.error('Failed to update price', error);
       const msg = error.response?.data?.message || error.response?.data?.detail;
       alert(msg || t('seller.updateFailed', 'Failed to update product'));
+    }
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (product.has_active_auction) {
+      alert(t('seller.deleteProductActive', 'You must end the auction before deleting this product.'));
+      return;
+    }
+    if (product.is_auction_product) {
+      alert(t('seller.deleteProductDisabled', 'This product is part of an auction and cannot be deleted.'));
+      return;
+    }
+    const confirmMessage = t(
+      'seller.deleteProductConfirm',
+      'Delete this product permanently?'
+    );
+    if (typeof window !== 'undefined' && !window.confirm(confirmMessage)) {
+      return;
+    }
+    try {
+      setDeletingId(product.id);
+      await api.delete(`/seller/products/${product.id}`);
+      fetchProducts();
+    } catch (error: any) {
+      console.error('Failed to delete product', error);
+      const msg = error.response?.data?.message || error.response?.data?.detail;
+      alert(msg || t('seller.deleteProductFailed', 'Failed to delete product'));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -268,14 +298,32 @@ export default function SellerProductsPage() {
                       i18n.language === 'ar' ? 'ar-EG' : 'en-US'
                     )}
                   </td>
-                  <td className="px-3 md:px-4 py-4 text-right">
-                    <button
-                      onClick={() => setEditingProduct(product)}
-                      className="px-2 py-1 rounded-full border border-gold text-charcoal hover:bg-gold/10 transition"
-                      aria-label={t('seller.moreActions', 'المزيد من الإجراءات')}
-                    >
-                      ⋮
-                    </button>
+                  <td className="px-3 md:px-4 py-4">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setEditingProduct(product)}
+                        className="px-2 py-1 rounded-full border border-gold text-charcoal hover:bg-gold/10 transition"
+                        aria-label={t('seller.moreActions', 'المزيد من الإجراءات')}
+                      >
+                        ⋮
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product)}
+                        disabled={Boolean(product.is_auction_product) || deletingId === product.id}
+                        title={
+                          product.is_auction_product
+                            ? t('seller.deleteProductTooltip', 'Auction products cannot be deleted')
+                            : undefined
+                        }
+                        className={`px-3 py-1 rounded-full border text-sm font-semibold transition ${
+                          product.is_auction_product
+                            ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'border-red-500 text-red-600 hover:bg-red-50'
+                        } ${deletingId === product.id ? 'opacity-60 cursor-wait' : ''}`}
+                      >
+                        {deletingId === product.id ? t('common.loading') : t('common.delete')}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -346,7 +394,7 @@ const createInitialFormState = (): ProductFormState => ({
   category: '',
   base_price: '',
   size_ml: '',
-  concentration: '',
+  concentration: 'N/A',
   stock_quantity: '',
   description_en: '',
   description_ar: '',
@@ -415,7 +463,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
           setTemplateResults(templates);
           setTemplateError(null);
         }
-      } catch (error) {
+      } catch (_error) {
         if (!cancelled) {
           setTemplateError(t('seller.templateLoadFailed', 'فشل تحميل القوالب'));
         }
@@ -523,7 +571,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       category: template.category || '',
       base_price: (template.base_price ?? '').toString(),
       size_ml: (template.size_ml ?? '').toString(),
-      concentration: template.concentration || '',
+      concentration: template.concentration || 'N/A',
       stock_quantity: '',
       description_en: template.description_en || '',
       description_ar: template.description_ar || '',
@@ -768,16 +816,6 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                 type="number"
                 value={formData.size_ml}
                 onChange={handleChange('size_ml')}
-                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-charcoal font-semibold mb-2">{t('seller.concentration', 'Concentration')}</label>
-              <input
-                type="text"
-                value={formData.concentration}
-                onChange={handleChange('concentration')}
                 className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
                 required
               />

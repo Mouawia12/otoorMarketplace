@@ -223,23 +223,28 @@ const requestPasswordReset = async (input) => {
         },
     });
     const resetUrl = `${env_1.config.auth.passwordResetUrl}?token=${encodeURIComponent(rawToken)}`;
+    const brandSignature = "FragraWorld | عالم العطور";
+    const contactEmail = env_1.config.mail.from.address || "fragreworld@gmail.com";
     const plainText = [
-        "مرحباً،",
+        `مرحباً ${user.fullName ?? ''}`.trim(),
         "",
-        "لقد طلبت إعادة تعيين كلمة المرور الخاصة بك في منصة أطور.",
-        `لإعادة التعيين اضغط على الرابط التالي (صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة):`,
+        `تم إرسال هذه الرسالة من ${brandSignature} لتأكيد طلب إعادة تعيين كلمة المرور الخاص بك على منصتنا.`,
+        `اضغط على الرابط التالي لإعادة التعيين (صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة):`,
         resetUrl,
         "",
-        "إذا لم تطلب هذه العملية فيرجى تجاهل الرسالة.",
+        `إذا لم تطلب هذه العملية فتجاهل الرسالة أو راسلنا على ${contactEmail} للمساعدة.`,
+        "",
+        brandSignature,
     ].join("\n");
     const html = `
     <p>مرحباً ${user.fullName ?? ""}</p>
-    <p>لقد استلمنا طلباً لإعادة تعيين كلمة المرور الخاصة بك.</p>
+    <p>هذه الرسالة مرسلة من فريق ${brandSignature}. لقد استلمنا طلباً لإعادة تعيين كلمة المرور الخاصة بك.</p>
     <p>
       <a href="${resetUrl}" style="color:#a67c52;font-weight:bold;">إعادة تعيين كلمة المرور</a>
     </p>
     <p>الرابط صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة واحدة فقط.</p>
-    <p>إذا لم تطلب هذه العملية يمكنك تجاهل هذه الرسالة.</p>
+    <p>إذا لم تطلب هذه العملية يمكنك تجاهل هذه الرسالة أو مراسلتنا عبر <a href="mailto:${contactEmail}" style="color:#a67c52;">${contactEmail}</a>.</p>
+    <p style="margin-top:16px;font-weight:bold;">${brandSignature}</p>
   `;
     await (0, mailer_1.sendMail)({
         to: user.email,
@@ -289,7 +294,7 @@ const authenticateUser = async (input) => {
         throw errors_1.AppError.unauthorized("Invalid credentials");
     }
     if (user.status === "SUSPENDED") {
-        throw errors_1.AppError.forbidden(`Your account is suspended. Please contact support at ${env_1.config.support.email}`);
+        throw errors_1.AppError.forbidden(`Your account is suspended. Please contact support at fragreworld@gmail.com`);
     }
     const valid = await (0, password_1.verifyPassword)(data.password, user.passwordHash);
     if (!valid) {

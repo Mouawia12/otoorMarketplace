@@ -1,4 +1,4 @@
-import { NotificationType, Prisma, ProductCondition, ProductStatus } from "@prisma/client";
+import { AuctionStatus, NotificationType, Prisma, ProductCondition, ProductStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "../prisma/client";
@@ -21,6 +21,7 @@ const normalizeStatus = (status: string | null | undefined) => {
 
 export const normalizeProduct = (product: any) => {
   const plain = toPlainObject(product);
+  const auctions = Array.isArray(plain.auctions) ? plain.auctions : [];
   const rawImages = Array.isArray(plain.images)
     ? plain.images.map((image: any) => image.url)
     : plain.image_urls ?? [];
@@ -28,6 +29,11 @@ export const normalizeProduct = (product: any) => {
     .map((url: any) => (typeof url === "string" ? url : null))
     .filter((url): url is string => Boolean(url))
     .map((url) => toPublicAssetUrl(url));
+
+  const hasActiveAuction = auctions.some((auction: any) => {
+    const status = typeof auction?.status === "string" ? auction.status.toUpperCase() : "";
+    return status === AuctionStatus.ACTIVE || status === AuctionStatus.SCHEDULED;
+  });
 
   return {
     id: plain.id,
@@ -44,7 +50,7 @@ export const normalizeProduct = (product: any) => {
     concentration: plain.concentration,
     condition: plain.condition?.toLowerCase?.() ?? plain.condition,
     stock_quantity: plain.stockQuantity,
-  image_urls: images,
+    image_urls: images,
     status: normalizeStatus(plain.status),
     created_at: plain.createdAt,
     updated_at: plain.updatedAt,
@@ -57,6 +63,8 @@ export const normalizeProduct = (product: any) => {
           verified_seller: plain.seller.verifiedSeller,
         }
       : undefined,
+    is_auction_product: auctions.length > 0,
+    has_active_auction: hasActiveAuction,
   };
 };
 
@@ -112,6 +120,14 @@ export const listProducts = async (query: unknown) => {
   } = listProductsSchema.parse(normalizedQuery);
 
   const filters: Prisma.ProductWhereInput = {};
+
+  const now = new Date();
+  filters.auctions = {
+    none: {
+      status: { in: [AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED] },
+      endTime: { gt: now },
+    },
+  };
 
   if (status) {
     if (typeof status === "string") {
@@ -341,12 +357,13 @@ const productInputSchema = z.object({
   concentration: z.string().min(1),
   condition: z.nativeEnum(ProductCondition),
   stockQuantity: z.coerce.number().int().nonnegative(),
-  status: z.nativeEnum(ProductStatus).default(ProductStatus.PENDING_REVIEW),
+  status: z.nativeEnum(ProductStatus).default(ProductStatus.PUBLISHED),
   imageUrls: z.array(imageUrlSchema).default([]),
 });
 
 export const createProduct = async (input: z.infer<typeof productInputSchema>) => {
   const data = productInputSchema.parse(input);
+  const initialStatus = ProductStatus.PUBLISHED;
   const slugBase = makeSlug(data.nameEn);
 
   const existingSlug = await prisma.product.findFirst({
@@ -379,7 +396,7 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
       concentration: data.concentration,
       condition: data.condition,
       stockQuantity: data.stockQuantity,
-      status: data.status,
+      status: initialStatus,
       images: {
         create: sanitizedImages.map((url, index) => ({
           url,
@@ -389,6 +406,7 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
     },
     include: {
       images: true,
+      auctions: true,
       seller: {
         select: {
           id: true,
@@ -401,17 +419,17 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
 
   await createNotificationForUser({
     userId: product.sellerId,
-    type: NotificationType.PRODUCT_SUBMITTED,
-    title: "تم استلام منتجك",
-    message: `نراجع الآن منتجك ${product.nameEn}. سنعلمك فور اتخاذ القرار.`,
-    data: { productId: product.id },
+    type: NotificationType.PRODUCT_APPROVED,
+    title: "تم نشر منتجك",
+    message: `${product.nameEn ?? product.nameAr} متاح الآن في المتجر ويمكنك مراقبته من لوحة البائع.`,
+    data: { productId: product.id, status: initialStatus },
   });
 
   await notifyAdmins({
     type: NotificationType.PRODUCT_SUBMITTED,
-    title: "منتج جديد بانتظار المراجعة",
-    message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn}.`,
-    data: { productId: product.id, sellerId: product.sellerId },
+    title: "منتج جديد تم نشره تلقائياً",
+    message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn ?? product.nameAr} وتم نشره مباشرة.`,
+    data: { productId: product.id, sellerId: product.sellerId, status: initialStatus },
     fallbackToSupport: true,
   });
 
@@ -508,6 +526,7 @@ export const updateProduct = async (
     },
     include: {
       images: { orderBy: { sortOrder: "asc" as const } },
+      auctions: true,
       seller: {
         select: {
           id: true,
@@ -540,6 +559,41 @@ export const updateProduct = async (
   }
 
   return normalizeProduct(updated);
+};
+
+export const deleteProduct = async (productId: number, sellerId: number) => {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      sellerId: true,
+      auctions: { select: { id: true, status: true } },
+    },
+  });
+
+  if (!product || product.sellerId !== sellerId) {
+    throw AppError.notFound("Product not found");
+  }
+
+  if (product.auctions.length > 0) {
+    const hasActive = product.auctions.some(
+      (auction) =>
+        auction.status === AuctionStatus.ACTIVE || auction.status === AuctionStatus.SCHEDULED
+    );
+    const message = hasActive
+      ? "Cannot delete a product with an active or scheduled auction"
+      : "Cannot delete a product that has participated in auctions";
+    throw AppError.badRequest(message);
+  }
+
+  try {
+    await prisma.product.delete({ where: { id: productId } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      throw AppError.badRequest("Cannot delete a product that is part of existing orders");
+    }
+    throw error;
+  }
 };
 
 export const moderateProduct = async (

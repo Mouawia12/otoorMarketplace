@@ -1,10 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addSupportReply = exports.updateSupportTicketStatus = exports.getSupportTicket = exports.listSupportTickets = exports.createSupportTicket = void 0;
+const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
-const client_1 = require("../prisma/client");
+const client_2 = require("../prisma/client");
 const errors_1 = require("../utils/errors");
 const serializer_1 = require("../utils/serializer");
+const notificationService_1 = require("./notificationService");
 const createTicketSchema = zod_1.z.object({
     userId: zod_1.z.number().int().positive(),
     subject: zod_1.z.string().min(3),
@@ -13,7 +15,7 @@ const createTicketSchema = zod_1.z.object({
 });
 const createSupportTicket = async (input) => {
     const data = createTicketSchema.parse(input);
-    const ticket = await client_1.prisma.supportTicket.create({
+    const ticket = await client_2.prisma.supportTicket.create({
         data: {
             userId: data.userId,
             subject: data.subject,
@@ -28,7 +30,15 @@ const createSupportTicket = async (input) => {
             },
         },
     });
-    return mapTicket(ticket);
+    const normalized = mapTicket(ticket);
+    await (0, notificationService_1.notifyAdmins)({
+        type: client_1.NotificationType.SYSTEM,
+        title: "تذكرة دعم جديدة",
+        message: `${ticket.user?.fullName ?? "مستخدم"} (${data.role}) فتح تذكرة: ${data.subject}`,
+        data: { ticketId: ticket.id, subject: ticket.subject, role: ticket.role },
+        fallbackToSupport: true,
+    });
+    return normalized;
 };
 exports.createSupportTicket = createSupportTicket;
 const listSupportTickets = async (opts) => {
@@ -39,7 +49,7 @@ const listSupportTickets = async (opts) => {
     if (opts.role) {
         where.role = opts.role;
     }
-    const tickets = await client_1.prisma.supportTicket.findMany({
+    const tickets = await client_2.prisma.supportTicket.findMany({
         where,
         orderBy: { createdAt: "desc" },
         include: {
@@ -54,7 +64,7 @@ const listSupportTickets = async (opts) => {
 };
 exports.listSupportTickets = listSupportTickets;
 const getSupportTicket = async (id, userId, isAdmin) => {
-    const ticket = await client_1.prisma.supportTicket.findUnique({
+    const ticket = await client_2.prisma.supportTicket.findUnique({
         where: { id },
         include: {
             user: { select: { id: true, fullName: true, email: true } },
@@ -78,7 +88,7 @@ const updateStatusSchema = zod_1.z.object({
 });
 const updateSupportTicketStatus = async (id, status) => {
     const data = updateStatusSchema.parse({ status: status.toUpperCase() });
-    const ticket = await client_1.prisma.supportTicket.update({
+    const ticket = await client_2.prisma.supportTicket.update({
         where: { id },
         data: { status: data.status },
         include: {
@@ -97,13 +107,16 @@ const replySchema = zod_1.z.object({
     userId: zod_1.z.number().int().positive(),
     message: zod_1.z.string().min(2),
 });
-const addSupportReply = async (input) => {
+const addSupportReply = async (input, options) => {
     const data = replySchema.parse(input);
-    const ticket = await client_1.prisma.supportTicket.findUnique({ where: { id: data.ticketId } });
+    const ticket = await client_2.prisma.supportTicket.findUnique({
+        where: { id: data.ticketId },
+        include: { user: { select: { id: true, fullName: true, email: true } } },
+    });
     if (!ticket) {
         throw errors_1.AppError.notFound("Ticket not found");
     }
-    const reply = await client_1.prisma.supportReply.create({
+    const reply = await client_2.prisma.supportReply.create({
         data: {
             ticketId: data.ticketId,
             userId: data.userId,
@@ -111,6 +124,24 @@ const addSupportReply = async (input) => {
         },
         include: { user: { select: { id: true, fullName: true, email: true } }, ticket: true },
     });
+    if (options?.actorIsAdmin) {
+        await (0, notificationService_1.createNotificationForUser)({
+            userId: ticket.userId,
+            type: client_1.NotificationType.SYSTEM,
+            title: "رد جديد على تذكرتك",
+            message: "قام فريق الدعم بالرد على تذكرتك.",
+            data: { ticketId: ticket.id, replyId: reply.id },
+        });
+    }
+    else {
+        await (0, notificationService_1.notifyAdmins)({
+            type: client_1.NotificationType.SYSTEM,
+            title: "رد جديد من مستخدم على تذكرة دعم",
+            message: `${reply.user?.fullName ?? "مستخدم"} رد على التذكرة #${ticket.id}`,
+            data: { ticketId: ticket.id, replyId: reply.id },
+            fallbackToSupport: true,
+        });
+    }
     return mapReply(reply);
 };
 exports.addSupportReply = addSupportReply;

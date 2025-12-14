@@ -176,7 +176,7 @@ export default function AdminProductsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex gap-2 flex-wrap">
         {([
           { id: "all", label: t("admin.all"), count: counts.all },
           { id: "pending", label: t("admin.pending"), count: counts.pending },
@@ -187,11 +187,12 @@ export default function AdminProductsPage() {
           <button
             key={tab.id}
             onClick={() => setActive(tab.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition
-              ${active === tab.id ? "bg-gold text-charcoal" : "bg-sand text-charcoal hover:bg-sand/80"}`}
+            className={`px-4 py-2 rounded-luxury text-xs sm:text-sm font-semibold transition ${
+              active === tab.id ? "bg-gold text-charcoal shadow-sm" : "bg-sand text-charcoal-light hover:bg-sand/80"
+            }`}
           >
             {tab.label}
-            <span className="ms-1 text-[10px] sm:text-xs opacity-70">({tab.count})</span>
+            <span className="ms-2 text-[10px] sm:text-xs opacity-80">({tab.count})</span>
           </button>
         ))}
       </div>

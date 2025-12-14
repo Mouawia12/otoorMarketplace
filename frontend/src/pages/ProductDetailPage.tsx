@@ -70,7 +70,7 @@ export default function ProductDetailPage() {
           } else {
             setActiveAuction(null);
           }
-        } catch (auctionError) {
+        } catch (_auctionError) {
           setActiveAuction(null);
         }
       } catch (error) {
@@ -153,6 +153,8 @@ export default function ProductDetailPage() {
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isInStock = product.stock_quantity > 0;
   const ratingLabel = reviewStats.count > 0 ? reviewStats.average.toFixed(1) : t('reviews.noRatings');
+  const sellerName = product.seller?.full_name;
+  const sellerVerified = product.seller?.verified_seller;
   const locale = language === 'ar' ? 'ar-EG' : 'en-US';
   const renderStars = (value: number) => (
     <div className="flex gap-1" aria-hidden>
@@ -224,6 +226,20 @@ export default function ProductDetailPage() {
           name={name}
           fallback={PLACEHOLDER_PERFUME}
           dir={language === 'ar' ? 'rtl' : 'ltr'}
+          overlay={(
+            <button
+              onClick={toggleWishlist}
+              disabled={wishlistLoading}
+              className={`w-full rounded-full px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2 shadow-lg transition ${
+                hasInWishlist ? 'bg-gold text-charcoal' : 'bg-white/90 text-charcoal'
+              }`}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill={hasInWishlist ? 'currentColor' : 'none'} stroke="currentColor">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M20.8 4.6a5 5 0 0 0-7.1 0L12 6.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 22l8.8-10.3a5 5 0 0 0 0-7.1z" />
+              </svg>
+              <span>{hasInWishlist ? t('wishlist.remove') : t('wishlist.add', 'أضف للمفضلة')}</span>
+            </button>
+          )}
         />
 
         {/* Product Info */}
@@ -236,7 +252,9 @@ export default function ProductDetailPage() {
               {product.brand}
             </Link>
             <h1 className="text-h1 text-charcoal mb-4">{name}</h1>
-            <p className="text-charcoal-light leading-relaxed">{description}</p>
+            <p className="text-charcoal-light leading-relaxed break-words whitespace-pre-line">
+              {description}
+            </p>
           </div>
 
           <div className="border-t border-b border-gray-200 py-6 space-y-3">
@@ -258,20 +276,19 @@ export default function ProductDetailPage() {
                 {isInStock ? `${product.stock_quantity} ${t('productDetail.available')}` : t('products.outOfStock')}
               </span>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-sand/60">
-              <button
-                onClick={toggleWishlist}
-                disabled={wishlistLoading}
-                className={`flex items-center gap-2 text-sm font-semibold ${
-                  hasInWishlist ? 'text-gold' : 'text-charcoal'
-                }`}
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill={hasInWishlist ? 'currentColor' : 'none'} stroke="currentColor">
-                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M20.8 4.6a5 5 0 0 0-7.1 0L12 6.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 22l8.8-10.3a5 5 0 0 0 0-7.1z" />
-                </svg>
-                <span>{hasInWishlist ? t('wishlist.remove') : t('wishlist.add', 'أضف للمفضلة')}</span>
-              </button>
-              {wishlistLoading && <span className="text-xs text-taupe">{t('common.loading')}</span>}
+          </div>
+
+          <div className="rounded-luxury border border-gray-200 p-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-sm text-charcoal-light">{t('products.seller')}</p>
+                <p className="text-charcoal font-semibold">{sellerName ?? t('products.sellerUnknown')}</p>
+              </div>
+              {sellerVerified && (
+                <span className="px-3 py-1 rounded-full text-xs bg-success text-white font-semibold">
+                  {t('auction.verifiedSeller')}
+                </span>
+              )}
             </div>
           </div>
 

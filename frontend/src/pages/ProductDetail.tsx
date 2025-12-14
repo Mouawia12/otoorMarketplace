@@ -86,6 +86,9 @@ export default function ProductDetail() {
   const baseImages = product.image_urls?.length > 0 ? product.image_urls : [PLACEHOLDER_PERFUME_KEY];
   const images = baseImages.map((img) => resolveImageUrl(img) || PLACEHOLDER_PERFUME);
   const isInStock = product.stock_quantity > 0;
+  const sellerName = product.seller?.full_name;
+  const sellerVerified = product.seller?.verified_seller;
+  const conditionLabel = product.condition === 'used' ? t('products.conditionUsed') : t('products.conditionNew');
 
   return (
     <div>
@@ -107,13 +110,16 @@ export default function ProductDetail() {
         <div className="bg-white p-8 rounded-luxury shadow-luxury">
           <h1 className="text-3xl font-bold text-charcoal mb-4">{name}</h1>
           
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
             <span className="text-4xl font-bold text-gold inline-flex items-center gap-2">
               {formatPrice(product.base_price, language).replace(/\s?(SAR|﷼)$/i, '')}
               <SARIcon size={22} className="text-gold" />
             </span>
             <span className={`px-3 py-1 rounded-full text-sm ${isInStock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {isInStock ? t('products.inStock') : t('products.outOfStock')}
+            </span>
+            <span className="text-sm text-charcoal-light">
+              {t('catalog.condition')}: <span className="text-charcoal font-semibold">{conditionLabel}</span>
             </span>
           </div>
 
@@ -140,12 +146,30 @@ export default function ProductDetail() {
               <span className="text-charcoal-light">{t('common.category')}:</span>
               <span className="text-charcoal font-semibold">{product.category}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-charcoal-light">{t('catalog.condition')}:</span>
+              <span className="text-charcoal font-semibold">{conditionLabel}</span>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-luxury border border-gray-200 p-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-sm text-charcoal-light">{t('products.seller')}</p>
+                <p className="text-charcoal font-semibold">{sellerName ?? t('products.sellerUnknown')}</p>
+              </div>
+              {sellerVerified && (
+                <span className="px-3 py-1 rounded-full text-xs bg-success text-white font-semibold">
+                  {t('auction.verifiedSeller')}
+                </span>
+              )}
+            </div>
           </div>
 
           {isInStock && (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <label className="text-charcoal font-medium">Quantity:</label>
+                <label className="text-charcoal font-medium">{t('common.quantity')}</label>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}

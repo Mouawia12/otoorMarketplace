@@ -24,4 +24,8 @@ export class AppError extends Error {
   static notFound(message = "Not found") {
     return new AppError(message, 404);
   }
+
+  static internal(message = "Internal server error", details?: unknown) {
+    return new AppError(message, 500, details);
+  }
 }

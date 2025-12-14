@@ -68,7 +68,6 @@ export default function SellerAuctionsPage() {
 
   useEffect(() => {
     loadAuctions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const filteredAuctions = useMemo(() => {
@@ -306,7 +305,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
           setTemplates(response);
           setTemplateError(null);
         }
-      } catch (err) {
+      } catch (_err) {
         if (!cancelled) {
           setTemplateError(t("seller.templateLoadFailed", "Failed to load templates"));
         }
@@ -344,8 +343,8 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
       const duration = Number(form.durationHours) || 24;
       const end = new Date(start.getTime() + duration * 60 * 60 * 1000);
 
-      if (duration < 12) {
-        setError(t("seller.auctionMinDuration", "يجب ألا تقل مدة المزاد عن 12 ساعة"));
+      if (duration < 2 || duration > 24) {
+        setError(t("seller.auctionMinDuration", "يجب أن تكون مدة المزاد بين ساعتين و24 ساعة"));
         setLoading(false);
         return;
       }
@@ -809,12 +808,15 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
               <label className="block text-charcoal font-semibold mb-2">{t("seller.durationHours")}</label>
               <input
                 type="number"
-                min="12"
+                min="2"
+                max="24"
                 value={form.durationHours}
                 onChange={handleChange("durationHours")}
                 className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
               />
-              <p className="text-xs text-taupe mt-1">{t("seller.auctionMinDuration", "مدة المزاد لا تقل عن 12 ساعة")}</p>
+              <p className="text-xs text-taupe mt-1">
+                {t("seller.auctionMinDuration", "مدة المزاد يجب أن تكون بين ساعتين و24 ساعة")}
+              </p>
             </div>
           </div>
 

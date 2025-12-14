@@ -29,10 +29,47 @@ import {
   updatePost,
   deletePost,
 } from "../services/blogService";
+import { listAdminAuditLogs, safeRecordAdminAuditLog } from "../services/auditLogService";
+import {
+  getBankTransferSettings,
+  getPlatformSettings,
+  getSocialLinks,
+  updateBankTransferSettings,
+  updatePlatformSettings,
+  updateSocialLinks,
+} from "../services/settingService";
 
 const router = Router();
 
 const adminOnly = authenticate({ roles: [RoleName.ADMIN, RoleName.SUPER_ADMIN] });
+
+type AuditDetails = {
+  action: string;
+  targetType: string;
+  targetId?: number;
+  description?: string;
+  metadata?: Record<string, unknown>;
+};
+
+const logAdminAction = async (req: any, details: AuditDetails) => {
+  if (!req.user) {
+    return;
+  }
+  const payload = {
+    actorId: req.user.id,
+    action: details.action,
+    targetType: details.targetType,
+    targetId: details.targetId,
+    description: details.description,
+    metadata: details.metadata,
+  };
+
+  await safeRecordAdminAuditLog(
+    typeof req.ip === "string" && req.ip.length > 0
+      ? { ...payload, ipAddress: req.ip }
+      : payload
+  );
+};
 
 router.get("/dashboard", adminOnly, async (_req, res, next) => {
   try {
@@ -47,6 +84,94 @@ router.get("/dashboard/moderation", adminOnly, async (_req, res, next) => {
   try {
     const queue = await getAdminModerationQueue();
     res.json(queue);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/audit-logs", adminOnly, async (req, res, next) => {
+  try {
+    const logs = await listAdminAuditLogs(req.query);
+    res.json(logs);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/settings/bank-transfer", adminOnly, async (_req, res, next) => {
+  try {
+    const settings = await getBankTransferSettings();
+    res.json(settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/settings/bank-transfer", adminOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const settings = await updateBankTransferSettings(req.body);
+    await logAdminAction(req, {
+      action: "settings.update",
+      targetType: "settings",
+      description: "Updated bank transfer settings",
+    });
+    res.json(settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/settings/platform", adminOnly, async (_req, res, next) => {
+  try {
+    const settings = await getPlatformSettings();
+    res.json(settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/settings/platform", adminOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const settings = await updatePlatformSettings(req.body);
+    await logAdminAction(req, {
+      action: "settings.update",
+      targetType: "settings",
+      description: "Updated platform settings",
+    });
+    res.json(settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/settings/social-links", adminOnly, async (_req, res, next) => {
+  try {
+    const links = await getSocialLinks();
+    res.json(links);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/settings/social-links", adminOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const links = await updateSocialLinks(req.body ?? {});
+    await logAdminAction(req, {
+      action: "settings.update",
+      targetType: "settings",
+      description: "Updated social media links",
+      metadata: { section: "social_links" },
+    });
+    res.json(links);
   } catch (error) {
     next(error);
   }
@@ -105,11 +230,12 @@ router.patch("/users/:id", adminOnly, async (req, res, next) => {
       throw AppError.badRequest("No valid fields provided");
     }
 
-    const user = await updateUserStatus(
-      id,
-      payload,
-      req.user.roles as RoleName[]
-    );
+    const auditContext =
+      typeof req.ip === "string" && req.ip.length > 0
+        ? { actorId: req.user.id, ipAddress: req.ip }
+        : { actorId: req.user.id };
+    const user = await updateUserStatus(id, payload, req.user.roles as RoleName[], auditContext);
+
     res.json(user);
   } catch (error) {
     next(error);
@@ -130,6 +256,14 @@ router.delete("/users/:id", adminOnly, async (req, res, next) => {
       req.user.roles as RoleName[],
       req.user.id
     );
+
+    await logAdminAction(req, {
+      action: "user.delete",
+      targetType: "user",
+      targetId: id,
+      description: `Deleted user ${id}`,
+    });
+
     res.json(result);
   } catch (error) {
     next(error);
@@ -158,6 +292,15 @@ router.patch("/products/:id/moderate", adminOnly, async (req, res, next) => {
     }
 
     const product = await moderateProduct(productId, action);
+
+    await logAdminAction(req, {
+      action: "product.moderate",
+      targetType: "product",
+      targetId: productId,
+      description: `Moderated product ${productId} with action ${action}`,
+      metadata: { action },
+    });
+
     res.json(product);
   } catch (error) {
     next(error);
@@ -185,6 +328,14 @@ router.patch("/products/:id/status", adminOnly, async (req, res, next) => {
       throw AppError.badRequest("Status value is required");
     }
     const product = await updateProductStatusAsAdmin(productId, status);
+
+    await logAdminAction(req, {
+      action: "product.status",
+      targetType: "product",
+      targetId: productId,
+      description: `Changed product ${productId} status to ${status}`,
+    });
+
     res.json(product);
   } catch (error) {
     next(error);
@@ -219,6 +370,14 @@ router.patch("/auctions/:id", adminOnly, async (req, res, next) => {
       status: req.body?.status,
     });
 
+    await logAdminAction(req, {
+      action: "auction.update",
+      targetType: "auction",
+      targetId: auctionId,
+      description: `Updated auction ${auctionId}`,
+      metadata: req.body,
+    });
+
     res.json(auction);
   } catch (error) {
     next(error);
@@ -243,6 +402,14 @@ router.post("/product-templates", adminOnly, async (req, res, next) => {
       ...req.body,
       createdById: req.user.id,
     });
+
+    await logAdminAction(req, {
+      action: "template.create",
+      targetType: "product_template",
+      targetId: template.id,
+      description: `Created template ${template.id}`,
+    });
+
     res.status(201).json(template);
   } catch (error) {
     next(error);
@@ -269,6 +436,15 @@ router.patch("/product-templates/:id", adminOnly, async (req, res, next) => {
       throw AppError.badRequest("Invalid template id");
     }
     const template = await updateProductTemplate(templateId, req.body);
+
+    await logAdminAction(req, {
+      action: "template.update",
+      targetType: "product_template",
+      targetId: templateId,
+      description: `Updated template ${templateId}`,
+      metadata: req.body,
+    });
+
     res.json(template);
   } catch (error) {
     next(error);
@@ -282,6 +458,14 @@ router.delete("/product-templates/:id", adminOnly, async (req, res, next) => {
       throw AppError.badRequest("Invalid template id");
     }
     await deleteProductTemplate(templateId);
+
+    await logAdminAction(req, {
+      action: "template.delete",
+      targetType: "product_template",
+      targetId: templateId,
+      description: `Deleted template ${templateId}`,
+    });
+
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -340,6 +524,13 @@ router.post("/blog", adminOnly, async (req, res, next) => {
       lang: (body.lang || "ar").toLowerCase(),
     } as any);
     res.status(201).json(post);
+
+    await logAdminAction(req, {
+      action: "blog.create",
+      targetType: "blog_post",
+      targetId: post.id,
+      description: `Created blog post ${post.id}`,
+    });
   } catch (error) {
     next(error);
   }
@@ -366,6 +557,13 @@ router.put("/blog/:id", adminOnly, async (req, res, next) => {
       lang: body.lang,
     } as any);
     res.json(post);
+
+    await logAdminAction(req, {
+      action: "blog.update",
+      targetType: "blog_post",
+      targetId: id,
+      description: `Updated blog post ${id}`,
+    });
   } catch (error) {
     next(error);
   }
@@ -378,6 +576,14 @@ router.delete("/blog/:id", adminOnly, async (req, res, next) => {
       throw AppError.badRequest("Invalid post id");
     }
     const result = await deletePost(id);
+
+    await logAdminAction(req, {
+      action: "blog.delete",
+      targetType: "blog_post",
+      targetId: id,
+      description: `Deleted blog post ${id}`,
+    });
+
     res.json(result);
   } catch (error) {
     next(error);

@@ -38,17 +38,17 @@ export default function SellerProfileComplete() {
             bank_name: res.data.profile.bank_name || "",
           });
         }
-      } catch (e) {
+      } catch (_error) {
         // ignore if none
       }
     };
     loadProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const normalizedValue = name === "iban" ? value.toUpperCase() : value;
+    setForm((prev) => ({ ...prev, [name]: normalizedValue }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +72,10 @@ export default function SellerProfileComplete() {
     }
     if (form.iban.trim().length < 10) {
       setError(t("seller.ibanValidation", "رقم الآيبان يجب أن يكون 10 أرقام أو أكثر"));
+      return;
+    }
+    if (!form.iban.trim().toUpperCase().startsWith("SA")) {
+      setError(t("seller.ibanPrefixValidation", "يجب أن يبدأ رقم الآيبان بالحرفين SA"));
       return;
     }
 
@@ -138,7 +142,7 @@ export default function SellerProfileComplete() {
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-charcoal mb-1">{t("seller.nationalId", "الهوية الوطنية")}</label>
+            <label className="block text-sm font-semibold text-charcoal mb-1">{t("seller.nationalId", "الهوية/الإقامة")}</label>
             <input
               name="national_id"
               value={form.national_id}

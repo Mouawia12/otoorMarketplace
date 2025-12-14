@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
 const sellerProfileService_1 = require("../services/sellerProfileService");
-const client_1 = require("@prisma/client");
 const errors_1 = require("../utils/errors");
+const auditLogService_1 = require("../services/auditLogService");
 const router = (0, express_1.Router)();
 router.get("/me", (0, auth_1.authenticate)(), async (req, res, next) => {
     try {
@@ -51,6 +52,19 @@ router.patch("/:userId/status", (0, auth_1.authenticate)({ roles: ["ADMIN", "SUP
             throw errors_1.AppError.badRequest("Invalid status");
         }
         const profile = await (0, sellerProfileService_1.updateSellerProfileStatus)(userId, status);
+        if (req.user) {
+            const auditPayload = {
+                actorId: req.user.id,
+                action: "user.seller_status",
+                targetType: "user",
+                targetId: userId,
+                description: `Updated seller status for user ${userId} to ${status}`,
+                metadata: { status },
+            };
+            await (0, auditLogService_1.safeRecordAdminAuditLog)(typeof req.ip === "string" && req.ip.length > 0
+                ? { ...auditPayload, ipAddress: req.ip }
+                : auditPayload);
+        }
         res.json(profile);
     }
     catch (error) {

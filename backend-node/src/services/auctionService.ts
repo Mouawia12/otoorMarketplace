@@ -349,6 +349,11 @@ const mapAuctionStatus = (start: Date, end: Date) => {
 
 export const createAuction = async (input: z.infer<typeof createAuctionSchema>) => {
   const data = createAuctionSchema.parse(input);
+  const durationMs = data.endTime.getTime() - data.startTime.getTime();
+  const durationHours = durationMs / (60 * 60 * 1000);
+  if (durationHours < 2 || durationHours > 24) {
+    throw AppError.badRequest("Auction duration must be between 2 and 24 hours");
+  }
 
   const product = await prisma.product.findUnique({
     where: { id: data.productId },
