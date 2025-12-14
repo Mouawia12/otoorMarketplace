@@ -886,6 +886,7 @@
     "running": "قيد التشغيل",
     "scheduled": "مجدول",
     "ended": "منتهي",
+    "cancelled": "ملغي",
     "bidLog": "سجل المزايدات",
     "orderId": "رقم الطلب",
     "buyer": "المشتري",
@@ -1019,6 +1020,7 @@
     "searchAudit": "ابحث باسم المسؤول أو الوصف...",
     "unknownUser": "مسؤول غير معروف",
     "noDescription": "لا يوجد وصف",
+    "noAuctions": "لا توجد مزادات",
     "pageIndicator": "الصفحة {{page}} من {{total}}",
     "noLogsFound": "لم يتم العثور على سجلات",
     "auditFilters": {
@@ -1028,7 +1030,10 @@
       "productStatus": "تحديث حالة المنتج",
       "auctionUpdate": "تحديثات المزاد",
       "templateChanges": "تعديلات القوالب",
-      "blogChanges": "تعديلات المدونة"
+      "blogChanges": "تعديلات المدونة",
+      "settingsUpdate": "تحديثات الإعدادات",
+      "settingsCreate": "إضافة إعدادات",
+      "settingsDelete": "حذف إعدادات"
     },
     "actorAdmin": "مسؤول",
     "actorUser": "مستخدم"

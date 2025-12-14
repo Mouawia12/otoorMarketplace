@@ -884,6 +884,7 @@
     "running": "Running",
     "scheduled": "Scheduled",
     "ended": "Ended",
+    "cancelled": "Cancelled",
     "bidLog": "Bid Log",
     "orderId": "Order ID",
     "buyer": "Buyer",
@@ -1017,6 +1018,7 @@
     "searchAudit": "Search user or description...",
     "unknownUser": "Unknown admin",
     "noDescription": "No description",
+    "noAuctions": "No auctions yet",
     "pageIndicator": "Page {{page}} of {{total}}",
     "noLogsFound": "No logs found",
     "auditFilters": {
@@ -1026,7 +1028,10 @@
       "productStatus": "Product status updates",
       "auctionUpdate": "Auction updates",
       "templateChanges": "Template changes",
-      "blogChanges": "Blog changes"
+      "blogChanges": "Blog changes",
+      "settingsUpdate": "Settings updates",
+      "settingsCreate": "Settings creation",
+      "settingsDelete": "Settings deletion"
     },
     "actorAdmin": "Admin",
     "actorUser": "User"

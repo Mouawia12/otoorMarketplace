@@ -195,7 +195,7 @@ export default function SellerProductsPage() {
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex flex-col gap-3 mb-6">
           <input
             type="text"
             placeholder={t('seller.searchProducts')}
@@ -203,17 +203,19 @@ export default function SellerProductsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
-          >
+          <div className="flex gap-2 flex-wrap">
             {statusOptions.map((option) => (
-              <option key={option} value={option}>
-            {option === 'all' ? t('seller.allStatuses', 'All statuses') : productStatusLabel(option, t)}
-              </option>
+              <button
+                key={option}
+                onClick={() => setStatusFilter(option)}
+                className={`px-4 py-2 rounded-luxury text-sm font-semibold ${
+                  statusFilter === option ? 'bg-gold text-charcoal' : 'bg-sand text-charcoal-light'
+                }`}
+              >
+                {option === 'all' ? t('seller.allStatuses', 'All statuses') : productStatusLabel(option, t)}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

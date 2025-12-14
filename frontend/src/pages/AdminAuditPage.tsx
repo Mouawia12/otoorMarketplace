@@ -30,6 +30,9 @@ const ACTION_KEYS = [
   'blog.create',
   'blog.update',
   'blog.delete',
+  'settings.update',
+  'settings.create',
+  'settings.delete',
 ];
 
 export default function AdminAuditPage() {
@@ -56,6 +59,9 @@ export default function AdminAuditPage() {
       { value: 'blog.create', label: t('admin.auditFilters.blogChanges', 'Blog changes') },
       { value: 'blog.update', label: t('admin.auditFilters.blogChanges', 'Blog changes') },
       { value: 'blog.delete', label: t('admin.auditFilters.blogChanges', 'Blog changes') },
+      { value: 'settings.update', label: t('admin.auditFilters.settingsUpdate', 'Settings updates') },
+      { value: 'settings.create', label: t('admin.auditFilters.settingsCreate', 'Settings creation') },
+      { value: 'settings.delete', label: t('admin.auditFilters.settingsDelete', 'Settings deletion') },
     ];
     const seen = new Set<string>();
     return base.filter((option) => {
@@ -95,6 +101,15 @@ export default function AdminAuditPage() {
         case 'blog.update':
         case 'blog.delete':
           labels[key] = t('admin.auditFilters.blogChanges', 'Blog changes');
+          break;
+        case 'settings.update':
+          labels[key] = t('admin.auditFilters.settingsUpdate', 'Settings updates');
+          break;
+        case 'settings.create':
+          labels[key] = t('admin.auditFilters.settingsCreate', 'Settings creation');
+          break;
+        case 'settings.delete':
+          labels[key] = t('admin.auditFilters.settingsDelete', 'Settings deletion');
           break;
         default:
           labels[key] = key;
@@ -142,7 +157,16 @@ export default function AdminAuditPage() {
     setPage(1);
   };
 
-  const renderAction = (value: string) => actionLabels[value] || value;
+  const renderAction = (value: string) => {
+    if (actionLabels[value]) return actionLabels[value];
+    // Fallback: humanize unknown keys like "settings.update" -> "Settings update"
+    const parts = value.split('.').map((p) => p.replace(/_/g, ' ')).join(' › ');
+    const sentence = parts
+      .split(' ')
+      .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ''))
+      .join(' ');
+    return sentence || value;
+  };
 
   return (
     <div className="space-y-6">
