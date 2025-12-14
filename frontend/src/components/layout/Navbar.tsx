@@ -331,18 +331,22 @@ export default function Navbar() {
                       </>
                     )}
 
-                    <p className="px-4 text-xs uppercase tracking-wide text-taupe">{t('account.myAccount')}</p>
-                    {accountMenuItems.map((item) => (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        onClick={closeMobileMenu}
-                        className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center gap-2"
-                      >
-                        <span>{item.icon}</span>
-                        <span>{item.label}</span>
-                      </Link>
-                    ))}
+                    {!isSeller && !isAdmin && (
+                      <>
+                        <p className="px-4 text-xs uppercase tracking-wide text-taupe">{t('account.myAccount')}</p>
+                        {accountMenuItems.map((item) => (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={closeMobileMenu}
+                            className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center gap-2"
+                          >
+                            <span>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </Link>
+                        ))}
+                      </>
+                    )}
 
                     {isAdmin && (
                       <>
