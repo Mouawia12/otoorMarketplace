@@ -75,6 +75,12 @@ export const initAuctionRealtime = (server: HTTPServer, corsOptions: CorsOptions
   });
 
   io.use((socket, next) => {
+    console.log("[socket] handshake", {
+      origin: socket.handshake.headers.origin,
+      auth: socket.handshake.auth,
+      cookie: socket.handshake.headers.cookie,
+    });
+
     const tokenRaw =
       (typeof socket.handshake.auth?.token === "string" && socket.handshake.auth.token.trim().length > 0
         ? socket.handshake.auth.token
@@ -116,6 +122,14 @@ export const initAuctionRealtime = (server: HTTPServer, corsOptions: CorsOptions
         return;
       }
       socket.leave(getAuctionRoom(auctionId));
+    });
+  });
+
+  io.engine.on("connection_error", (err) => {
+    console.error("[engine] connection_error", {
+      code: err.code,
+      message: err.message,
+      context: err.context,
     });
   });
 

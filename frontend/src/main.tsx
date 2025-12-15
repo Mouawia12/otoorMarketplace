@@ -14,6 +14,15 @@ const initialLang = i18n.language || 'ar';
 document.documentElement.setAttribute('dir', initialLang === 'ar' ? 'rtl' : 'ltr');
 document.documentElement.setAttribute('lang', initialLang);
 
+// Enable Socket.IO client debug logging for diagnostics
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.setItem('debug', 'socket.io-client:*');
+  } catch {
+    // ignore if storage is unavailable
+  }
+}
+
 const googleClientId = googleAuthConfig.clientId;
 const googleLoginEnabled = googleAuthConfig.isEnabled;
 
