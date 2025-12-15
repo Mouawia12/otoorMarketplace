@@ -7,6 +7,16 @@ let currentAuthToken: string | null = null;
 
 const stripApiSuffix = (baseUrl: string) => baseUrl.replace(/\/api$/i, '');
 
+const getSocketBaseUrl = () => {
+  const apiBase = getResolvedApiBaseUrl();
+  // primary: direct host without /api (e.g. https://api.fragraworld.com)
+  const derived = stripApiSuffix(apiBase);
+  // allow explicit override if needed later
+  const explicit = (typeof import.meta !== 'undefined' &&
+    (import.meta.env?.VITE_SOCKET_BASE_URL as string | undefined))?.trim();
+  return explicit && explicit.length > 0 ? explicit : derived;
+};
+
 const refreshSocketAuth = (instance: Socket) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
   if (currentAuthToken !== token) {
@@ -26,11 +36,7 @@ const refreshSocketAuth = (instance: Socket) => {
 
 const ensureSocket = () => {
   if (!socket) {
-    // use API base (no /api suffix) with socket path under /api to work behind reverse proxy
-    const apiBase = getResolvedApiBaseUrl();
-    const realtimeBase = stripApiSuffix(apiBase);
-
-    socket = io(realtimeBase, {
+    socket = io(getSocketBaseUrl(), {
       path: '/api/socket.io',
       withCredentials: true,
       transports: ['websocket', 'polling'],

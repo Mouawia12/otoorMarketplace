@@ -19,17 +19,25 @@ import { safeRecordAdminAuditLog } from "./auditLogService";
 export const getAdminDashboardStats = async () => {
   const [totalUsers, totalProducts, pendingProducts, totalOrders, pendingOrders, runningAuctions] =
     await prisma.$transaction([
-      prisma.user.count(),
-      prisma.product.count(),
+      prisma.user.count({
+        where: { status: UserStatus.ACTIVE },
+      }),
+      prisma.product.count({
+        where: { status: ProductStatus.PUBLISHED },
+      }),
       prisma.product.count({
         where: { status: ProductStatus.PENDING_REVIEW },
       }),
-      prisma.order.count(),
+      prisma.order.count({
+        where: { status: { notIn: [OrderStatus.CANCELLED, OrderStatus.REFUNDED] } },
+      }),
       prisma.order.count({
         where: { status: OrderStatus.PENDING },
       }),
       prisma.auction.count({
-        where: { status: AuctionStatus.ACTIVE },
+        where: {
+          status: { in: [AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED] },
+        },
       }),
     ]);
 
