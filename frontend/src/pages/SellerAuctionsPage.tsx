@@ -10,12 +10,20 @@ import { sellerSearchTemplates } from "../services/productTemplateService";
 import { PLACEHOLDER_PERFUME } from "../utils/staticAssets";
 import SARIcon from "../components/common/SARIcon";
 
-type AuctionFilter = "all" | "active" | "scheduled" | "completed" | "cancelled";
+type AuctionFilter =
+  | "all"
+  | "pending_review"
+  | "active"
+  | "scheduled"
+  | "completed"
+  | "cancelled";
 
 const statusTone = (status: string) => {
   switch (status) {
     case "active":
       return "text-green-600 bg-green-100";
+    case "pending_review":
+      return "text-amber-700 bg-amber-100";
     case "scheduled":
       return "text-blue-600 bg-blue-100";
     case "completed":
@@ -31,6 +39,8 @@ const statusLabelKey = (status: AuctionFilter) => {
   switch (status) {
     case "active":
       return "seller.active";
+    case "pending_review":
+      return "seller.pendingReview";
     case "scheduled":
       return "seller.upcoming";
     case "completed":
@@ -117,6 +127,7 @@ export default function SellerAuctionsPage() {
           <div>
             <h1 className="text-h2 text-charcoal">{t("seller.auctions")}</h1>
             <p className="text-taupe text-sm">{t("seller.auctionsSubtitle")}</p>
+            <p className="text-amber-700 text-xs mt-1">{t("seller.auctionsApprovalNote", "New auctions go live after admin approval.")}</p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
@@ -127,7 +138,7 @@ export default function SellerAuctionsPage() {
         </div>
 
         <div className="flex gap-2 flex-wrap mb-6">
-          {(["all", "active", "scheduled", "completed", "cancelled"] as AuctionFilter[]).map((status) => (
+          {(["all", "pending_review", "active", "scheduled", "completed", "cancelled"] as AuctionFilter[]).map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}

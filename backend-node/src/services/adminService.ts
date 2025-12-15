@@ -511,7 +511,11 @@ const buildModerationItems = (
     const endTime = new Date(auction.endTime);
     const isEndingSoon = endTime.getTime() - Date.now() < 12 * 60 * 60 * 1000;
     const priority: ModerationItem["priority"] =
-      auction.status === AuctionStatus.ACTIVE && isEndingSoon ? "high" : "low";
+      auction.status === AuctionStatus.PENDING_REVIEW
+        ? "high"
+        : auction.status === AuctionStatus.ACTIVE && isEndingSoon
+          ? "high"
+          : "low";
 
     return {
       id: `auction-${auction.id}`,
@@ -564,7 +568,15 @@ export const getAdminModerationQueue = async () => {
       take: 5,
     }),
     prisma.auction.findMany({
-      where: { status: { in: [AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED] } },
+      where: {
+        status: {
+          in: [
+            AuctionStatus.PENDING_REVIEW,
+            AuctionStatus.ACTIVE,
+            AuctionStatus.SCHEDULED,
+          ],
+        },
+      },
       include: {
         product: {
           include: {

@@ -57,15 +57,31 @@ const listAuctionsSchema = z.object({
   status: z.nativeEnum(AuctionStatus).optional(),
   seller_id: z.coerce.number().optional(),
   product_id: z.coerce.number().optional(),
+  include_pending: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((value) => {
+      if (typeof value === "string") {
+        return value.toLowerCase() === "true" || value === "1";
+      }
+      return Boolean(value);
+    }),
 });
 
 export const listAuctions = async (query: unknown) => {
-  const { status, seller_id, product_id } = listAuctionsSchema.parse(query);
+  const { status, seller_id, product_id, include_pending } = listAuctionsSchema.parse(query);
+  const includePending = Boolean(include_pending);
 
   const filters: Prisma.AuctionWhereInput = {};
 
+  if (status === AuctionStatus.PENDING_REVIEW && !includePending) {
+    return [];
+  }
+
   if (status) {
     filters.status = status;
+  } else if (!includePending) {
+    filters.status = { not: AuctionStatus.PENDING_REVIEW };
   }
 
   if (seller_id) {
@@ -153,7 +169,7 @@ export const getAuctionById = async (id: number) => {
     },
   });
 
-  if (!auction) {
+  if (!auction || auction.status === AuctionStatus.PENDING_REVIEW) {
     throw AppError.notFound("Auction not found");
   }
 
@@ -169,8 +185,8 @@ export const getAuctionById = async (id: number) => {
 };
 
 export const getAuctionByProductId = async (productId: number) => {
-  const auction = await prisma.auction.findUnique({
-    where: { productId },
+  const auction = await prisma.auction.findFirst({
+    where: { productId, status: { not: AuctionStatus.PENDING_REVIEW } },
     include: {
       product: {
         include: {
@@ -307,6 +323,15 @@ export const placeBid = async (input: z.infer<typeof placeBidSchema>) => {
 };
 
 export const getAuctionBids = async (auctionId: number) => {
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    select: { status: true },
+  });
+
+  if (!auction || auction.status === AuctionStatus.PENDING_REVIEW) {
+    throw AppError.notFound("Auction not found");
+  }
+
   const bids = await prisma.bid.findMany({
     where: { auctionId },
     orderBy: { createdAt: "desc" },
@@ -333,7 +358,7 @@ const createAuctionSchema = z.object({
   endTime: z.coerce.date(),
 });
 
-const mapAuctionStatus = (start: Date, end: Date) => {
+const assertValidAuctionWindow = (start: Date, end: Date) => {
   const now = new Date();
   if (end <= start) {
     throw AppError.badRequest("Auction end time must be after the start time");
@@ -341,10 +366,6 @@ const mapAuctionStatus = (start: Date, end: Date) => {
   if (end <= now) {
     throw AppError.badRequest("Auction end time must be in the future");
   }
-  if (start > now) {
-    return AuctionStatus.SCHEDULED;
-  }
-  return AuctionStatus.ACTIVE;
 };
 
 export const createAuction = async (input: z.infer<typeof createAuctionSchema>) => {
@@ -354,6 +375,8 @@ export const createAuction = async (input: z.infer<typeof createAuctionSchema>) 
   if (durationHours < 2 || durationHours > 24) {
     throw AppError.badRequest("Auction duration must be between 2 and 24 hours");
   }
+
+  assertValidAuctionWindow(data.startTime, data.endTime);
 
   const product = await prisma.product.findUnique({
     where: { id: data.productId },
@@ -384,8 +407,6 @@ export const createAuction = async (input: z.infer<typeof createAuctionSchema>) 
     throw AppError.badRequest("Auction already exists for this product");
   }
 
-  const status = mapAuctionStatus(data.startTime, data.endTime);
-
   const auction = await prisma.auction.create({
     data: {
       productId: data.productId,
@@ -395,7 +416,7 @@ export const createAuction = async (input: z.infer<typeof createAuctionSchema>) 
       minimumIncrement: new Prisma.Decimal(data.minimumIncrement),
       startTime: data.startTime,
       endTime: data.endTime,
-      status,
+      status: AuctionStatus.PENDING_REVIEW,
     },
     include: {
       product: {
@@ -429,7 +450,9 @@ export const createAuction = async (input: z.infer<typeof createAuctionSchema>) 
 
 const updateAuctionSchema = z.object({
   endTime: z.coerce.date().optional(),
-  status: z.enum(["scheduled", "active", "completed", "cancelled"]).optional(),
+  status: z
+    .enum(["scheduled", "active", "completed", "cancelled", "pending_review", "pending"])
+    .optional(),
 });
 
 export const updateAuction = async (auctionId: number, payload: unknown) => {
@@ -461,10 +484,29 @@ export const updateAuction = async (auctionId: number, payload: unknown) => {
   }
 
   if (data.status) {
-    const normalized = data.status.toUpperCase() as AuctionStatus;
+    const normalizedInput = data.status.toLowerCase();
+    const normalized =
+      normalizedInput === "pending" || normalizedInput === "pending_review"
+        ? AuctionStatus.PENDING_REVIEW
+        : (data.status.toUpperCase() as AuctionStatus);
+
     if (!Object.values(AuctionStatus).includes(normalized)) {
       throw AppError.badRequest("Unsupported auction status");
     }
+
+    const nextEndTime =
+      (updateData.endTime as Date | undefined) ?? existing.endTime;
+
+    if (normalized === AuctionStatus.ACTIVE) {
+      if (nextEndTime <= new Date()) {
+        throw AppError.badRequest("Cannot activate an auction that has already ended");
+      }
+    }
+
+    if (normalized === AuctionStatus.SCHEDULED && existing.startTime <= new Date()) {
+      throw AppError.badRequest("Scheduled auctions must have a future start time");
+    }
+
     updateData.status = normalized;
   }
 

@@ -5,7 +5,13 @@ import type { Auction, Bid } from "../types";
 import { formatPrice } from "../utils/currency";
 import { useUIStore } from "../store/uiStore";
 
-type FilterStatus = "all" | "active" | "scheduled" | "completed" | "cancelled";
+type FilterStatus =
+  | "all"
+  | "pending_review"
+  | "active"
+  | "scheduled"
+  | "completed"
+  | "cancelled";
 
 const statusLabelKey = (status: FilterStatus) => {
   switch (status) {
@@ -17,6 +23,8 @@ const statusLabelKey = (status: FilterStatus) => {
       return "admin.ended";
     case "cancelled":
       return "admin.cancelled";
+    case "pending_review":
+      return "admin.pendingReview";
     default:
       return "admin.all";
   }
@@ -32,6 +40,8 @@ const statusTone = (status: string) => {
       return "text-gray-600 bg-gray-200";
     case "cancelled":
       return "text-red-600 bg-red-100";
+    case "pending_review":
+      return "text-amber-700 bg-amber-100";
     default:
       return "text-gray-600 bg-gray-100";
   }
@@ -115,6 +125,27 @@ export default function AdminAuctionsPage() {
     }
   };
 
+  const handleApprove = async (auction: Auction) => {
+    const now = new Date();
+    const start = new Date(auction.start_time);
+    const end = new Date(auction.end_time);
+
+    if (end <= now) {
+      alert(t("admin.cannotApproveEnded", "Cannot approve an auction that already ended"));
+      return;
+    }
+
+    const nextStatus = start > now ? "scheduled" : "active";
+
+    try {
+      await api.patch(`/admin/auctions/${auction.id}`, { status: nextStatus });
+      await loadAuctions();
+    } catch (err: any) {
+      console.error("Failed to approve auction", err);
+      alert(err?.response?.data?.detail ?? t("admin.approveAuctionFailed", "Failed to approve auction"));
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-12">
@@ -143,7 +174,7 @@ export default function AdminAuctionsPage() {
         <h1 className="text-h2 text-charcoal mb-6">{t("admin.auctions")}</h1>
 
         <div className="flex gap-2 mb-6 flex-wrap">
-          {(["all", "active", "scheduled", "completed", "cancelled"] as FilterStatus[]).map((status) => (
+          {(["all", "pending_review", "active", "scheduled", "completed", "cancelled"] as FilterStatus[]).map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
@@ -193,12 +224,22 @@ export default function AdminAuctionsPage() {
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex gap-2 flex-wrap">
-                        <button
-                          onClick={() => handleViewBids(auction)}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-semibold"
-                        >
-                          {t("admin.viewBids")}
-                        </button>
+                        {auction.status !== "pending_review" && (
+                          <button
+                            onClick={() => handleViewBids(auction)}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-semibold"
+                          >
+                            {t("admin.viewBids")}
+                          </button>
+                        )}
+                        {auction.status === "pending_review" && (
+                          <button
+                            onClick={() => handleApprove(auction)}
+                            className="text-green-700 hover:text-green-800 text-sm font-semibold"
+                          >
+                            {t("admin.approveAuction", "Approve")}
+                          </button>
+                        )}
                         {auction.status === "active" && (
                           <>
                             <button

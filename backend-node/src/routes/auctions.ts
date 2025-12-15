@@ -15,7 +15,10 @@ const router = Router();
 
 router.get("/", async (req, res, next) => {
   try {
-    const auctions = await listAuctions(req.query);
+    const auctions = await listAuctions({
+      ...req.query,
+      include_pending: false,
+    });
     res.json({ auctions });
   } catch (error) {
     next(error);

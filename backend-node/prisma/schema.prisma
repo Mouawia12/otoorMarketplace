@@ -121,7 +121,7 @@ model Auction {
   minimumIncrement Decimal       @map("minimum_increment") @db.Decimal(10, 2)
   startTime        DateTime      @map("start_time")
   endTime          DateTime      @map("end_time")
-  status           AuctionStatus @default(SCHEDULED)
+  status           AuctionStatus @default(PENDING_REVIEW)
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
@@ -377,6 +377,7 @@ model Post {
 }
 
 enum AuctionStatus {
+  PENDING_REVIEW
   SCHEDULED
   ACTIVE
   COMPLETED

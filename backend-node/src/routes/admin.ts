@@ -351,6 +351,7 @@ router.get("/auctions", adminOnly, async (req, res, next) => {
 
     const auctions = await listAuctions({
       status,
+      include_pending: true,
     });
     res.json(auctions);
   } catch (error) {
