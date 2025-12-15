@@ -24,7 +24,8 @@ const initAuctionRealtime = (server, corsOptions) => {
             origin: resolveCorsOrigins(corsOptions),
             credentials: true,
         },
-        path: "/socket.io",
+        // align websocket path with API prefix to work behind /api reverse proxy
+        path: "/api/socket.io",
         serveClient: false,
     });
     io.use((socket, next) => {

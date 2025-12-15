@@ -224,7 +224,7 @@ const requestPasswordReset = async (input) => {
     });
     const resetUrl = `${env_1.config.auth.passwordResetUrl}?token=${encodeURIComponent(rawToken)}`;
     const brandSignature = "FragraWorld | عالم العطور";
-    const contactEmail = env_1.config.mail.from.address || "fragreworld@gmail.com";
+    const contactEmail = "fragreworld@gmail.com";
     const plainText = [
         `مرحباً ${user.fullName ?? ''}`.trim(),
         "",
@@ -237,14 +237,37 @@ const requestPasswordReset = async (input) => {
         brandSignature,
     ].join("\n");
     const html = `
-    <p>مرحباً ${user.fullName ?? ""}</p>
-    <p>هذه الرسالة مرسلة من فريق ${brandSignature}. لقد استلمنا طلباً لإعادة تعيين كلمة المرور الخاصة بك.</p>
-    <p>
-      <a href="${resetUrl}" style="color:#a67c52;font-weight:bold;">إعادة تعيين كلمة المرور</a>
-    </p>
-    <p>الرابط صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة واحدة فقط.</p>
-    <p>إذا لم تطلب هذه العملية يمكنك تجاهل هذه الرسالة أو مراسلتنا عبر <a href="mailto:${contactEmail}" style="color:#a67c52;">${contactEmail}</a>.</p>
-    <p style="margin-top:16px;font-weight:bold;">${brandSignature}</p>
+    <div style="background:#f7f4ef;padding:32px;font-family:'Cairo','Inter','Segoe UI',sans-serif;direction:rtl;text-align:center;color:#2c2a29;">
+      <table role="presentation" style="margin:0 auto;max-width:520px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+        <tr>
+          <td style="padding:28px 28px 8px;">
+            <div style="font-size:18px;font-weight:700;color:#a67c52;margin-bottom:4px;">${brandSignature}</div>
+            <div style="font-size:24px;font-weight:800;margin:0 0 12px;">إعادة تعيين كلمة المرور</div>
+            <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#4d463f;">مرحباً ${user.fullName ?? ""}،</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#4d463f;">
+              استلمنا طلباً لإعادة تعيين كلمة المرور الخاصة بك على منصتنا. اضغط الزر أدناه لإكمال العملية.
+            </p>
+            <div style="margin:24px 0;">
+              <a href="${resetUrl}" style="display:inline-block;padding:14px 22px;background:#caa56a;color:#2c2a29;font-weight:800;text-decoration:none;border-radius:999px;box-shadow:0 8px 20px rgba(202,165,106,0.35);">
+                إعادة تعيين كلمة المرور
+              </a>
+            </div>
+            <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#6a635b;">
+              الرابط صالح لمدة ${PASSWORD_RESET_EXPIRY_MINUTES} دقيقة واحدة فقط.
+            </p>
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#6a635b;">
+              إذا لم تطلب هذه العملية يمكنك تجاهل الرسالة أو مراسلة الدعم عبر
+              <a href="mailto:${contactEmail}" style="color:#a67c52;font-weight:700;text-decoration:none;">${contactEmail}</a>.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f2e9dc;padding:14px 20px;text-align:center;font-size:13px;color:#655b50;">
+            فريق ${brandSignature}
+          </td>
+        </tr>
+      </table>
+    </div>
   `;
     await (0, mailer_1.sendMail)({
         to: user.email,

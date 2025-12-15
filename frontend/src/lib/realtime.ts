@@ -7,11 +7,6 @@ let currentAuthToken: string | null = null;
 
 const stripApiSuffix = (baseUrl: string) => baseUrl.replace(/\/api$/i, '');
 
-const resolveRealtimeBase = () => {
-  const apiBase = getResolvedApiBaseUrl();
-  return stripApiSuffix(apiBase);
-};
-
 const refreshSocketAuth = (instance: Socket) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
   if (currentAuthToken !== token) {
@@ -31,8 +26,12 @@ const refreshSocketAuth = (instance: Socket) => {
 
 const ensureSocket = () => {
   if (!socket) {
-    socket = io(resolveRealtimeBase(), {
-      path: '/socket.io',
+    // use API base (no /api suffix) with socket path under /api to work behind reverse proxy
+    const apiBase = getResolvedApiBaseUrl();
+    const realtimeBase = stripApiSuffix(apiBase);
+
+    socket = io(realtimeBase, {
+      path: '/api/socket.io',
       withCredentials: true,
       transports: ['websocket', 'polling'],
       autoConnect: false,
