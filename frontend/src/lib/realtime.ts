@@ -12,8 +12,11 @@ const getSocketBaseUrl = () => {
   // primary: direct host without /api (e.g. https://api.fragraworld.com)
   const derived = stripApiSuffix(apiBase);
   // allow explicit override if needed later
-  const explicit = (typeof import.meta !== 'undefined' &&
-    (import.meta.env?.VITE_SOCKET_BASE_URL as string | undefined))?.trim();
+  const raw =
+    typeof import.meta !== 'undefined'
+      ? (import.meta.env?.VITE_SOCKET_BASE_URL as unknown)
+      : undefined;
+  const explicit = typeof raw === 'string' ? raw.trim() : undefined;
   return explicit && explicit.length > 0 ? explicit : derived;
 };
 
