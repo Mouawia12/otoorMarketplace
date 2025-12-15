@@ -53,11 +53,13 @@ const ensureSocket = () => {
       autoConnect: false,
     });
 
-    socket.on('connect', () => {
-      console.log('[socket] connected', socket.id);
+    const instance = socket;
+
+    instance.on('connect', () => {
+      console.log('[socket] connected', instance.id);
     });
 
-    socket.on('connect_error', (err) => {
+    instance.on('connect_error', (err) => {
       console.error('[socket] connect_error', {
         message: err.message,
         description: (err as any)?.description,
@@ -66,15 +68,15 @@ const ensureSocket = () => {
       });
     });
 
-    socket.on('error', (err) => {
+    instance.on('error', (err) => {
       console.error('[socket] error', err);
     });
 
-    socket.io.on('reconnect_error', (err) => {
+    instance.io.on('reconnect_error', (err) => {
       console.error('[socket] reconnect_error', err);
     });
 
-    socket.io.on('reconnect_failed', () => {
+    instance.io.on('reconnect_failed', () => {
       console.error('[socket] reconnect_failed');
     });
   }
