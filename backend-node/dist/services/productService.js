@@ -420,7 +420,6 @@ const updateProduct = async (productId, sellerId, payload) => {
     if (!product || product.sellerId !== sellerId) {
         throw errors_1.AppError.notFound("Product not found");
     }
-    const wasPendingReview = product.status === client_1.ProductStatus.PENDING_REVIEW;
     const updateData = {};
     if (data.nameAr !== undefined)
         updateData.nameAr = data.nameAr;
@@ -447,18 +446,20 @@ const updateProduct = async (productId, sellerId, payload) => {
     if (data.stockQuantity !== undefined)
         updateData.stockQuantity = data.stockQuantity;
     if (data.status !== undefined) {
-        if (typeof data.status === "string" &&
-            (data.status.toLowerCase() === "pending" || data.status.toLowerCase() === "published")) {
-            updateData.status = client_1.ProductStatus.PENDING_REVIEW;
-        }
-        else if (typeof data.status === "string") {
-            updateData.status = data.status.toUpperCase();
+        if (typeof data.status === "string") {
+            const normalized = data.status.toLowerCase();
+            // treat "pending" or "published" as published for instant approval
+            if (normalized === "pending" || normalized === "published") {
+                updateData.status = client_1.ProductStatus.PUBLISHED;
+            }
+            else {
+                updateData.status = normalized.toUpperCase();
+            }
         }
         else {
             updateData.status = data.status;
         }
     }
-    const willBePendingReview = updateData.status === client_1.ProductStatus.PENDING_REVIEW && !wasPendingReview;
     const imagesUpdate = data.imageUrls !== undefined
         ? {
             deleteMany: {},
@@ -488,26 +489,6 @@ const updateProduct = async (productId, sellerId, payload) => {
             },
         },
     });
-    if (willBePendingReview) {
-        await (0, notificationService_1.notifyAdmins)({
-            type: client_1.NotificationType.PRODUCT_SUBMITTED,
-            title: "تعديلات منتج بانتظار المراجعة",
-            message: `${updated.seller?.fullName ?? "بائع"} عدل المنتج ${updated.nameEn ?? updated.nameAr} ويحتاج موافقة جديدة`,
-            data: {
-                productId: updated.id,
-                sellerId,
-                reason: "update",
-            },
-            fallbackToSupport: true,
-        });
-        await (0, notificationService_1.createNotificationForUser)({
-            userId: sellerId,
-            type: client_1.NotificationType.PRODUCT_SUBMITTED,
-            title: "تم إرسال التعديلات للمراجعة",
-            message: `استلمنا تعديلاتك على ${updated.nameEn ?? updated.nameAr}. سيتم إشعارك فور مراجعتها.`,
-            data: { productId: updated.id },
-        });
-    }
     return (0, exports.normalizeProduct)(updated);
 };
 exports.updateProduct = updateProduct;
