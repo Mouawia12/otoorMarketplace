@@ -5,19 +5,26 @@ import type { Bid } from '../types';
 let socket: Socket | null = null;
 let currentAuthToken: string | null = null;
 
+const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const stripApiSuffix = (baseUrl: string) => baseUrl.replace(/\/api$/i, '');
 
 const getSocketBaseUrl = () => {
-  const apiBase = getResolvedApiBaseUrl();
-  // primary: direct host without /api (e.g. https://api.fragraworld.com)
-  const derived = stripApiSuffix(apiBase);
-  // allow explicit override if needed later
-  const raw =
+  const rawEnv =
     typeof import.meta !== 'undefined'
       ? (import.meta.env?.VITE_SOCKET_BASE_URL as unknown)
       : undefined;
-  const explicit = typeof raw === 'string' ? raw.trim() : undefined;
-  return explicit && explicit.length > 0 ? explicit : derived;
+  const explicit =
+    typeof rawEnv === 'string' && rawEnv.trim().length > 0
+      ? stripTrailingSlash(rawEnv.trim())
+      : null;
+
+  if (explicit) {
+    return explicit;
+  }
+
+  // fallback for local/dev: derive from API base without the /api suffix
+  const apiBase = getResolvedApiBaseUrl();
+  return stripTrailingSlash(stripApiSuffix(apiBase));
 };
 
 const refreshSocketAuth = (instance: Socket) => {
