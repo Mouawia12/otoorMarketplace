@@ -7,6 +7,12 @@ export type PendingOrderPayload = {
     region: string;
     address: string;
     type?: string;
+    redbox_point_id?: string;
+    redbox_city_code?: string;
+    customer_city_code?: string;
+    customer_country?: string;
+    cod_amount?: number;
+    cod_currency?: string;
   };
   items: Array<{
     productId: number;

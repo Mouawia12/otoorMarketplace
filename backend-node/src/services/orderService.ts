@@ -6,9 +6,18 @@ import { AppError } from "../utils/errors";
 import { normalizeProduct } from "./productService";
 import { config } from "../config/env";
 import {
-  finalizeCouponUsage,
   prepareCouponForOrder,
+  finalizeCouponUsage,
 } from "./couponService";
+import {
+  createShipmentAgency,
+  createShipmentDirect,
+  createOmniOrder,
+  getActivities as getRedboxActivities,
+  getLabel as getRedboxLabel,
+  getStatus as getRedboxStatus,
+  type RedboxShipmentPayload,
+} from "./redboxService";
 
 const orderItemSchema = z.object({
   productId: z.coerce.number().int().positive(),
@@ -16,144 +25,207 @@ const orderItemSchema = z.object({
   unitPrice: z.coerce.number().positive().optional(),
 });
 
+const shippingDetailsSchema = z.preprocess((value) => {
+  if (value && typeof value === "object") {
+    const shipping = value as Record<string, unknown>;
+    return {
+      name: shipping.name,
+      phone: shipping.phone,
+      city: shipping.city,
+      region: shipping.region,
+      address: shipping.address,
+      type: shipping.type,
+      redboxPointId:
+        shipping.redboxPointId ??
+        shipping.redbox_point_id ??
+        shipping.point_id,
+      customerCityCode:
+        shipping.customerCityCode ?? shipping.customer_city_code ?? shipping.city,
+      customerCountry:
+        shipping.customerCountry ?? shipping.customer_country ?? "SA",
+      codAmount: shipping.codAmount ?? shipping.cod_amount,
+      codCurrency: shipping.codCurrency ?? shipping.cod_currency,
+      redboxType:
+        shipping.redboxType ??
+        shipping.redbox_type ??
+        (shipping.type === "omni" ? "omni" : undefined),
+      shipmentType:
+        shipping.shipmentType ??
+        shipping.shipment_type ??
+        (shipping.type === "omni" ? "omni" : undefined),
+    };
+  }
+  return value;
+}, z.object({
+  name: z.string().min(2),
+  phone: z.string().min(6),
+  city: z.string().min(2),
+  region: z.string().min(2),
+  address: z.string().min(3),
+  type: z.enum(["standard", "express", "redbox", "omni"]).default("standard"),
+  redboxPointId: z.string().min(1, "RedBox point_id is required").optional(),
+  customerCityCode: z.string().optional(),
+  customerCountry: z.string().default("SA"),
+  codAmount: z.coerce.number().nonnegative().optional(),
+  codCurrency: z.string().default("SAR"),
+  redboxType: z.enum(["redbox", "omni"]).default("redbox"),
+  shipmentType: z.enum(["direct", "agency", "omni"]).default("direct"),
+}));
+
 const createOrderSchema = z.object({
   buyerId: z.number().int().positive(),
   paymentMethod: z.string().min(2),
-  shipping: z
-    .object({
-      name: z.string().min(2),
-      phone: z.string().min(6),
-      city: z.string().min(2),
-      region: z.string().min(2),
-      address: z.string().min(3),
-      type: z.enum(["standard", "express"]).optional(),
-    })
-    .optional(),
+  shipping: shippingDetailsSchema.optional(),
   items: z.array(orderItemSchema).min(1),
   couponCode: z.string().min(3).optional(),
 });
 
 export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   const data = createOrderSchema.parse(input);
-  const shipping =
-    data.shipping ?? {
-      name: "Pending",
-      phone: "0000000000",
-      city: "Unknown",
-      region: "Unknown",
-      address: "Pending",
-      type: "standard",
-    };
-  const shippingOption = shipping.type === "express" ? "express" : "standard";
+  if (!data.shipping) {
+    throw AppError.badRequest("Shipping details are required");
+  }
+
+  const shipping = data.shipping;
+  const redboxPointId = shipping.redboxPointId;
+
+  if (!redboxPointId) {
+    throw AppError.badRequest("RedBox point selection is required");
+  }
+
+  const shippingMethod = shipping.type ?? "standard";
+  const shippingOption = shippingMethod === "express" ? "express" : "standard";
   const shippingFeeValue =
     shippingOption === "express"
       ? config.shipping.express
       : config.shipping.standard;
 
-  return prisma.$transaction(async (tx) => {
-    // validate products and stock
-    const products = await tx.product.findMany({
-      where: {
-        id: { in: data.items.map((item) => item.productId) },
-      },
-      select: {
-        id: true,
-        stockQuantity: true,
-        status: true,
-        basePrice: true,
-        sellerId: true,
-      },
-    });
+  // validate products and stock
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: data.items.map((item) => item.productId) },
+    },
+    select: {
+      id: true,
+      stockQuantity: true,
+      status: true,
+      basePrice: true,
+      sellerId: true,
+    },
+  });
 
-    const productMap = new Map(products.map((product) => [product.id, product]));
+  const productMap = new Map(products.map((product) => [product.id, product]));
 
-    if (productMap.size !== data.items.length) {
-      throw AppError.badRequest("One or more products are unavailable");
+  if (productMap.size !== data.items.length) {
+    throw AppError.badRequest("One or more products are unavailable");
+  }
+
+  const subtotal = data.items.reduce((total, item) => {
+    const product = productMap.get(item.productId);
+    if (!product) {
+      throw AppError.badRequest(`Product ${item.productId} not found`);
     }
+    return total + product.basePrice.toNumber() * item.quantity;
+  }, 0);
 
-    const subtotal = data.items.reduce((total, item) => {
-      const product = productMap.get(item.productId);
-      if (!product) {
-        throw AppError.badRequest(`Product ${item.productId} not found`);
-      }
-      return total + product.basePrice.toNumber() * item.quantity;
-    }, 0);
+  if (subtotal <= 0) {
+    throw AppError.badRequest("Order subtotal must be greater than zero");
+  }
 
-    if (subtotal <= 0) {
-      throw AppError.badRequest("Order subtotal must be greater than zero");
+  for (const item of data.items) {
+    const product = productMap.get(item.productId);
+    if (!product) {
+      throw AppError.badRequest(`Product ${item.productId} not found`);
     }
-
-    for (const item of data.items) {
-      const product = productMap.get(item.productId);
-      if (!product) {
-        throw AppError.badRequest(`Product ${item.productId} not found`);
-      }
-      if (product.status !== "PUBLISHED") {
-        throw AppError.badRequest(`Product ${item.productId} is not available`);
-      }
-      if (product.stockQuantity < item.quantity) {
-        throw AppError.badRequest(
-          `Insufficient stock for product ${item.productId}`
-        );
-      }
+    if (product.status !== "PUBLISHED") {
+      throw AppError.badRequest(`Product ${item.productId} is not available`);
     }
-
-    const normalizedItems = data.items.map((item) => {
-      const product = productMap.get(item.productId)!;
-      const basePriceNumber = product.basePrice.toNumber();
-      const unitPrice = new Prisma.Decimal(basePriceNumber);
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice,
-        totalPrice: unitPrice.mul(item.quantity),
-      };
-    });
-
-    const couponLines = data.items.map((item) => {
-      const product = productMap.get(item.productId)!;
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        sellerId: product.sellerId,
-        unitPrice: product.basePrice.toNumber(),
-      };
-    });
-
-    let appliedCoupon: { coupon: Coupon; discountAmount: number } | null = null;
-    if (data.couponCode) {
-      appliedCoupon = await prepareCouponForOrder(
-        tx,
-        data.couponCode,
-        couponLines
+    if (product.stockQuantity < item.quantity) {
+      throw AppError.badRequest(
+        `Insufficient stock for product ${item.productId}`
       );
     }
+  }
 
-    const discountAmount = appliedCoupon?.discountAmount ?? 0;
+  const normalizedItems = data.items.map((item) => {
+    const product = productMap.get(item.productId)!;
+    const basePriceNumber = product.basePrice.toNumber();
+    const unitPrice = new Prisma.Decimal(basePriceNumber);
+    return {
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice,
+      totalPrice: unitPrice.mul(item.quantity),
+    };
+  });
 
-    const order = await tx.order.create({
+  const couponLines = data.items.map((item) => {
+    const product = productMap.get(item.productId)!;
+    return {
+      productId: item.productId,
+      quantity: item.quantity,
+      sellerId: product.sellerId,
+      unitPrice: product.basePrice.toNumber(),
+    };
+  });
+
+  let appliedCoupon: { coupon: Coupon; discountAmount: number } | null = null;
+  if (data.couponCode) {
+    appliedCoupon = await prisma.$transaction((tx) =>
+      prepareCouponForOrder(tx, data.couponCode!, couponLines)
+    );
+  }
+
+  const discountAmount = appliedCoupon?.discountAmount ?? 0;
+  const totalBeforeShipping = Math.max(0, subtotal - discountAmount);
+  const totalAmount = totalBeforeShipping + shippingFeeValue;
+  const platformFee =
+    totalAmount * config.platformCommissionRate;
+  const shouldRecordCod =
+    shipping.codAmount !== undefined ||
+    data.paymentMethod.toLowerCase() === "cod";
+  const codAmount =
+    shipping.codAmount !== undefined
+      ? shipping.codAmount
+      : shouldRecordCod
+      ? totalAmount
+      : undefined;
+  const codCurrency = shipping.codCurrency ?? "SAR";
+  const customerCityCode = shipping.customerCityCode ?? shipping.city;
+  const customerCountry = shipping.customerCountry ?? "SA";
+  const redboxShipmentType = shipping.shipmentType ?? "direct";
+  const redboxType =
+    shipping.redboxType ??
+    (shippingMethod === "omni" ? "omni" : "redbox");
+
+  const order = await prisma.$transaction(async (tx) => {
+    const created = await tx.order.create({
       data: {
         buyerId: data.buyerId,
         status: OrderStatus.PENDING,
         paymentMethod: data.paymentMethod,
-        shippingMethod: shippingOption,
+        shippingMethod,
         shippingName: shipping.name,
         shippingPhone: shipping.phone,
         shippingCity: shipping.city,
         shippingRegion: shipping.region,
         shippingAddress: shipping.address,
+        customerCityCode,
+        customerCountry,
         subtotalAmount: new Prisma.Decimal(subtotal),
         discountAmount: new Prisma.Decimal(discountAmount),
         shippingFee: new Prisma.Decimal(shippingFeeValue),
-        totalAmount: new Prisma.Decimal(
-          Math.max(0, subtotal - discountAmount) + shippingFeeValue
-        ),
-        platformFee: new Prisma.Decimal(
-          (Math.max(0, subtotal - discountAmount) + shippingFeeValue) *
-            config.platformCommissionRate
-        ),
+        totalAmount: new Prisma.Decimal(totalAmount),
+        platformFee: new Prisma.Decimal(platformFee),
         couponId: appliedCoupon?.coupon.id ?? null,
         couponCode: appliedCoupon?.coupon.code ?? null,
+        codAmount:
+          codAmount !== undefined
+            ? new Prisma.Decimal(codAmount)
+            : null,
+        codCurrency: codAmount !== undefined ? codCurrency : null,
+        redboxPointId,
+        redboxStatus: "pending",
         items: {
           create: normalizedItems,
         },
@@ -163,11 +235,6 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
       },
     });
 
-    if (appliedCoupon) {
-      await finalizeCouponUsage(tx, appliedCoupon.coupon);
-    }
-
-    // decrement stock
     for (const item of normalizedItems) {
       await tx.product.update({
         where: { id: item.productId },
@@ -179,13 +246,83 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
       });
     }
 
-    return mapOrderToDto(
-      await tx.order.findUniqueOrThrow({
-        where: { id: order.id },
-        include: orderInclude,
-      })
-    );
+    return created;
   });
+
+  let shipment;
+  try {
+    const shipmentPayload: RedboxShipmentPayload = {
+      pointId: redboxPointId,
+      reference: `order-${order.id}`,
+      type: redboxType,
+      customerCityCode,
+      customerCountry,
+      codAmount: codAmount ?? 0,
+      codCurrency,
+      metadata: {
+        orderId: order.id,
+        buyerId: data.buyerId,
+      },
+      receiver: {
+        name: shipping.name,
+        phone: shipping.phone,
+        cityCode: customerCityCode,
+        country: customerCountry,
+        address: shipping.address,
+      },
+      items: normalizedItems.map((item) => ({
+        name: `Item-${item.productId}`,
+        quantity: item.quantity,
+        price: Number(item.unitPrice),
+      })),
+    };
+
+    if (redboxShipmentType === "agency") {
+      shipment = await createShipmentAgency(shipmentPayload);
+    } else if (redboxShipmentType === "omni" || redboxType === "omni") {
+      shipment = await createOmniOrder(shipmentPayload);
+    } else {
+      shipment = await createShipmentDirect(shipmentPayload);
+    }
+  } catch (error) {
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.CANCELLED, redboxStatus: "failed" },
+      });
+      for (const item of normalizedItems) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stockQuantity: {
+              increment: item.quantity,
+            },
+          },
+        });
+      }
+    });
+    throw error;
+  }
+
+  if (appliedCoupon) {
+    await prisma.$transaction((tx) =>
+      finalizeCouponUsage(tx, appliedCoupon.coupon)
+    );
+  }
+
+  const updatedOrder = await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      redboxShipmentId: shipment.id,
+      redboxTrackingNumber:
+        shipment.trackingNumber ?? order.redboxTrackingNumber,
+      redboxLabelUrl: shipment.labelUrl ?? order.redboxLabelUrl,
+      redboxStatus: shipment.status ?? "created",
+    },
+    include: orderInclude,
+  });
+
+  return mapOrderToDto(updatedOrder);
 };
 
 const orderInclude = Prisma.validator<Prisma.OrderInclude>()({
@@ -201,6 +338,25 @@ const orderInclude = Prisma.validator<Prisma.OrderInclude>()({
     },
   },
 });
+
+const assertOrderAccess = (
+  order: Prisma.OrderGetPayload<{ include: typeof orderInclude }>,
+  userId: number,
+  roles: string[]
+) => {
+  const normalizedRoles = roles.map((role) => role.toUpperCase());
+  const isAdmin = normalizedRoles.some((role) =>
+    ["ADMIN", "SUPER_ADMIN"].includes(role)
+  );
+  const isBuyer = order.buyerId === userId;
+  const isSeller = order.items.some(
+    (item) => item.product?.sellerId === userId
+  );
+
+  if (!isAdmin && !isBuyer && !isSeller) {
+    throw AppError.forbidden();
+  }
+};
 
 const statusToFriendly = (status: OrderStatus) => {
   switch (status) {
@@ -280,6 +436,15 @@ const mapOrderToDto = (
     status: statusToFriendly(order.status),
     created_at: order.createdAt.toISOString(),
     platform_fee: Number(order.platformFee ?? 0),
+    cod_amount: order.codAmount ? Number(order.codAmount) : null,
+    cod_currency: order.codCurrency ?? null,
+    customer_city_code: order.customerCityCode ?? null,
+    customer_country: order.customerCountry ?? null,
+    redbox_point_id: order.redboxPointId ?? null,
+    redbox_shipment_id: order.redboxShipmentId ?? null,
+    redbox_tracking_number: order.redboxTrackingNumber ?? null,
+    redbox_label_url: order.redboxLabelUrl ?? null,
+    redbox_status: order.redboxStatus ?? null,
     product: summaryItem?.product,
     items,
   };
@@ -428,4 +593,110 @@ export const updateOrderStatus = async (
   });
 
   return mapOrderToDto(updated);
+};
+
+export const getOrderLabel = async (
+  orderId: number,
+  actorId: number,
+  actorRoles: string[]
+) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: orderInclude,
+  });
+
+  if (!order) {
+    throw AppError.notFound("Order not found");
+  }
+
+  assertOrderAccess(order, actorId, actorRoles);
+
+  if (!order.redboxShipmentId) {
+    throw AppError.badRequest("No RedBox shipment for this order");
+  }
+
+  const label = await getRedboxLabel(order.redboxShipmentId);
+  const labelUrl =
+    label.url ||
+    label.labelUrl ||
+    label.label_url ||
+    label.link ||
+    order.redboxLabelUrl ||
+    "";
+
+  const updated = await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      redboxLabelUrl: labelUrl || order.redboxLabelUrl,
+    },
+    include: orderInclude,
+  });
+
+  return {
+    label_url: labelUrl || updated.redboxLabelUrl || null,
+    tracking_number: updated.redboxTrackingNumber ?? null,
+    order: mapOrderToDto(updated),
+  };
+};
+
+export const getOrderTracking = async (
+  orderId: number,
+  actorId: number,
+  actorRoles: string[]
+) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: orderInclude,
+  });
+
+  if (!order) {
+    throw AppError.notFound("Order not found");
+  }
+
+  assertOrderAccess(order, actorId, actorRoles);
+
+  if (!order.redboxShipmentId) {
+    throw AppError.badRequest("No RedBox shipment for this order");
+  }
+
+  const shipmentStatus = await getRedboxStatus(order.redboxShipmentId);
+
+  let activities: unknown[] = [];
+  try {
+    const activityResponse = await getRedboxActivities(order.redboxShipmentId);
+    activities = Array.isArray(activityResponse)
+      ? activityResponse
+      : (
+          activityResponse as {
+            activities?: unknown[];
+          }
+        )?.activities ?? [];
+  } catch (error) {
+    activities = [];
+  }
+
+  const statusValue =
+    shipmentStatus.status ?? order.redboxStatus ?? statusToFriendly(order.status);
+  const trackingNumber =
+    shipmentStatus.trackingNumber ??
+    (shipmentStatus.raw as { tracking_number?: string })?.tracking_number ??
+    order.redboxTrackingNumber;
+
+  const updated = await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      redboxStatus: statusValue,
+      redboxTrackingNumber: trackingNumber,
+    },
+    include: orderInclude,
+  });
+
+  return {
+    order_id: updated.id,
+    shipment_id: updated.redboxShipmentId,
+    tracking_number: trackingNumber,
+    status: statusValue,
+    activities,
+    order: mapOrderToDto(updated),
+  };
 };

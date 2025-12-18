@@ -157,11 +157,20 @@ model Order {
   shippingCity    String      @map("shipping_city")
   shippingRegion  String      @map("shipping_region")
   shippingAddress String      @map("shipping_address")
+  customerCityCode String?    @map("customer_city_code")
+  customerCountry  String?    @map("customer_country")
   subtotalAmount  Decimal     @map("subtotal_amount") @db.Decimal(10, 2)
   discountAmount  Decimal     @map("discount_amount") @db.Decimal(10, 2)
   shippingFee     Decimal     @map("shipping_fee") @db.Decimal(10, 2)
   totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
   platformFee     Decimal     @map("platform_fee") @db.Decimal(10, 2) @default(0)
+  codAmount       Decimal?    @map("cod_amount") @db.Decimal(10, 2)
+  codCurrency     String?     @map("cod_currency")
+  redboxPointId   String?     @map("redbox_point_id")
+  redboxShipmentId String?    @map("redbox_shipment_id")
+  redboxTrackingNumber String? @map("redbox_tracking_number")
+  redboxLabelUrl  String?     @map("redbox_label_url")
+  redboxStatus    String?     @map("redbox_status")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
@@ -172,6 +181,8 @@ model Order {
 
   @@index([buyerId])
   @@index([couponId])
+  @@index([redboxShipmentId])
+  @@index([redboxTrackingNumber])
 }
 
 model OrderItem {

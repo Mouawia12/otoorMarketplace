@@ -25,6 +25,33 @@ const dialCodeOptions = [
 
 const normalizeDigits = (value: string) => value.replace(/[^\d]/g, "");
 
+const formatPointAddress = (point: any, lang: "ar" | "en") => {
+  const raw =
+    (lang === "ar" ? point.address_ar : point.address) ??
+    (lang === "ar" ? point.address : point.address_ar) ??
+    point.address ??
+    point.point_address ??
+    point.full_address ??
+    "";
+
+  if (!raw) return "";
+
+  if (typeof raw === "string") {
+    return raw;
+  }
+
+  if (typeof raw === "object") {
+    const address = raw as Record<string, unknown>;
+    const parts = [address.street, address.district, address.city]
+      .filter((value) => typeof value === "string" && value.trim().length > 0)
+      .map((value) => String(value).trim());
+    const separator = lang === "ar" ? "، " : ", ";
+    return parts.length > 0 ? parts.join(separator) : "";
+  }
+
+  return String(raw);
+};
+
 export default function CheckoutPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -38,6 +65,14 @@ export default function CheckoutPage() {
   const [couponSuccess, setCouponSuccess] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [bankSettings, setBankSettings] = useState<BankTransferSettings | null>(null);
+  const [redboxCities, setRedboxCities] = useState<Array<{ code: string; name: string }>>([]);
+  const [redboxPoints, setRedboxPoints] = useState<
+    Array<{ id: string; name: string; address?: string }>
+  >([]);
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedPoint, setSelectedPoint] = useState("");
+  const [redboxLoading, setRedboxLoading] = useState(false);
+  const [redboxError, setRedboxError] = useState<string | null>(null);
 
   useEffect(() => {
     setCoupon(null);
@@ -45,6 +80,10 @@ export default function CheckoutPage() {
     setCouponError("");
     setCouponSuccess("");
   }, [setCoupon]);
+
+  useEffect(() => {
+    setShipping("redbox");
+  }, [setShipping]);
 
   useEffect(() => {
     const loadBankSettings = async () => {
@@ -58,11 +97,147 @@ export default function CheckoutPage() {
     loadBankSettings();
   }, []);
 
+  useEffect(() => {
+    const loadCities = async () => {
+      try {
+        setRedboxLoading(true);
+        const response = await api.get("/shipping/redbox/cities");
+        const raw = response.data;
+        const list = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw?.cities)
+          ? raw.cities
+          : [];
+
+        const normalized = list
+          .map((city: any) => {
+            const code = city.code || city.city_code || city.cityCode || city.id || city.Code;
+            const localizedName =
+              (lang === "ar"
+                ? city.ar || city.name_ar || city.city_name_ar
+                : city.en || city.name_en || city.city_name_en) ??
+              (city.name ||
+                city.city_name ||
+                city.cityName ||
+                city.title ||
+                code);
+            if (!code || !localizedName) return null;
+            return { code: String(code), name: String(localizedName) };
+          })
+          .filter(Boolean) as Array<{ code: string; name: string }>;
+
+        setRedboxCities(normalized);
+        if (normalized.length > 0 && !selectedCity) {
+          setSelectedCity(normalized[0].code);
+        }
+      } catch (error) {
+        console.error("Failed to load RedBox cities", error);
+        const msg = (error as any)?.response?.data?.message || (error as any)?.message;
+        setRedboxError(msg ?? t("checkout.redboxLoadFailed", "تعذّر تحميل مدن RedBox"));
+      } finally {
+        setRedboxLoading(false);
+      }
+    };
+
+    loadCities();
+  }, [t, lang]);
+
+  useEffect(() => {
+    if (selectedPoint) {
+      const point = redboxPoints.find((p) => p.id === selectedPoint);
+      if (point) {
+        setFormData((prev) => ({
+          ...prev,
+          address: point.address || point.name,
+        }));
+      }
+    }
+  }, [selectedPoint, redboxPoints]);
+
+  useEffect(() => {
+    const loadPoints = async () => {
+      if (!selectedCity) return;
+      try {
+        setRedboxLoading(true);
+        setRedboxError(null);
+        const response = await api.get("/shipping/redbox/points", {
+          params: { city_code: selectedCity },
+        });
+        const raw = response.data;
+        const list = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw?.points)
+          ? raw.points
+          : [];
+        const normalized = list
+          .map((point: any) => {
+            const id =
+              point.point_id ||
+              point.pointId ||
+              point.id ||
+              point.code ||
+              point.point_code ||
+              point.pointCode;
+            const localizedName =
+              (lang === "ar"
+                ? point.host_name_ar ||
+                  point.name_ar ||
+                  point.point_name_ar ||
+                  point.ar
+                : point.host_name_en ||
+                  point.name_en ||
+                  point.point_name_en ||
+                  point.en) ??
+              (point.host_name ||
+                point.point_name ||
+                point.name ||
+                point.pointName ||
+                point.label ||
+                id);
+            const address =
+              formatPointAddress(point, lang) ||
+              (typeof point.location === "string" ? point.location : "") ||
+              "";
+            if (!id || !localizedName) return null;
+            return {
+              id: String(id),
+              name: String(localizedName),
+              address: address ? String(address) : undefined,
+            };
+          })
+          .filter(Boolean) as Array<{ id: string; name: string; address?: string }>;
+
+        setRedboxPoints(normalized);
+        if (normalized.length > 0) {
+          setSelectedPoint(normalized[0].id);
+          setFormData((prev) => ({
+            ...prev,
+            address: normalized[0].address ?? normalized[0].name,
+          }));
+        } else {
+          setSelectedPoint("");
+        }
+      } catch (error) {
+        console.error("Failed to load RedBox points", error);
+        const msg = (error as any)?.response?.data?.message || (error as any)?.message;
+        setRedboxError(msg ?? t("checkout.redboxPointsFailed", "تعذّر تحميل نقاط RedBox"));
+      } finally {
+        setRedboxLoading(false);
+      }
+    };
+
+    loadPoints();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCity, lang]);
+
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     phoneCode: "+966",
-    city: "",
     address: "",
     paymentMethod: "cod" as "card" | "applepay" | "mada" | "cod" | "bank",
   });
@@ -139,8 +314,9 @@ export default function CheckoutPage() {
     } else if (formData.phone.trim().length < 8) {
       newErrors.phone = t('checkout.phoneInvalid', 'أدخل رقم هاتف صالح');
     }
-    if (!formData.city.trim()) newErrors.city = t('checkout.cityRequired');
     if (!formData.address.trim()) newErrors.address = t('checkout.addressRequired');
+    if (!selectedCity) newErrors.redboxCity = t("checkout.redboxCityRequired", "اختر مدينة RedBox");
+    if (!selectedPoint) newErrors.redboxPoint = t("checkout.redboxPointRequired", "اختر نقطة استلام RedBox");
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -151,15 +327,25 @@ export default function CheckoutPage() {
       return null;
     }
 
+    const cityName =
+      redboxCities.find((city) => city.code === selectedCity)?.name ||
+      selectedCity;
+
     return {
       payment_method: formData.paymentMethod.toUpperCase(),
       shipping: {
         name: formData.name,
         phone: `${formData.phoneCode} ${formData.phone}`.trim(),
-        city: formData.city,
-        region: formData.city,
-        address: formData.address,
-        type: shipping,
+        city: cityName,
+        region: cityName,
+        address: formData.address || selectedPoint,
+        type: "redbox",
+        redbox_point_id: selectedPoint,
+        customer_city_code: selectedCity,
+        redbox_city_code: selectedCity,
+        customer_country: "SA",
+        cod_amount: formData.paymentMethod === "cod" ? total : undefined,
+        cod_currency: "SAR",
       },
       items: items.map((item) => ({
         productId: Number(item.id),
@@ -280,32 +466,102 @@ export default function CheckoutPage() {
                   {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
                 </div>
 
-                <div>
-                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.city')}</label>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className={`w-full px-4 py-3 rounded-lg border ${
-                      errors.city ? 'border-red-500' : 'border-charcoal-light'
-                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
-                    placeholder={t('checkout.cityPlaceholder')}
-                  />
-                  {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
-                </div>
+                <div className="sm:col-span-2 border border-gold/40 bg-white rounded-xl p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <p className="text-charcoal font-semibold">
+                        {t("checkout.redboxPickup", "استلام من نقطة RedBox (إلزامي)")}
+                      </p>
+                      <p className="text-sm text-taupe">
+                        {t("checkout.redboxHint", "اختر المدينة ثم نقطة الاستلام الأقرب لك.")}
+                      </p>
+                    </div>
+                    {redboxLoading && (
+                      <span className="text-sm text-gold">{t("common.loading")}</span>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.address')}</label>
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className={`w-full px-4 py-3 rounded-lg border ${
-                      errors.address ? 'border-red-500' : 'border-charcoal-light'
-                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
-                    placeholder={t('checkout.addressPlaceholder')}
-                  />
-                  {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-charcoal font-semibold mb-2">
+                        {t("checkout.redboxCity", "مدينة الاستلام")}
+                      </label>
+                      <select
+                        value={selectedCity}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSelectedCity(value);
+                          setSelectedPoint("");
+                          setFormData((prev) => ({ ...prev, address: "" }));
+                        }}
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.redboxCity ? "border-red-500" : "border-charcoal-light"
+                        } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
+                      >
+                        {!selectedCity && <option value="">{t("checkout.selectCity", "اختر المدينة")}</option>}
+                        {redboxCities.map((city) => (
+                          <option key={city.code} value={city.code}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.redboxCity && (
+                        <p className="text-red-500 text-sm mt-1">{errors.redboxCity}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-charcoal font-semibold mb-2">
+                        {t("checkout.redboxPoint", "نقطة الاستلام")}
+                      </label>
+                      <select
+                        value={selectedPoint}
+                        disabled={!selectedCity || redboxLoading}
+                        onChange={(e) => {
+                          const pointId = e.target.value;
+                          setSelectedPoint(pointId);
+                          const point = redboxPoints.find((p) => p.id === pointId);
+                          if (point) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              address: point.address || point.name,
+                              city: prev.city || point.name,
+                            }));
+                          }
+                        }}
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.redboxPoint ? "border-red-500" : "border-charcoal-light"
+                        } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                      >
+                        {!selectedPoint && <option value="">{t("checkout.selectPoint", "اختر نقطة الاستلام")}</option>}
+                        {redboxPoints.map((point) => (
+                          <option key={point.id} value={point.id}>
+                            {point.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.redboxPoint && (
+                        <p className="text-red-500 text-sm mt-1">{errors.redboxPoint}</p>
+                      )}
+                      {redboxError && (
+                        <p className="text-red-500 text-sm mt-1">{redboxError}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-charcoal font-semibold mb-2">{t('checkout.address')}</label>
+                    <input
+                      type="text"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      className={`w-full px-4 py-3 rounded-lg border ${
+                        errors.address ? 'border-red-500' : 'border-charcoal-light'
+                      } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
+                      placeholder={t('checkout.addressPlaceholder')}
+                    />
+                    {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
+                  </div>
                 </div>
               </div>
             </div>
@@ -314,6 +570,25 @@ export default function CheckoutPage() {
             <div className="bg-ivory rounded-luxury p-6 shadow-sm">
               <h2 className="text-2xl font-bold text-charcoal mb-6">{t('checkout.shipping')}</h2>
               <div className="space-y-3">
+                <label className="flex items-center gap-4 p-4 border border-gold rounded-lg cursor-pointer bg-white hover:bg-sand transition">
+                  <input
+                    type="radio"
+                    name="shipping"
+                    checked={shipping === "redbox"}
+                    onChange={() => setShipping("redbox")}
+                    className="w-5 h-5 text-gold"
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold text-charcoal">
+                      {t("checkout.redboxShipping", "استلام من نقطة RedBox")}
+                    </p>
+                    <p className="text-sm text-taupe">
+                      {t("checkout.redboxShippingDesc", "مطلوب اختيار نقطة RedBox قبل إتمام الطلب.")}
+                    </p>
+                  </div>
+                  <p className="font-bold text-gold">{t('checkout.free')}</p>
+                </label>
+
                 <label className="flex items-center gap-4 p-4 border border-charcoal-light rounded-lg cursor-pointer hover:bg-sand transition">
                   <input
                     type="radio"
@@ -321,10 +596,13 @@ export default function CheckoutPage() {
                     checked={shipping === "standard"}
                     onChange={() => setShipping("standard")}
                     className="w-5 h-5 text-gold"
+                    disabled
                   />
                   <div className="flex-1">
                     <p className="font-semibold text-charcoal">{t('checkout.standardShipping')}</p>
-                    <p className="text-sm text-taupe">{t('checkout.standardShippingDesc')}</p>
+                    <p className="text-sm text-taupe">
+                      {t('checkout.standardShippingDesc')} ({t("checkout.unavailableNow", "غير متاحة حالياً")})
+                    </p>
                   </div>
                   <p className="font-bold text-gold">{t('checkout.free')}</p>
                 </label>
@@ -336,10 +614,13 @@ export default function CheckoutPage() {
                     checked={shipping === "express"}
                     onChange={() => setShipping("express")}
                     className="w-5 h-5 text-gold"
+                    disabled
                   />
                   <div className="flex-1">
                     <p className="font-semibold text-charcoal">{t('checkout.expressShipping')}</p>
-                    <p className="text-sm text-taupe">{t('checkout.expressShippingDesc')}</p>
+                    <p className="text-sm text-taupe">
+                      {t('checkout.expressShippingDesc')} ({t("checkout.unavailableNow", "غير متاحة حالياً")})
+                    </p>
                   </div>
                   <p className="font-bold text-gold">{formatPrice(35, lang)}</p>
                 </label>

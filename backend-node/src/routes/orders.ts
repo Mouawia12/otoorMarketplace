@@ -9,6 +9,8 @@ import {
   listOrdersForSeller,
   updateOrderStatus,
   confirmOrderDelivery,
+  getOrderLabel,
+  getOrderTracking,
 } from "../services/orderService";
 import { AppError } from "../utils/errors";
 import { prisma } from "../prisma/client";
@@ -100,10 +102,30 @@ router.post("/", authenticate(), async (req, res, next) => {
       ];
     }
 
+    const shippingInput =
+      body.shipping ??
+      (body.shipping_name
+        ? {
+            name: body.shipping_name,
+            phone: body.shipping_phone,
+            city: body.shipping_city,
+            region: body.shipping_region,
+            address: body.shipping_address,
+            type: body.shipping_method,
+            redbox_point_id: body.redbox_point_id,
+            customer_city_code: body.customer_city_code,
+            customer_country: body.customer_country,
+            cod_amount: body.cod_amount,
+            cod_currency: body.cod_currency,
+            redbox_type: body.redbox_type,
+            shipment_type: body.shipment_type,
+          }
+        : undefined);
+
     const order = await createOrder({
       buyerId: req.user.id,
       paymentMethod: body.payment_method ?? "COD",
-      shipping: body.shipping,
+      shipping: shippingInput,
       items,
       couponCode: typeof body.coupon_code === "string" ? body.coupon_code : undefined,
     });
@@ -159,6 +181,42 @@ router.post("/:id/confirm-delivery", authenticate(), async (req, res, next) => {
 
     const order = await confirmOrderDelivery(orderId, req.user.id);
     res.json(order);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/label", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+
+    const orderId = Number(req.params.id);
+    if (Number.isNaN(orderId)) {
+      throw AppError.badRequest("Invalid order id");
+    }
+
+    const result = await getOrderLabel(orderId, req.user.id, req.user.roles);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/tracking", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+
+    const orderId = Number(req.params.id);
+    if (Number.isNaN(orderId)) {
+      throw AppError.badRequest("Invalid order id");
+    }
+
+    const result = await getOrderTracking(orderId, req.user.id, req.user.roles);
+    res.json(result);
   } catch (error) {
     next(error);
   }

@@ -233,9 +233,9 @@ export default function SellerProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product) => (
+              {filteredProducts.map((product, index) => (
                 <tr key={product.id} className="border-b border-gray-100 hover:bg-sand transition">
-                  <td className="px-3 md:px-4 py-4 text-charcoal-light">{product.id}</td>
+                  <td className="px-3 md:px-4 py-4 text-charcoal-light">{index + 1}</td>
                   <td className="px-3 md:px-4 py-4 text-charcoal font-medium">
                     {i18n.language === 'ar' ? product.name_ar : product.name_en}
                   </td>

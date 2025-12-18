@@ -40,6 +40,14 @@ const envSchema = z.object({
     .string()
     .email()
     .default("fragreworld@gmail.com"),
+  REDBOX_API_TOKEN: z.string().min(1, "REDBOX_API_TOKEN is required"),
+  REDBOX_BUSINESS_ID: z.string().optional(),
+  REDBOX_ENV: z.enum(["production", "sandbox"]).default("production"),
+  REDBOX_API_BASE_URL: z
+    .string()
+    .url()
+    .default("https://api.redboxsa.com"),
+  REDBOX_DEFAULT_COUNTRY: z.string().default("SA"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -74,6 +82,11 @@ const {
   MAIL_FROM_NAME,
   PASSWORD_RESET_URL,
   ADMIN_PROTECTED_EMAIL,
+  REDBOX_API_TOKEN,
+  REDBOX_BUSINESS_ID,
+  REDBOX_ENV,
+  REDBOX_API_BASE_URL,
+  REDBOX_DEFAULT_COUNTRY,
 } = parsed.data;
 
 const allowedOrigins =
@@ -123,5 +136,12 @@ export const config = {
   },
   accounts: {
     protectedAdminEmail: ADMIN_PROTECTED_EMAIL.toLowerCase(),
+  },
+  redbox: {
+    token: REDBOX_API_TOKEN,
+    businessId: REDBOX_BUSINESS_ID,
+    env: REDBOX_ENV,
+    baseUrl: `${REDBOX_API_BASE_URL.replace(/\/+$/, "")}/v3`,
+    defaultCountry: REDBOX_DEFAULT_COUNTRY,
   },
 };
