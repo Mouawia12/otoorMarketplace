@@ -40,5 +40,12 @@ export declare const config: {
     accounts: {
         protectedAdminEmail: string;
     };
+    redbox: {
+        token: string;
+        businessId: string | undefined;
+        env: "production" | "sandbox";
+        baseUrl: string;
+        defaultCountry: string;
+    };
 };
 //# sourceMappingURL=env.d.ts.map

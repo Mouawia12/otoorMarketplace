@@ -54,12 +54,28 @@ const listAuctionsSchema = zod_1.z.object({
     status: zod_1.z.nativeEnum(client_1.AuctionStatus).optional(),
     seller_id: zod_1.z.coerce.number().optional(),
     product_id: zod_1.z.coerce.number().optional(),
+    include_pending: zod_1.z
+        .union([zod_1.z.boolean(), zod_1.z.string()])
+        .optional()
+        .transform((value) => {
+        if (typeof value === "string") {
+            return value.toLowerCase() === "true" || value === "1";
+        }
+        return Boolean(value);
+    }),
 });
 const listAuctions = async (query) => {
-    const { status, seller_id, product_id } = listAuctionsSchema.parse(query);
+    const { status, seller_id, product_id, include_pending } = listAuctionsSchema.parse(query);
+    const includePending = Boolean(include_pending);
     const filters = {};
+    if (status === client_1.AuctionStatus.PENDING_REVIEW && !includePending) {
+        return [];
+    }
     if (status) {
         filters.status = status;
+    }
+    else if (!includePending) {
+        filters.status = { not: client_1.AuctionStatus.PENDING_REVIEW };
     }
     if (seller_id) {
         filters.sellerId = seller_id;
@@ -140,7 +156,7 @@ const getAuctionById = async (id) => {
             },
         },
     });
-    if (!auction) {
+    if (!auction || auction.status === client_1.AuctionStatus.PENDING_REVIEW) {
         throw errors_1.AppError.notFound("Auction not found");
     }
     const normalized = normalizeAuction({
@@ -154,8 +170,8 @@ const getAuctionById = async (id) => {
 };
 exports.getAuctionById = getAuctionById;
 const getAuctionByProductId = async (productId) => {
-    const auction = await client_2.prisma.auction.findUnique({
-        where: { productId },
+    const auction = await client_2.prisma.auction.findFirst({
+        where: { productId, status: { not: client_1.AuctionStatus.PENDING_REVIEW } },
         include: {
             product: {
                 include: {
@@ -275,6 +291,13 @@ const placeBid = async (input) => {
 };
 exports.placeBid = placeBid;
 const getAuctionBids = async (auctionId) => {
+    const auction = await client_2.prisma.auction.findUnique({
+        where: { id: auctionId },
+        select: { status: true },
+    });
+    if (!auction || auction.status === client_1.AuctionStatus.PENDING_REVIEW) {
+        throw errors_1.AppError.notFound("Auction not found");
+    }
     const bids = await client_2.prisma.bid.findMany({
         where: { auctionId },
         orderBy: { createdAt: "desc" },
@@ -299,7 +322,7 @@ const createAuctionSchema = zod_1.z.object({
     startTime: zod_1.z.coerce.date(),
     endTime: zod_1.z.coerce.date(),
 });
-const mapAuctionStatus = (start, end) => {
+const assertValidAuctionWindow = (start, end) => {
     const now = new Date();
     if (end <= start) {
         throw errors_1.AppError.badRequest("Auction end time must be after the start time");
@@ -307,10 +330,6 @@ const mapAuctionStatus = (start, end) => {
     if (end <= now) {
         throw errors_1.AppError.badRequest("Auction end time must be in the future");
     }
-    if (start > now) {
-        return client_1.AuctionStatus.SCHEDULED;
-    }
-    return client_1.AuctionStatus.ACTIVE;
 };
 const createAuction = async (input) => {
     const data = createAuctionSchema.parse(input);
@@ -319,6 +338,7 @@ const createAuction = async (input) => {
     if (durationHours < 2 || durationHours > 24) {
         throw errors_1.AppError.badRequest("Auction duration must be between 2 and 24 hours");
     }
+    assertValidAuctionWindow(data.startTime, data.endTime);
     const product = await client_2.prisma.product.findUnique({
         where: { id: data.productId },
         select: {
@@ -341,7 +361,6 @@ const createAuction = async (input) => {
         existing.status !== client_1.AuctionStatus.CANCELLED) {
         throw errors_1.AppError.badRequest("Auction already exists for this product");
     }
-    const status = mapAuctionStatus(data.startTime, data.endTime);
     const auction = await client_2.prisma.auction.create({
         data: {
             productId: data.productId,
@@ -351,7 +370,7 @@ const createAuction = async (input) => {
             minimumIncrement: new client_1.Prisma.Decimal(data.minimumIncrement),
             startTime: data.startTime,
             endTime: data.endTime,
-            status,
+            status: client_1.AuctionStatus.PENDING_REVIEW,
         },
         include: {
             product: {
@@ -384,7 +403,9 @@ const createAuction = async (input) => {
 exports.createAuction = createAuction;
 const updateAuctionSchema = zod_1.z.object({
     endTime: zod_1.z.coerce.date().optional(),
-    status: zod_1.z.enum(["scheduled", "active", "completed", "cancelled"]).optional(),
+    status: zod_1.z
+        .enum(["scheduled", "active", "completed", "cancelled", "pending_review", "pending"])
+        .optional(),
 });
 const updateAuction = async (auctionId, payload) => {
     const data = updateAuctionSchema.parse(payload ?? {});
@@ -410,9 +431,21 @@ const updateAuction = async (auctionId, payload) => {
         updateData.endTime = data.endTime;
     }
     if (data.status) {
-        const normalized = data.status.toUpperCase();
+        const normalizedInput = data.status.toLowerCase();
+        const normalized = normalizedInput === "pending" || normalizedInput === "pending_review"
+            ? client_1.AuctionStatus.PENDING_REVIEW
+            : data.status.toUpperCase();
         if (!Object.values(client_1.AuctionStatus).includes(normalized)) {
             throw errors_1.AppError.badRequest("Unsupported auction status");
+        }
+        const nextEndTime = updateData.endTime ?? existing.endTime;
+        if (normalized === client_1.AuctionStatus.ACTIVE) {
+            if (nextEndTime <= new Date()) {
+                throw errors_1.AppError.badRequest("Cannot activate an auction that has already ended");
+            }
+        }
+        if (normalized === client_1.AuctionStatus.SCHEDULED && existing.startTime <= new Date()) {
+            throw errors_1.AppError.badRequest("Scheduled auctions must have a future start time");
         }
         updateData.status = normalized;
     }

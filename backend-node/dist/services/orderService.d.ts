@@ -2,17 +2,33 @@ import { z } from "zod";
 declare const createOrderSchema: z.ZodObject<{
     buyerId: z.ZodNumber;
     paymentMethod: z.ZodString;
-    shipping: z.ZodOptional<z.ZodObject<{
+    shipping: z.ZodOptional<z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodObject<{
         name: z.ZodString;
         phone: z.ZodString;
         city: z.ZodString;
         region: z.ZodString;
         address: z.ZodString;
-        type: z.ZodOptional<z.ZodEnum<{
+        type: z.ZodDefault<z.ZodEnum<{
+            omni: "omni";
+            redbox: "redbox";
             standard: "standard";
             express: "express";
         }>>;
-    }, z.core.$strip>>;
+        redboxPointId: z.ZodOptional<z.ZodString>;
+        customerCityCode: z.ZodOptional<z.ZodString>;
+        customerCountry: z.ZodDefault<z.ZodString>;
+        codAmount: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
+        codCurrency: z.ZodDefault<z.ZodString>;
+        redboxType: z.ZodDefault<z.ZodEnum<{
+            omni: "omni";
+            redbox: "redbox";
+        }>>;
+        shipmentType: z.ZodDefault<z.ZodEnum<{
+            direct: "direct";
+            agency: "agency";
+            omni: "omni";
+        }>>;
+    }, z.core.$strip>>>;
     items: z.ZodArray<z.ZodObject<{
         productId: z.ZodCoercedNumber<unknown>;
         quantity: z.ZodCoercedNumber<unknown>;
@@ -40,6 +56,15 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
     status: string;
     created_at: string;
     platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    redbox_point_id: string | null;
+    redbox_shipment_id: string | null;
+    redbox_tracking_number: string | null;
+    redbox_label_url: string | null;
+    redbox_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -126,6 +151,15 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
     status: string;
     created_at: string;
     platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    redbox_point_id: string | null;
+    redbox_shipment_id: string | null;
+    redbox_tracking_number: string | null;
+    redbox_label_url: string | null;
+    redbox_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -212,6 +246,15 @@ export declare const listAllOrders: (status?: string) => Promise<{
     status: string;
     created_at: string;
     platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    redbox_point_id: string | null;
+    redbox_shipment_id: string | null;
+    redbox_tracking_number: string | null;
+    redbox_label_url: string | null;
+    redbox_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -298,6 +341,15 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
     status: string;
     created_at: string;
     platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    redbox_point_id: string | null;
+    redbox_shipment_id: string | null;
+    redbox_tracking_number: string | null;
+    redbox_label_url: string | null;
+    redbox_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -384,6 +436,15 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
     status: string;
     created_at: string;
     platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    redbox_point_id: string | null;
+    redbox_shipment_id: string | null;
+    redbox_tracking_number: string | null;
+    redbox_label_url: string | null;
+    redbox_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -470,6 +531,15 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
     status: string;
     created_at: string;
     platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    redbox_point_id: string | null;
+    redbox_shipment_id: string | null;
+    redbox_tracking_number: string | null;
+    redbox_label_url: string | null;
+    redbox_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -535,6 +605,207 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
             has_active_auction: any;
         } | undefined;
     }[];
+}>;
+export declare const getOrderLabel: (orderId: number, actorId: number, actorRoles: string[]) => Promise<{
+    label_url: string | null;
+    tracking_number: string | null;
+    order: {
+        id: number;
+        buyer_id: number;
+        product_id: number | null;
+        quantity: number;
+        unit_price: number;
+        total_amount: number;
+        payment_method: string;
+        shipping_address: string;
+        shipping_name: string;
+        shipping_phone: string;
+        shipping_city: string;
+        shipping_region: string;
+        shipping_method: string;
+        shipping_fee: number;
+        discount_amount: number;
+        coupon_code: string | null;
+        status: string;
+        created_at: string;
+        platform_fee: number;
+        cod_amount: number | null;
+        cod_currency: string | null;
+        customer_city_code: string | null;
+        customer_country: string | null;
+        redbox_point_id: string | null;
+        redbox_shipment_id: string | null;
+        redbox_tracking_number: string | null;
+        redbox_label_url: string | null;
+        redbox_status: string | null;
+        product: {
+            id: any;
+            seller_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            image_urls: string[];
+            status: string;
+            created_at: any;
+            updated_at: any;
+            rating_avg: number;
+            rating_count: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
+        } | undefined;
+        items: {
+            id: number;
+            product_id: number;
+            quantity: number;
+            unit_price: number;
+            total_price: number;
+            product: {
+                id: any;
+                seller_id: any;
+                name_ar: any;
+                name_en: any;
+                description_ar: any;
+                description_en: any;
+                product_type: any;
+                brand: any;
+                category: any;
+                base_price: any;
+                size_ml: any;
+                concentration: any;
+                condition: any;
+                stock_quantity: any;
+                image_urls: string[];
+                status: string;
+                created_at: any;
+                updated_at: any;
+                rating_avg: number;
+                rating_count: any;
+                seller: {
+                    id: any;
+                    full_name: any;
+                    verified_seller: any;
+                } | undefined;
+                is_auction_product: boolean;
+                has_active_auction: any;
+            } | undefined;
+        }[];
+    };
+}>;
+export declare const getOrderTracking: (orderId: number, actorId: number, actorRoles: string[]) => Promise<{
+    order_id: number;
+    shipment_id: string | null;
+    tracking_number: string | null;
+    status: string;
+    activities: unknown[];
+    order: {
+        id: number;
+        buyer_id: number;
+        product_id: number | null;
+        quantity: number;
+        unit_price: number;
+        total_amount: number;
+        payment_method: string;
+        shipping_address: string;
+        shipping_name: string;
+        shipping_phone: string;
+        shipping_city: string;
+        shipping_region: string;
+        shipping_method: string;
+        shipping_fee: number;
+        discount_amount: number;
+        coupon_code: string | null;
+        status: string;
+        created_at: string;
+        platform_fee: number;
+        cod_amount: number | null;
+        cod_currency: string | null;
+        customer_city_code: string | null;
+        customer_country: string | null;
+        redbox_point_id: string | null;
+        redbox_shipment_id: string | null;
+        redbox_tracking_number: string | null;
+        redbox_label_url: string | null;
+        redbox_status: string | null;
+        product: {
+            id: any;
+            seller_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            image_urls: string[];
+            status: string;
+            created_at: any;
+            updated_at: any;
+            rating_avg: number;
+            rating_count: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
+        } | undefined;
+        items: {
+            id: number;
+            product_id: number;
+            quantity: number;
+            unit_price: number;
+            total_price: number;
+            product: {
+                id: any;
+                seller_id: any;
+                name_ar: any;
+                name_en: any;
+                description_ar: any;
+                description_en: any;
+                product_type: any;
+                brand: any;
+                category: any;
+                base_price: any;
+                size_ml: any;
+                concentration: any;
+                condition: any;
+                stock_quantity: any;
+                image_urls: string[];
+                status: string;
+                created_at: any;
+                updated_at: any;
+                rating_avg: number;
+                rating_count: any;
+                seller: {
+                    id: any;
+                    full_name: any;
+                    verified_seller: any;
+                } | undefined;
+                is_auction_product: boolean;
+                has_active_auction: any;
+            } | undefined;
+        }[];
+    };
 }>;
 export {};
 //# sourceMappingURL=orderService.d.ts.map

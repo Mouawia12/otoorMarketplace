@@ -8,7 +8,10 @@ const auctionRealtime_1 = require("../realtime/auctionRealtime");
 const router = (0, express_1.Router)();
 router.get("/", async (req, res, next) => {
     try {
-        const auctions = await (0, auctionService_1.listAuctions)(req.query);
+        const auctions = await (0, auctionService_1.listAuctions)({
+            ...req.query,
+            include_pending: false,
+        });
         res.json({ auctions });
     }
     catch (error) {

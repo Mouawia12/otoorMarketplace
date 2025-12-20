@@ -52,7 +52,12 @@ router.get("/redbox/nearby", async (req, res, next) => {
       throw AppError.badRequest("lat and lng are required");
     }
 
-    const result = await searchNearbyPoints({ lat, lng, radius, type });
+    const result = await searchNearbyPoints({
+      lat,
+      lng,
+      ...(radius !== undefined ? { radius } : {}),
+      ...(type !== undefined ? { type } : {}),
+    });
     res.json(result);
   } catch (error) {
     next(error);

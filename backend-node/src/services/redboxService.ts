@@ -38,18 +38,18 @@ export interface RedboxShipmentPayload {
 
 export interface RedboxShipment {
   id: string;
-  trackingNumber?: string;
-  labelUrl?: string;
-  status?: string;
-  pointId?: string;
+  trackingNumber?: string | undefined;
+  labelUrl?: string | undefined;
+  status?: string | undefined;
+  pointId?: string | undefined;
   raw?: unknown;
 }
 
 export interface RedboxLabelResponse {
   url: string;
-  labelUrl?: string;
-  label_url?: string;
-  link?: string;
+  labelUrl?: string | undefined;
+  label_url?: string | undefined;
+  link?: string | undefined;
 }
 
 const assertShipmentId = (shipmentId?: string) => {

@@ -10,17 +10,25 @@ const notificationService_1 = require("./notificationService");
 const auditLogService_1 = require("./auditLogService");
 const getAdminDashboardStats = async () => {
     const [totalUsers, totalProducts, pendingProducts, totalOrders, pendingOrders, runningAuctions] = await client_2.prisma.$transaction([
-        client_2.prisma.user.count(),
-        client_2.prisma.product.count(),
+        client_2.prisma.user.count({
+            where: { status: client_1.UserStatus.ACTIVE },
+        }),
+        client_2.prisma.product.count({
+            where: { status: client_1.ProductStatus.PUBLISHED },
+        }),
         client_2.prisma.product.count({
             where: { status: client_1.ProductStatus.PENDING_REVIEW },
         }),
-        client_2.prisma.order.count(),
+        client_2.prisma.order.count({
+            where: { status: { notIn: [client_1.OrderStatus.CANCELLED, client_1.OrderStatus.REFUNDED] } },
+        }),
         client_2.prisma.order.count({
             where: { status: client_1.OrderStatus.PENDING },
         }),
         client_2.prisma.auction.count({
-            where: { status: client_1.AuctionStatus.ACTIVE },
+            where: {
+                status: { in: [client_1.AuctionStatus.ACTIVE, client_1.AuctionStatus.SCHEDULED] },
+            },
         }),
     ]);
     return {
@@ -372,7 +380,11 @@ const buildModerationItems = (products, orders, auctions) => {
         const product = auction.product;
         const endTime = new Date(auction.endTime);
         const isEndingSoon = endTime.getTime() - Date.now() < 12 * 60 * 60 * 1000;
-        const priority = auction.status === client_1.AuctionStatus.ACTIVE && isEndingSoon ? "high" : "low";
+        const priority = auction.status === client_1.AuctionStatus.PENDING_REVIEW
+            ? "high"
+            : auction.status === client_1.AuctionStatus.ACTIVE && isEndingSoon
+                ? "high"
+                : "low";
         return {
             id: `auction-${auction.id}`,
             item_id: auction.id,
@@ -419,7 +431,15 @@ const getAdminModerationQueue = async () => {
             take: 5,
         }),
         client_2.prisma.auction.findMany({
-            where: { status: { in: [client_1.AuctionStatus.ACTIVE, client_1.AuctionStatus.SCHEDULED] } },
+            where: {
+                status: {
+                    in: [
+                        client_1.AuctionStatus.PENDING_REVIEW,
+                        client_1.AuctionStatus.ACTIVE,
+                        client_1.AuctionStatus.SCHEDULED,
+                    ],
+                },
+            },
             include: {
                 product: {
                     include: {

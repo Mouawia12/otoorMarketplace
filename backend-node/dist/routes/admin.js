@@ -283,6 +283,7 @@ router.get("/auctions", adminOnly, async (req, res, next) => {
             : undefined;
         const auctions = await (0, auctionService_1.listAuctions)({
             status,
+            include_pending: true,
         });
         res.json(auctions);
     }

@@ -57,6 +57,15 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
     status: string;
     created_at: string;
     platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    redbox_point_id: string | null;
+    redbox_shipment_id: string | null;
+    redbox_tracking_number: string | null;
+    redbox_label_url: string | null;
+    redbox_status: string | null;
     product: {
         id: any;
         seller_id: any;
