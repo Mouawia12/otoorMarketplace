@@ -78,6 +78,11 @@ router.post("/", authenticate(), async (req, res, next) => {
       throw AppError.unauthorized();
     }
 
+    // Debug logging to diagnose 403/auth issues in production
+    console.log("ORDER AUTH USER:", req.user);
+    console.log("ORDER AUTH HEADER:", req.headers.authorization);
+    console.log("ORDER PAYLOAD:", req.body);
+
     const body = req.body ?? {};
 
     let items = body.items;
