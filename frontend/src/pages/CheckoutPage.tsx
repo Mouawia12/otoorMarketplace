@@ -239,6 +239,7 @@ export default function CheckoutPage() {
     phone: "",
     phoneCode: "+966",
     address: "",
+    city: "",
     paymentMethod: "cod" as "card" | "applepay" | "mada" | "cod" | "bank",
   });
 
