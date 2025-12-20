@@ -1,10 +1,23 @@
 import { useTranslation } from "react-i18next";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 
 export default function OrderSuccessPage() {
   const { t } = useTranslation();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get("orderId") || "N/A";
+  const trackingFromQuery = searchParams.get("tracking") || "";
+  const statusFromQuery = searchParams.get("status") || "";
+
+  const state = (location.state || {}) as {
+    trackingNumber?: string;
+    labelUrl?: string;
+    redboxStatus?: string;
+  };
+
+  const trackingNumber = state.trackingNumber || trackingFromQuery || "";
+  const labelUrl = state.labelUrl || "";
+  const redboxStatus = state.redboxStatus || statusFromQuery || "";
 
   return (
     <div className="min-h-screen bg-sand py-16">
@@ -22,6 +35,40 @@ export default function OrderSuccessPage() {
               {t('orderSuccess.orderNumber')}: <span className="text-gold">{orderId}</span>
             </p>
           </div>
+
+          {(trackingNumber || labelUrl || redboxStatus) && (
+            <div className="bg-white rounded-luxury p-6 shadow-sm border border-gold/50 mb-8 text-left">
+              <h3 className="text-xl font-bold text-charcoal mb-3 flex items-center gap-2">
+                <span aria-hidden>🚚</span>
+                {t("orderSuccess.trackingTitle", "تفاصيل الشحن")}
+              </h3>
+              <div className="space-y-2 text-charcoal">
+                {trackingNumber && (
+                  <p className="text-sm">
+                    {t("orderSuccess.trackingNumber", "رقم التتبع")}:{" "}
+                    <span className="font-semibold text-gold break-all">{trackingNumber}</span>
+                  </p>
+                )}
+                {redboxStatus && (
+                  <p className="text-sm">
+                    {t("orderSuccess.shipmentStatus", "حالة الشحنة")}:{" "}
+                    <span className="font-semibold">{redboxStatus}</span>
+                  </p>
+                )}
+                {labelUrl && (
+                  <a
+                    className="inline-flex items-center gap-2 text-sm text-charcoal underline hover:text-gold transition"
+                    href={labelUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("orderSuccess.downloadLabel", "تحميل ملصق الشحنة")}
+                    <span aria-hidden>↗</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="bg-ivory rounded-luxury p-8 mb-8 shadow-sm">
             <h2 className="text-2xl font-bold text-charcoal mb-4">{t('orderSuccess.whatNext')}</h2>

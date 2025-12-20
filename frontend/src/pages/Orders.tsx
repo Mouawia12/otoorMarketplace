@@ -430,6 +430,43 @@ export default function Orders({ view }: OrdersProps = {}) {
                 </div>
               </div>
 
+              {(activeOrder.redbox_tracking_number ||
+                activeOrder.redbox_label_url ||
+                activeOrder.redbox_status) && (
+                <div className="border border-sand/70 rounded-xl p-4">
+                  <h4 className="font-semibold text-charcoal mb-2">
+                    {t('orders.trackingInfo', 'معلومات الشحنة')}
+                  </h4>
+                  <div className="space-y-2 text-sm text-charcoal">
+                    {activeOrder.redbox_tracking_number && (
+                      <p className="break-all">
+                        {t('orders.trackingNumber', 'رقم التتبع')}:{" "}
+                        <span className="font-semibold text-gold">
+                          {activeOrder.redbox_tracking_number}
+                        </span>
+                      </p>
+                    )}
+                    {activeOrder.redbox_status && (
+                      <p>
+                        {t('orders.shipmentStatus', 'حالة الشحنة')}:{" "}
+                        <span className="font-semibold">{activeOrder.redbox_status}</span>
+                      </p>
+                    )}
+                    {activeOrder.redbox_label_url && (
+                      <a
+                        href={activeOrder.redbox_label_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition"
+                      >
+                        {t('orders.downloadLabel', 'تحميل ملصق الشحنة')}
+                        <span aria-hidden>↗</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {activeOrder.shipping_address && (
                 <div className="border border-sand/70 rounded-xl p-4">
                   <h4 className="font-semibold text-charcoal mb-2">{t('orders.shippingAddress')}</h4>

@@ -301,7 +301,16 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         });
       }
     });
-    throw error;
+    const friendlyMessage =
+      "تعذر إنشاء الشحنة مع شركة التوصيل، حاول مرة أخرى أو اختر طريقة شحن أخرى.";
+    if (error instanceof AppError) {
+      throw new AppError(
+        friendlyMessage,
+        error.statusCode,
+        error.details ?? error
+      );
+    }
+    throw AppError.internal(friendlyMessage, error);
   }
 
   if (appliedCoupon) {

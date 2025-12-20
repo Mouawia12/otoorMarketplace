@@ -123,6 +123,10 @@ export interface Order {
   status: string;
   created_at: string;
   product?: Product;
+  redbox_shipment_id?: string | null;
+  redbox_tracking_number?: string | null;
+  redbox_label_url?: string | null;
+  redbox_status?: string | null;
   items?: Array<{
     id: number;
     product_id: number;

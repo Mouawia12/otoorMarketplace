@@ -361,9 +361,22 @@ export default function CheckoutPage() {
       setPlacingOrder(true);
       setSubmitError(null);
       const response = await api.post("/orders", payload);
+      const order = response.data ?? {};
+      const trackingNumber = order.redbox_tracking_number;
+      const labelUrl = order.redbox_label_url;
+      const redboxStatus = order.redbox_status;
+      const params = new URLSearchParams({ orderId: String(order.id ?? "") });
+      if (trackingNumber) params.set("tracking", trackingNumber);
+      if (redboxStatus) params.set("status", redboxStatus);
       clearPendingOrder();
       clear();
-      navigate(`/order/success?orderId=${response.data.id}`);
+      navigate(`/order/success?${params.toString()}`, {
+        state: {
+          trackingNumber,
+          labelUrl,
+          redboxStatus,
+        },
+      });
     } catch (error: any) {
       console.error("Failed to place order", error);
       const apiMessage = error?.response?.data?.message || error?.response?.data?.detail;
