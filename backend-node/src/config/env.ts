@@ -43,10 +43,7 @@ const envSchema = z.object({
   REDBOX_API_TOKEN: z.string().min(1, "REDBOX_API_TOKEN is required"),
   REDBOX_BUSINESS_ID: z.string().optional(),
   REDBOX_ENV: z.enum(["production", "sandbox"]).default("production"),
-  REDBOX_API_BASE_URL: z
-    .string()
-    .url()
-    .default("https://api.redboxsa.com"),
+  REDBOX_API_BASE_URL: z.string().url().optional(),
   REDBOX_DEFAULT_COUNTRY: z.string().default("SA"),
 });
 
@@ -141,7 +138,12 @@ export const config = {
     token: REDBOX_API_TOKEN,
     businessId: REDBOX_BUSINESS_ID,
     env: REDBOX_ENV,
-    baseUrl: `${REDBOX_API_BASE_URL.replace(/\/+$/, "")}/v3`,
+    baseUrl: `${(
+      REDBOX_API_BASE_URL ||
+      (REDBOX_ENV === "sandbox"
+        ? "https://stage.api.redboxsa.com"
+        : "https://api.redboxsa.com")
+    ).replace(/\/+$/, "")}/v3`,
     defaultCountry: REDBOX_DEFAULT_COUNTRY,
   },
 };

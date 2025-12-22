@@ -28,12 +28,14 @@ router.get("/redbox/points", async (req, res, next) => {
         : typeof req.query.cityCode === "string"
         ? req.query.cityCode
         : undefined;
+    const type =
+      typeof req.query.type === "string" ? req.query.type : undefined;
 
     if (!cityCode) {
       throw AppError.badRequest("city_code is required");
     }
 
-    const result = await getPointsByCity(cityCode);
+    const result = await getPointsByCity(cityCode, type);
     res.json(result);
   } catch (error) {
     next(error);

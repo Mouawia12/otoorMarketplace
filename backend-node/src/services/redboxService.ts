@@ -59,14 +59,28 @@ const assertShipmentId = (shipmentId?: string) => {
   return shipmentId;
 };
 
-const normalizeShipmentPayload = (payload: RedboxShipmentPayload) => {
-  if (!payload.pointId) {
+const normalizeShipmentPayload = (
+  payload: RedboxShipmentPayload,
+  options?: {
+    requirePointId?: boolean;
+    includeBusinessId?: boolean;
+  }
+) => {
+  const requirePointId = options?.requirePointId ?? true;
+  const includeBusinessId = options?.includeBusinessId ?? false;
+  const businessId = payload.businessId ?? config.redbox.businessId;
+
+  if (requirePointId && !payload.pointId) {
     throw AppError.badRequest("RedBox point_id is required");
   }
 
+  if (includeBusinessId && !businessId) {
+    throw AppError.badRequest("RedBox business_id is required");
+  }
+
   return {
-    business_id: payload.businessId ?? config.redbox.businessId,
-    point_id: payload.pointId,
+    ...(includeBusinessId ? { business_id: businessId } : {}),
+    ...(payload.pointId ? { point_id: payload.pointId } : {}),
     reference: payload.reference,
     type: payload.type ?? "redbox",
     customer_city_code: payload.customerCityCode,
@@ -128,13 +142,18 @@ const mapShipment = (data: unknown): RedboxShipment => {
   };
 };
 
-const requestShipment = async (
-  kind: ShipmentKind,
-  payload: RedboxShipmentPayload
-) => {
-  const body = normalizeShipmentPayload(payload);
-  const url =
-    kind === "omni" ? "/shipments/omni" : `/shipments/${kind}`;
+const requestShipment = async (kind: ShipmentKind, payload: RedboxShipmentPayload) => {
+  const isOmni = kind === "omni";
+  const isAgency = kind === "agency";
+  const body = normalizeShipmentPayload(payload, {
+    requirePointId: !isOmni,
+    includeBusinessId: isAgency,
+  });
+  const url = isOmni
+    ? "/omni/orders"
+    : isAgency
+    ? "/businesses/shipments"
+    : "/shipments";
   const data = await redboxRequest<unknown>({
     method: "POST",
     url,
@@ -152,13 +171,14 @@ export const getCities = async (country?: string) => {
   });
 };
 
-export const getPointsByCity = async (cityCode: string) => {
+export const getPointsByCity = async (cityCode: string, type?: string) => {
   if (!cityCode) {
     throw AppError.badRequest("cityCode is required");
   }
   return redboxRequest<unknown>({
     method: "GET",
     url: `/cities/${cityCode}/points`,
+    params: type ? { type } : undefined,
   });
 };
 
@@ -174,7 +194,7 @@ export const searchNearbyPoints = async (params: {
 
   return redboxRequest<unknown>({
     method: "GET",
-    url: "/points/nearby",
+    url: "/points/search/nearby",
     params: {
       lat: params.lat,
       lng: params.lng,
@@ -213,7 +233,7 @@ export const getStatus = async (shipmentId: string) => {
   const id = assertShipmentId(shipmentId);
   const data = await redboxRequest<unknown>({
     method: "GET",
-    url: `/shipments/${id}`,
+    url: `/shipments/${id}/status`,
   });
   return mapShipment(data);
 };

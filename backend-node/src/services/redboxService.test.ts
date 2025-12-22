@@ -49,9 +49,9 @@ describe("redboxService", () => {
     const { getStatus, config } = await loadServices();
 
     const scope = nock(config.redbox.baseUrl)
-      .get("/shipments/demo")
+      .get("/shipments/demo/status")
       .reply(500, { message: "server error" })
-      .get("/shipments/demo")
+      .get("/shipments/demo/status")
       .reply(200, {
         success: true,
         data: { shipment_id: "sh-1", tracking_number: "TRK-1" },
@@ -79,7 +79,7 @@ describe("redboxService", () => {
     const { createShipmentDirect, config } = await loadServices();
 
     nock(config.redbox.baseUrl)
-      .post("/shipments/direct", (body) => body.point_id === "POINT-1")
+      .post("/shipments", (body) => body.point_id === "POINT-1")
       .reply(200, {
         success: true,
         data: {
