@@ -25,6 +25,10 @@ export interface RedboxShipmentPayload {
   pointId?: string;
   reference?: string;
   type?: "redbox" | "omni";
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  customerCity?: string;
   customerCityCode?: string;
   customerCountry?: string;
   codAmount?: number;
@@ -83,6 +87,10 @@ const normalizeShipmentPayload = (
     ...(payload.pointId ? { point_id: payload.pointId } : {}),
     reference: payload.reference,
     type: payload.type ?? "redbox",
+    customer_name: payload.customerName,
+    customer_phone: payload.customerPhone,
+    customer_address: payload.customerAddress,
+    customer_city: payload.customerCity,
     customer_city_code: payload.customerCityCode,
     customer_country: payload.customerCountry,
     cod_amount: payload.codAmount,
