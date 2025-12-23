@@ -25,22 +25,46 @@ const orderItemSchema = z.object({
   unitPrice: z.coerce.number().positive().optional(),
 });
 
+const normalizeShippingType = (value?: unknown) => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (["standard", "express", "redbox", "omni"].includes(normalized)) {
+    return normalized as "standard" | "express" | "redbox" | "omni";
+  }
+  return undefined;
+};
+
 const shippingDetailsSchema = z.preprocess((value) => {
   if (value && typeof value === "object") {
     const shipping = value as Record<string, unknown>;
+    const normalizedType =
+      normalizeShippingType(shipping.type) ??
+      normalizeShippingType(shipping.shipping_method) ??
+      normalizeShippingType(shipping.shippingMethod);
     return {
       name: shipping.name,
       phone: shipping.phone,
       city: shipping.city,
       region: shipping.region,
       address: shipping.address,
-      type: shipping.type,
+      type: normalizedType ?? shipping.type,
       redboxPointId:
         shipping.redboxPointId ??
         shipping.redbox_point_id ??
         shipping.point_id,
+      redboxCityCode:
+        shipping.redboxCityCode ??
+        shipping.redbox_city_code ??
+        shipping.customer_city_code ??
+        shipping.customerCityCode ??
+        shipping.city,
       customerCityCode:
-        shipping.customerCityCode ?? shipping.customer_city_code ?? shipping.city,
+        shipping.customerCityCode ??
+        shipping.customer_city_code ??
+        shipping.redbox_city_code ??
+        shipping.city,
       customerCountry:
         shipping.customerCountry ?? shipping.customer_country ?? "SA",
       codAmount: shipping.codAmount ?? shipping.cod_amount,
@@ -63,6 +87,7 @@ const shippingDetailsSchema = z.preprocess((value) => {
   region: z.string().min(2),
   address: z.string().min(3),
   type: z.enum(["standard", "express", "redbox", "omni"]).default("standard"),
+  redboxCityCode: z.string().optional(),
   redboxPointId: z.string().min(1, "RedBox point_id is required").optional(),
   customerCityCode: z.string().optional(),
   customerCountry: z.string().default("SA"),
@@ -81,19 +106,61 @@ const createOrderSchema = z.object({
 });
 
 export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
+  const rawShipping = (input as { shipping?: Record<string, unknown> }).shipping ?? {};
+  console.log("ORDER PAYLOAD:", input);
+  console.log(
+    "SHIPPING METHOD:",
+    rawShipping.shipping_method ??
+      rawShipping.shippingMethod ??
+      rawShipping.type ??
+      (input as { shipping_method?: unknown }).shipping_method
+  );
+  console.log(
+    "REDBOX CITY:",
+    rawShipping.redbox_city_code ??
+      rawShipping.customer_city_code ??
+      rawShipping.customerCityCode ??
+      rawShipping.redboxCityCode
+  );
+  console.log(
+    "REDBOX POINT:",
+    rawShipping.redbox_point_id ??
+      rawShipping.redboxPointId ??
+      rawShipping.point_id ??
+      rawShipping.pointId
+  );
+  console.log(
+    "COD:",
+    rawShipping.cod_amount ?? rawShipping.codAmount,
+    rawShipping.cod_currency ?? rawShipping.codCurrency
+  );
+
   const data = createOrderSchema.parse(input);
   if (!data.shipping) {
     throw AppError.badRequest("Shipping details are required");
   }
 
   const shipping = data.shipping;
-  const redboxPointId = shipping.redboxPointId;
+  const shippingMethod = shipping.type ?? "standard";
+  const normalizedShippingMethod = shippingMethod.toLowerCase();
+  const redboxCityCode = shipping.redboxCityCode ?? shipping.customerCityCode;
 
-  if (!redboxPointId) {
-    throw AppError.badRequest("RedBox point selection is required");
+  if (normalizedShippingMethod === "redbox") {
+    if (!redboxCityCode) {
+      throw AppError.badRequest("RedBox city is required");
+    }
+    if (!shipping.redboxPointId) {
+      throw AppError.badRequest("RedBox point is required");
+    }
+    if (shipping.codAmount === undefined || Number.isNaN(shipping.codAmount)) {
+      throw AppError.badRequest("Invalid COD data");
+    }
+    if (!shipping.codCurrency) {
+      throw AppError.badRequest("Invalid COD data");
+    }
   }
 
-  const shippingMethod = shipping.type ?? "standard";
+  const redboxPointId = shipping.redboxPointId;
   const shippingOption = shippingMethod === "express" ? "express" : "standard";
   const shippingFeeValue =
     shippingOption === "express"
@@ -191,7 +258,8 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
       ? totalAmount
       : undefined;
   const codCurrency = shipping.codCurrency ?? "SAR";
-  const customerCityCode = shipping.customerCityCode ?? shipping.city;
+  const customerCityCode =
+    shipping.customerCityCode ?? shipping.redboxCityCode ?? shipping.city;
   const customerCountry = shipping.customerCountry ?? "SA";
   const redboxShipmentType = shipping.shipmentType ?? "direct";
   const redboxType =

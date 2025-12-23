@@ -7,6 +7,7 @@ export type PendingOrderPayload = {
     region: string;
     address: string;
     type?: string;
+    shipping_method?: string;
     redbox_point_id?: string;
     redbox_city_code?: string;
     customer_city_code?: string;

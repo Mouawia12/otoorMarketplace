@@ -341,11 +341,12 @@ export default function CheckoutPage() {
         region: cityName,
         address: formData.address || selectedPoint,
         type: "redbox",
+        shipping_method: "REDBOX",
         redbox_point_id: selectedPoint,
         customer_city_code: selectedCity,
         redbox_city_code: selectedCity,
         customer_country: "SA",
-        cod_amount: formData.paymentMethod === "cod" ? total : undefined,
+        cod_amount: formData.paymentMethod === "cod" ? total : 0,
         cod_currency: "SAR",
       },
       items: items.map((item) => ({
