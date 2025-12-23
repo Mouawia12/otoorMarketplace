@@ -143,6 +143,8 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   const shipping = data.shipping;
   const shippingMethod = shipping.type ?? "standard";
   const normalizedShippingMethod = shippingMethod.toLowerCase();
+  const requiresRedboxShipment =
+    normalizedShippingMethod === "redbox" || normalizedShippingMethod === "omni";
   const redboxCityCode = shipping.redboxCityCode ?? shipping.customerCityCode;
 
   if (normalizedShippingMethod === "redbox") {
@@ -292,8 +294,8 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
             ? new Prisma.Decimal(codAmount)
             : null,
         codCurrency: codAmount !== undefined ? codCurrency : null,
-        redboxPointId,
-        redboxStatus: "pending",
+        redboxPointId: redboxPointId ?? null,
+        redboxStatus: requiresRedboxShipment ? "pending" : null,
         items: {
           create: normalizedItems,
         },
@@ -318,67 +320,69 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   });
 
   let shipment;
-  try {
-    const shipmentPayload: RedboxShipmentPayload = {
-      pointId: redboxPointId,
-      reference: `order-${order.id}`,
-      type: redboxType,
-      customerCityCode,
-      customerCountry,
-      codAmount: codAmount ?? 0,
-      codCurrency,
-      metadata: {
-        orderId: order.id,
-        buyerId: data.buyerId,
-      },
-      receiver: {
-        name: shipping.name,
-        phone: shipping.phone,
-        cityCode: customerCityCode,
-        country: customerCountry,
-        address: shipping.address,
-      },
-      items: normalizedItems.map((item) => ({
-        name: `Item-${item.productId}`,
-        quantity: item.quantity,
-        price: Number(item.unitPrice),
-      })),
-    };
+  if (requiresRedboxShipment) {
+    try {
+      const shipmentPayload: RedboxShipmentPayload = {
+        pointId: redboxPointId,
+        reference: `order-${order.id}`,
+        type: redboxType,
+        customerCityCode,
+        customerCountry,
+        codAmount: codAmount ?? 0,
+        codCurrency,
+        metadata: {
+          orderId: order.id,
+          buyerId: data.buyerId,
+        },
+        receiver: {
+          name: shipping.name,
+          phone: shipping.phone,
+          cityCode: customerCityCode,
+          country: customerCountry,
+          address: shipping.address,
+        },
+        items: normalizedItems.map((item) => ({
+          name: `Item-${item.productId}`,
+          quantity: item.quantity,
+          price: Number(item.unitPrice),
+        })),
+      };
 
-    if (redboxShipmentType === "agency") {
-      shipment = await createShipmentAgency(shipmentPayload);
-    } else if (redboxShipmentType === "omni" || redboxType === "omni") {
-      shipment = await createOmniOrder(shipmentPayload);
-    } else {
-      shipment = await createShipmentDirect(shipmentPayload);
-    }
-  } catch (error) {
-    await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: OrderStatus.CANCELLED, redboxStatus: "failed" },
-      });
-      for (const item of normalizedItems) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stockQuantity: {
-              increment: item.quantity,
-            },
-          },
-        });
+      if (redboxShipmentType === "agency") {
+        shipment = await createShipmentAgency(shipmentPayload);
+      } else if (redboxShipmentType === "omni" || redboxType === "omni") {
+        shipment = await createOmniOrder(shipmentPayload);
+      } else {
+        shipment = await createShipmentDirect(shipmentPayload);
       }
-    });
-    const friendlyMessage =
-      "تعذر إنشاء الشحنة مع شركة التوصيل، حاول مرة أخرى أو اختر طريقة شحن أخرى.";
-    if (error instanceof AppError) {
-      throw new AppError(
-        friendlyMessage,
-        error.statusCode,
-        error.details ?? error
-      );
+    } catch (error) {
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.CANCELLED, redboxStatus: "failed" },
+        });
+        for (const item of normalizedItems) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stockQuantity: {
+                increment: item.quantity,
+              },
+            },
+          });
+        }
+      });
+      const friendlyMessage =
+        "تعذر إنشاء الشحنة مع شركة التوصيل، حاول مرة أخرى أو اختر طريقة شحن أخرى.";
+      if (error instanceof AppError) {
+        throw new AppError(
+          friendlyMessage,
+          error.statusCode,
+          error.details ?? error
+        );
+      }
+      throw AppError.internal(friendlyMessage, error);
     }
-    throw AppError.internal(friendlyMessage, error);
   }
 
   if (appliedCoupon) {
@@ -387,17 +391,22 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     );
   }
 
-  const updatedOrder = await prisma.order.update({
-    where: { id: order.id },
-    data: {
-      redboxShipmentId: shipment.id,
-      redboxTrackingNumber:
-        shipment.trackingNumber ?? order.redboxTrackingNumber,
-      redboxLabelUrl: shipment.labelUrl ?? order.redboxLabelUrl,
-      redboxStatus: shipment.status ?? "created",
-    },
-    include: orderInclude,
-  });
+  const updatedOrder = shipment
+    ? await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          redboxShipmentId: shipment.id,
+          redboxTrackingNumber:
+            shipment.trackingNumber ?? order.redboxTrackingNumber,
+          redboxLabelUrl: shipment.labelUrl ?? order.redboxLabelUrl,
+          redboxStatus: shipment.status ?? "created",
+        },
+        include: orderInclude,
+      })
+    : await prisma.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: orderInclude,
+      });
 
   return mapOrderToDto(updatedOrder);
 };

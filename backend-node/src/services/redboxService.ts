@@ -22,7 +22,7 @@ export interface RedboxItem {
 }
 
 export interface RedboxShipmentPayload {
-  pointId: string;
+  pointId?: string;
   reference?: string;
   type?: "redbox" | "omni";
   customerCityCode?: string;
