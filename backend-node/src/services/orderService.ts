@@ -323,7 +323,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   if (requiresRedboxShipment) {
     try {
       const shipmentPayload: RedboxShipmentPayload = {
-        pointId: redboxPointId,
+        ...(redboxPointId ? { pointId: redboxPointId } : {}),
         reference: `order-${order.id}`,
         type: redboxType,
         customerCityCode,
