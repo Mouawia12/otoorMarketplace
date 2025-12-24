@@ -323,9 +323,15 @@ export default function ProductDetailPage() {
                   }
                   navigate(target);
                 }}
-                className="w-full bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}
+                <span>{isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}</span>
+                {!isInStock && (
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6M15 9l-6 6" />
+                    <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>

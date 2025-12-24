@@ -166,8 +166,8 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {isInStock && (
-            <div className="space-y-4">
+          <div className="space-y-4">
+            {isInStock && (
               <div className="flex items-center gap-4">
                 <label className="text-charcoal font-medium">{t('common.quantity')}</label>
                 <div className="flex items-center gap-2">
@@ -186,15 +186,22 @@ export default function ProductDetail() {
                   </button>
                 </div>
               </div>
+            )}
 
-              <button
-                onClick={handleOrder}
-                className="w-full bg-gold text-charcoal font-semibold py-3 rounded-luxury hover:bg-gold-light transition"
-              >
-                {t('products.addToCart')}
-              </button>
-            </div>
-          )}
+            <button
+              onClick={handleOrder}
+              disabled={!isInStock}
+              className="w-full bg-gold text-charcoal font-semibold py-3 rounded-luxury hover:bg-gold-light transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <span>{isInStock ? t('products.addToCart') : t('products.outOfStock')}</span>
+              {!isInStock && (
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6M15 9l-6 6" />
+                  <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

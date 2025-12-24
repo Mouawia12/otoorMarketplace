@@ -44,6 +44,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const isAuction = type === 'auction';
   const isAuctionEnded =
     isAuction && auctionEndDate ? new Date(auctionEndDate).getTime() <= Date.now() : false;
+  const isOutOfStock = product.stock_quantity <= 0;
   const conditionLabel =
     product.condition === 'used'
       ? t('products.conditionUsed', 'Used')
@@ -85,7 +86,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   };
 
   const handleAddToCart = () => {
-    if (isAuctionEnded) return;
+    if (isAuctionEnded || isOutOfStock) return;
     addToCart(
       {
         id: product.id.toString(),
@@ -199,20 +200,27 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
           ) : (
             <button
               onClick={handleAddToCart}
-              disabled={isAuctionEnded}
+              disabled={isAuctionEnded || isOutOfStock}
               className={`h-10 sm:h-11 w-full rounded-luxury font-semibold transition flex items-center justify-center gap-2 min-h-[40px] sm:min-h-[44px] text-sm sm:text-base ${
-                isAuctionEnded
+                isAuctionEnded || isOutOfStock
                   ? 'bg-sand text-charcoal/70 cursor-not-allowed'
                   : 'bg-gold text-charcoal hover:bg-gold-hover'
               }`}
               aria-label={t('common.addToCart')}
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9H7.5L6 6zM7 6V4a3 3 0 016 0v2" />
-              </svg>
               <span>
-                {isAuctionEnded ? t('auctionDetail.auctionEnded', 'Auction Ended') : t('common.addToCart')}
+                {isOutOfStock ? t('products.outOfStock') : t('common.addToCart')}
               </span>
+              {isOutOfStock ? (
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6M15 9l-6 6" />
+                  <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 6h15l-1.5 9H7.5L6 6zM7 6V4a3 3 0 016 0v2" />
+                </svg>
+              )}
             </button>
           )}
         </div>

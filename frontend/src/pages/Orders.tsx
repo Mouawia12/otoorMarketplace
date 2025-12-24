@@ -30,6 +30,7 @@ export default function Orders({ view }: OrdersProps = {}) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted?: boolean }>>({});
   const [submittingReviewKey, setSubmittingReviewKey] = useState<string | null>(null);
+  const [printingLabel, setPrintingLabel] = useState(false);
 
   const userIsSeller = useMemo(() => user?.roles?.includes('seller'), [user]);
   const userIsAdmin = useMemo(() => user?.roles?.some((r) => ['admin', 'super_admin'].includes(r)), [user]);
@@ -124,6 +125,32 @@ export default function Orders({ view }: OrdersProps = {}) {
       alert(err?.response?.data?.detail || t('orders.updateFailed', 'تعذر تحديث الحالة'));
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handlePrintLabel = async (orderId: number) => {
+    try {
+      setPrintingLabel(true);
+      const response = await api.get(`/orders/${orderId}/label`);
+      const labelUrl = response.data?.label_url;
+      if (!labelUrl) {
+        alert(t('orders.labelUnavailable', 'تعذر الحصول على بوليصة الشحن'));
+        return;
+      }
+      window.open(labelUrl, '_blank', 'noopener,noreferrer');
+      const updatedOrder = response.data?.order;
+      if (updatedOrder) {
+        setOrders((prev) => prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
+        setActiveOrder(updatedOrder);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.detail ||
+        t('orders.labelUnavailable', 'تعذر الحصول على بوليصة الشحن');
+      alert(message);
+    } finally {
+      setPrintingLabel(false);
     }
   };
 
@@ -451,6 +478,19 @@ export default function Orders({ view }: OrdersProps = {}) {
                         {t('orders.shipmentStatus', 'حالة الشحنة')}:{" "}
                         <span className="font-semibold">{activeOrder.redbox_status}</span>
                       </p>
+                    )}
+                    {(sellerMode || userIsAdmin) && (
+                      <button
+                        type="button"
+                        onClick={() => handlePrintLabel(activeOrder.id)}
+                        className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition disabled:opacity-60"
+                        disabled={printingLabel}
+                      >
+                        {printingLabel
+                          ? t('orders.labelLoading', 'جاري تحميل البوليصة...')
+                          : t('orders.printLabel', 'طباعة بوليصة الشحن')}
+                        <span aria-hidden>↗</span>
+                      </button>
                     )}
                     {activeOrder.redbox_label_url && (
                       <a

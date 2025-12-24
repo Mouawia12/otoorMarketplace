@@ -15,6 +15,26 @@ const normalizeSeller = (seller?: { id: number; fullName: string; verifiedSeller
       }
     : undefined;
 
+const resolveAuctionStatus = (status: AuctionStatus, startTime: Date, endTime: Date, now = new Date()) => {
+  if (
+    status === AuctionStatus.PENDING_REVIEW ||
+    status === AuctionStatus.CANCELLED ||
+    status === AuctionStatus.COMPLETED
+  ) {
+    return status;
+  }
+
+  if (endTime <= now) {
+    return AuctionStatus.COMPLETED;
+  }
+
+  if (startTime > now) {
+    return AuctionStatus.SCHEDULED;
+  }
+
+  return AuctionStatus.ACTIVE;
+};
+
 const normalizeAuction = (auction: any) => {
   const plain = toPlainObject(auction);
   return {
@@ -123,9 +143,32 @@ export const listAuctions = async (query: unknown) => {
     },
   });
 
+  const now = new Date();
+  const statusUpdates = auctions.reduce<Array<{ id: number; status: AuctionStatus }>>((acc, auction) => {
+    const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime, now);
+    if (nextStatus !== auction.status) {
+      acc.push({ id: auction.id, status: nextStatus });
+    }
+    return acc;
+  }, []);
+
+  const statusById = new Map(statusUpdates.map((update) => [update.id, update.status]));
+
+  if (statusUpdates.length > 0) {
+    await prisma.$transaction(
+      statusUpdates.map((update) =>
+        prisma.auction.update({
+          where: { id: update.id },
+          data: { status: update.status },
+        })
+      )
+    );
+  }
+
   return auctions.map((auction) =>
     normalizeAuction({
       ...auction,
+      status: statusById.get(auction.id) ?? auction.status,
       total_bids: auction._count.bids,
     })
   );
@@ -173,8 +216,17 @@ export const getAuctionById = async (id: number) => {
     throw AppError.notFound("Auction not found");
   }
 
+  const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime);
+  if (nextStatus !== auction.status) {
+    await prisma.auction.update({
+      where: { id: auction.id },
+      data: { status: nextStatus },
+    });
+  }
+
   const normalized = normalizeAuction({
     ...auction,
+    status: nextStatus,
     total_bids: auction.bids.length,
   });
 
@@ -217,8 +269,17 @@ export const getAuctionByProductId = async (productId: number) => {
     return null;
   }
 
+  const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime);
+  if (nextStatus !== auction.status) {
+    await prisma.auction.update({
+      where: { id: auction.id },
+      data: { status: nextStatus },
+    });
+  }
+
   return normalizeAuction({
     ...auction,
+    status: nextStatus,
     total_bids: auction._count.bids,
   });
 };

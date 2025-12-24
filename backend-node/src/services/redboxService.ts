@@ -150,6 +150,25 @@ const mapShipment = (data: unknown): RedboxShipment => {
   };
 };
 
+const extractLabelUrlFromDetails = (data: unknown) => {
+  const payload = data as Record<string, unknown>;
+  const direct =
+    (payload?.label_url as string | undefined) ??
+    (payload?.labelUrl as string | undefined) ??
+    (payload?.label as { url?: string })?.url;
+
+  const shipment =
+    (payload?.shipment as Record<string, unknown> | undefined) ??
+    (payload?.data as Record<string, unknown> | undefined);
+
+  const nested =
+    (shipment?.label_url as string | undefined) ??
+    (shipment?.labelUrl as string | undefined) ??
+    (shipment?.label as { url?: string })?.url;
+
+  return direct ?? nested ?? "";
+};
+
 const requestShipment = async (kind: ShipmentKind, payload: RedboxShipmentPayload) => {
   const isOmni = kind === "omni";
   const isAgency = kind === "agency";
@@ -234,6 +253,30 @@ export const getLabel = async (shipmentId: string): Promise<RedboxLabelResponse>
     labelUrl: data.labelUrl ?? data.label_url,
     label_url: data.label_url,
     link: data.link,
+  };
+};
+
+export const getShipmentDetails = async (shipmentId: string) => {
+  const id = assertShipmentId(shipmentId);
+  return redboxRequest<unknown>({
+    method: "GET",
+    url: `/shipments/${id}`,
+  });
+};
+
+export const getShipmentLabel = async (shipmentId: string): Promise<RedboxLabelResponse> => {
+  const label = await getLabel(shipmentId);
+  if (label.url) {
+    return label;
+  }
+
+  const details = await getShipmentDetails(shipmentId);
+  const labelUrl = extractLabelUrlFromDetails(details);
+  return {
+    url: labelUrl,
+    labelUrl,
+    label_url: labelUrl,
+    link: labelUrl,
   };
 };
 

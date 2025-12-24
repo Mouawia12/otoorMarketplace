@@ -62,6 +62,7 @@ export default function AdminOrdersPage() {
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [printingLabelId, setPrintingLabelId] = useState<number | null>(null);
 
   const loadOrders = async () => {
     try {
@@ -97,6 +98,27 @@ export default function AdminOrdersPage() {
     } catch (err: any) {
       console.error("Failed to update order status", err);
       alert(err?.response?.data?.detail ?? t("orders.updateFailed", "Failed to update order"));
+    }
+  };
+
+  const handlePrintLabel = async (orderId: number) => {
+    try {
+      setPrintingLabelId(orderId);
+      const response = await api.get(`/orders/${orderId}/label`);
+      const labelUrl = response.data?.label_url;
+      if (!labelUrl) {
+        alert(t("orders.labelUnavailable", "تعذر الحصول على بوليصة الشحن"));
+        return;
+      }
+      window.open(labelUrl, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      alert(
+        err?.response?.data?.message ??
+          err?.response?.data?.detail ??
+          t("orders.labelUnavailable", "تعذر الحصول على بوليصة الشحن")
+      );
+    } finally {
+      setPrintingLabelId(null);
     }
   };
 
@@ -171,6 +193,9 @@ export default function AdminOrdersPage() {
                   id: order.buyer_id,
                   defaultValue: `Buyer #${order.buyer_id}`,
                 });
+                const isRedbox =
+                  typeof order.shipping_method === "string" &&
+                  order.shipping_method.toLowerCase().includes("redbox");
                 return (
                   <tr key={order.id} className="border-b border-gray-100 hover:bg-sand">
                     <td className="px-4 py-4 text-charcoal-light">#{order.id}</td>
@@ -188,17 +213,31 @@ export default function AdminOrdersPage() {
                       {new Date(order.created_at).toLocaleDateString(i18n.language === "ar" ? "ar-EG" : "en-US")}
                     </td>
                     <td className="px-4 py-4">
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        className="px-3 py-1 rounded-full text-sm font-semibold bg-white border border-sand/60"
-                      >
-                        {statusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {t(option.labelKey)}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex flex-col gap-2">
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                          className="px-3 py-1 rounded-full text-sm font-semibold bg-white border border-sand/60"
+                        >
+                          {statusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {t(option.labelKey)}
+                            </option>
+                          ))}
+                        </select>
+                        {isRedbox && (
+                          <button
+                            type="button"
+                            onClick={() => handlePrintLabel(order.id)}
+                            className="text-sm text-charcoal underline hover:text-gold transition disabled:opacity-60"
+                            disabled={printingLabelId === order.id}
+                          >
+                            {printingLabelId === order.id
+                              ? t("orders.labelLoading", "جاري تحميل البوليصة...")
+                              : t("orders.printLabel", "طباعة بوليصة الشحن")}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

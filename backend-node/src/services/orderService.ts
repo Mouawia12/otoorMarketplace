@@ -14,7 +14,7 @@ import {
   createShipmentDirect,
   createOmniOrder,
   getActivities as getRedboxActivities,
-  getLabel as getRedboxLabel,
+  getShipmentLabel as getRedboxLabel,
   getStatus as getRedboxStatus,
   type RedboxShipmentPayload,
 } from "./redboxService";
@@ -106,35 +106,6 @@ const createOrderSchema = z.object({
 });
 
 export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
-  const rawShipping = (input as { shipping?: Record<string, unknown> }).shipping ?? {};
-  console.log("ORDER PAYLOAD:", input);
-  console.log(
-    "SHIPPING METHOD:",
-    rawShipping.shipping_method ??
-      rawShipping.shippingMethod ??
-      rawShipping.type ??
-      (input as { shipping_method?: unknown }).shipping_method
-  );
-  console.log(
-    "REDBOX CITY:",
-    rawShipping.redbox_city_code ??
-      rawShipping.customer_city_code ??
-      rawShipping.customerCityCode ??
-      rawShipping.redboxCityCode
-  );
-  console.log(
-    "REDBOX POINT:",
-    rawShipping.redbox_point_id ??
-      rawShipping.redboxPointId ??
-      rawShipping.point_id ??
-      rawShipping.pointId
-  );
-  console.log(
-    "COD:",
-    rawShipping.cod_amount ?? rawShipping.codAmount,
-    rawShipping.cod_currency ?? rawShipping.codCurrency
-  );
-
   const data = createOrderSchema.parse(input);
   if (!data.shipping) {
     throw AppError.badRequest("Shipping details are required");
@@ -701,8 +672,8 @@ export const getOrderLabel = async (
 
   assertOrderAccess(order, actorId, actorRoles);
 
-  if (!order.redboxShipmentId) {
-    throw AppError.badRequest("No RedBox shipment for this order");
+  if (!order.redboxShipmentId || order.shippingMethod?.toLowerCase() !== "redbox") {
+    throw AppError.badRequest("لا توجد شحنة RedBox مرتبطة بهذا الطلب");
   }
 
   const label = await getRedboxLabel(order.redboxShipmentId);

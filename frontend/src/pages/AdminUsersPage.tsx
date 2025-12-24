@@ -210,9 +210,9 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {sellerRequests.map((req) => (
+                {sellerRequests.map((req, index) => (
                   <tr key={req.id} className="border-b border-gray-100 hover:bg-sand">
-                    <td className="px-4 py-3 text-charcoal-light">#{req.id}</td>
+                    <td className="px-4 py-3 text-charcoal-light">#{index + 1}</td>
                     <td className="px-4 py-3 text-charcoal font-semibold">
                       {req.full_name || req.user?.full_name || t("common.unknown")}
                     </td>
@@ -269,9 +269,9 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {usersWithProtection.map((user) => (
+              {usersWithProtection.map((user, index) => (
                 <tr key={user.id} className="border-b border-gray-100 hover:bg-sand">
-                  <td className="px-4 py-4 text-charcoal-light">#{user.id}</td>
+                  <td className="px-4 py-4 text-charcoal-light">#{index + 1}</td>
                   <td className="px-4 py-4 text-charcoal font-medium">{user.full_name}</td>
                   <td className="px-4 py-4 text-charcoal-light">{user.email}</td>
                   <td className="px-4 py-4">

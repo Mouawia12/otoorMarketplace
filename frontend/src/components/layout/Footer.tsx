@@ -89,7 +89,6 @@ export default function Footer() {
       disabled: !href,
     };
   });
-  const hasSocialLinks = resolvedSocialLinks.some((link) => !link.disabled);
 
   const groups: Array<{ title: string; description: string; pages: FooterPageKey[] }> = [
     {
@@ -126,30 +125,38 @@ export default function Footer() {
             </p>
             <h2 className="text-2xl sm:text-3xl font-bold">{t('footer.taglineTitle')}</h2>
             <p className="text-sm text-ivory/80">{t('footer.tagline')}</p>
-            {hasSocialLinks && (
-              <div className="w-full flex flex-col gap-3">
-                <p
-                  className={`text-xs text-gold/80 ${isArabic ? '' : 'uppercase tracking-[0.3em]'}`}
-                  style={isArabic ? { letterSpacing: 'normal' } : undefined}
-                >
-                  {t('footer.followUs')}
-                </p>
-                <div className="flex gap-2 sm:gap-3 flex-nowrap justify-center flex-wrap">
-                  {resolvedSocialLinks.map(({ label, href, icon: Icon }) => (
-                    <a
-                      key={label}
-                      href={href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 transition text-xs sm:text-sm whitespace-nowrap"
-                    >
-                      <Icon className="w-4 h-4 text-gold" />
-                      <span className="font-semibold">{label}</span>
-                    </a>
-                  ))}
-                </div>
+            <div className="w-full flex flex-col gap-3">
+              <p
+                className={`text-xs text-gold/80 ${isArabic ? '' : 'uppercase tracking-[0.3em]'}`}
+                style={isArabic ? { letterSpacing: 'normal' } : undefined}
+              >
+                {t('footer.followUs')}
+              </p>
+              <div className="flex gap-2 sm:gap-3 flex-nowrap justify-center flex-wrap">
+                {resolvedSocialLinks.map(({ label, href, icon: Icon, disabled }) => (
+                  <a
+                    key={label}
+                    href={disabled ? '#' : href}
+                    target={disabled ? undefined : '_blank'}
+                    rel={disabled ? undefined : 'noreferrer'}
+                    aria-disabled={disabled}
+                    onClick={(event) => {
+                      if (disabled) {
+                        event.preventDefault();
+                      }
+                    }}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full border transition text-xs sm:text-sm whitespace-nowrap ${
+                      disabled
+                        ? 'bg-white/5 border-white/10 text-ivory/60 cursor-default'
+                        : 'bg-white/10 border-white/20 hover:bg-white/20'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 text-gold" />
+                    <span className="font-semibold">{label}</span>
+                  </a>
+                ))}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
