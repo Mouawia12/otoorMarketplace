@@ -73,7 +73,14 @@ const parseFile = async (filePath: string) => {
   const ext = getFileExtension(filePath);
   if (ext === ".xlsx") {
     const workbook = xlsx.readFile(filePath, { cellDates: false });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) {
+      return [];
+    }
+    const sheet = workbook.Sheets[firstSheetName];
+    if (!sheet) {
+      return [];
+    }
     return xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet, {
       defval: "",
       raw: false,
@@ -144,7 +151,8 @@ const downloadImage = async (url: string, filename: string | null) => {
   const safeName = filename
     ? filename.replace(/[^a-z0-9\-.]+/gi, "-").toLowerCase()
     : `perfume-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-  const ext = path.extname(url.split("?")[0]) || ".jpg";
+  const baseUrl = url.split("?")[0] ?? url;
+  const ext = path.extname(baseUrl) || ".jpg";
   const storedName = `${safeName}${ext}`;
   const targetPath = path.join(IMAGE_DIR, storedName);
 
@@ -212,22 +220,25 @@ const updateJob = async (
     finishedAt: Date | null;
   }>
 ) => {
+  const updateData: Prisma.PerfumeImportJobUpdateInput = {};
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.totalRows !== undefined) updateData.totalRows = data.totalRows;
+  if (data.processedRows !== undefined) updateData.processedRows = data.processedRows;
+  if (data.insertedRows !== undefined) updateData.insertedRows = data.insertedRows;
+  if (data.updatedRows !== undefined) updateData.updatedRows = data.updatedRows;
+  if (data.skippedRows !== undefined) updateData.skippedRows = data.skippedRows;
+  if (data.failedRows !== undefined) updateData.failedRows = data.failedRows;
+  if (data.errorCount !== undefined) updateData.errorCount = data.errorCount;
+  if (data.errorSamples !== undefined) {
+    updateData.errorSamples = data.errorSamples as Prisma.JsonArray;
+  }
+  if (data.errorFilePath !== undefined) updateData.errorFilePath = data.errorFilePath;
+  if (data.startedAt !== undefined) updateData.startedAt = data.startedAt;
+  if (data.finishedAt !== undefined) updateData.finishedAt = data.finishedAt;
+
   await prisma.perfumeImportJob.update({
     where: { id: jobId },
-    data: {
-      status: data.status,
-      totalRows: data.totalRows,
-      processedRows: data.processedRows,
-      insertedRows: data.insertedRows,
-      updatedRows: data.updatedRows,
-      skippedRows: data.skippedRows,
-      failedRows: data.failedRows,
-      errorCount: data.errorCount,
-      errorSamples: data.errorSamples as Prisma.JsonArray | undefined,
-      errorFilePath: data.errorFilePath ?? undefined,
-      startedAt: data.startedAt ?? undefined,
-      finishedAt: data.finishedAt ?? undefined,
-    },
+    data: updateData,
   });
 };
 
@@ -352,7 +363,7 @@ const processPerfumeImport = async (jobId: number) => {
   const errorSamples: Array<{ row: number; reason: string }> = [];
 
   try {
-    const rows = await parseFile(job.filePath);
+      const rows = await parseFile(job.filePath);
     totalRows = rows.length;
     await updateJob(jobId, { totalRows, errorFilePath });
 
@@ -369,6 +380,9 @@ const processPerfumeImport = async (jobId: number) => {
 
         for (let index = 0; index < batch.length; index += 1) {
           const raw = batch[index];
+          if (!raw) {
+            continue;
+          }
           const rowNumber = start + index + 2;
           try {
             const mapped = mapRowToTemplate(raw);
@@ -395,33 +409,32 @@ const processPerfumeImport = async (jobId: number) => {
               continue;
             }
 
-            await withRetry(() =>
-              prisma.productTemplate.create({
-                data: {
-                  nameEn: mapped.nameEn,
-                  nameAr: mapped.nameAr ?? mapped.nameEn,
-                  brand: mapped.brand,
-                  productType: mapped.productType,
-                  category: mapped.category,
-                  basePrice: new Prisma.Decimal(mapped.basePrice),
-                  sizeMl: mapped.sizeMl,
-                  concentration: mapped.concentration,
-                  descriptionEn: mapped.descriptionEn,
-                  descriptionAr: mapped.descriptionAr,
-                  createdById,
-                  images: imageLink
-                    ? {
-                        create: [
-                          {
-                            url: imageLink,
-                            sortOrder: 0,
-                          },
-                        ],
-                      }
-                    : undefined,
-                },
-              })
-            );
+            await withRetry(() => {
+              const data: Prisma.ProductTemplateCreateInput = {
+                nameEn: mapped.nameEn,
+                nameAr: mapped.nameAr ?? mapped.nameEn,
+                brand: mapped.brand,
+                productType: mapped.productType,
+                category: mapped.category,
+                basePrice: new Prisma.Decimal(mapped.basePrice),
+                sizeMl: mapped.sizeMl,
+                concentration: mapped.concentration,
+                descriptionEn: mapped.descriptionEn,
+                descriptionAr: mapped.descriptionAr,
+                createdBy: { connect: { id: createdById } },
+              };
+              if (imageLink) {
+                data.images = {
+                  create: [
+                    {
+                      url: imageLink,
+                      sortOrder: 0,
+                    },
+                  ],
+                };
+              }
+              return prisma.productTemplate.create({ data });
+            });
             insertedRows += 1;
           } catch (error: any) {
             failedRows += 1;
@@ -438,6 +451,9 @@ const processPerfumeImport = async (jobId: number) => {
       } else {
         for (let index = 0; index < batch.length; index += 1) {
           const raw = batch[index];
+          if (!raw) {
+            continue;
+          }
           const rowNumber = start + index + 2;
           try {
             const mapped = mapRowToTemplate(raw);
@@ -460,63 +476,63 @@ const processPerfumeImport = async (jobId: number) => {
             });
 
             if (existing) {
-              await withRetry(() =>
-                prisma.productTemplate.update({
+              await withRetry(() => {
+                const data: Prisma.ProductTemplateUpdateInput = {
+                  nameEn: mapped.nameEn,
+                  nameAr: mapped.nameAr ?? mapped.nameEn,
+                  brand: mapped.brand,
+                  productType: mapped.productType,
+                  category: mapped.category,
+                  basePrice: new Prisma.Decimal(mapped.basePrice),
+                  sizeMl: mapped.sizeMl,
+                  concentration: mapped.concentration,
+                  descriptionEn: mapped.descriptionEn,
+                  descriptionAr: mapped.descriptionAr,
+                };
+                if (imageLink) {
+                  data.images = {
+                    deleteMany: {},
+                    create: [
+                      {
+                        url: imageLink,
+                        sortOrder: 0,
+                      },
+                    ],
+                  };
+                }
+                return prisma.productTemplate.update({
                   where: { id: existing.id },
-                  data: {
-                    nameEn: mapped.nameEn,
-                    nameAr: mapped.nameAr ?? mapped.nameEn,
-                    brand: mapped.brand,
-                    productType: mapped.productType,
-                    category: mapped.category,
-                    basePrice: new Prisma.Decimal(mapped.basePrice),
-                    sizeMl: mapped.sizeMl,
-                    concentration: mapped.concentration,
-                    descriptionEn: mapped.descriptionEn,
-                    descriptionAr: mapped.descriptionAr,
-                    images: imageLink
-                      ? {
-                          deleteMany: {},
-                          create: [
-                            {
-                              url: imageLink,
-                              sortOrder: 0,
-                            },
-                          ],
-                        }
-                      : undefined,
-                  },
-                })
-              );
+                  data,
+                });
+              });
               updatedRows += 1;
             } else {
-              await withRetry(() =>
-                prisma.productTemplate.create({
-                  data: {
-                    nameEn: mapped.nameEn,
-                    nameAr: mapped.nameAr ?? mapped.nameEn,
-                    brand: mapped.brand,
-                    productType: mapped.productType,
-                    category: mapped.category,
-                    basePrice: new Prisma.Decimal(mapped.basePrice),
-                    sizeMl: mapped.sizeMl,
-                    concentration: mapped.concentration,
-                    descriptionEn: mapped.descriptionEn,
-                    descriptionAr: mapped.descriptionAr,
-                    createdById,
-                    images: imageLink
-                      ? {
-                          create: [
-                            {
-                              url: imageLink,
-                              sortOrder: 0,
-                            },
-                          ],
-                        }
-                      : undefined,
-                  },
-                })
-              );
+              await withRetry(() => {
+                const data: Prisma.ProductTemplateCreateInput = {
+                  nameEn: mapped.nameEn,
+                  nameAr: mapped.nameAr ?? mapped.nameEn,
+                  brand: mapped.brand,
+                  productType: mapped.productType,
+                  category: mapped.category,
+                  basePrice: new Prisma.Decimal(mapped.basePrice),
+                  sizeMl: mapped.sizeMl,
+                  concentration: mapped.concentration,
+                  descriptionEn: mapped.descriptionEn,
+                  descriptionAr: mapped.descriptionAr,
+                  createdBy: { connect: { id: createdById } },
+                };
+                if (imageLink) {
+                  data.images = {
+                    create: [
+                      {
+                        url: imageLink,
+                        sortOrder: 0,
+                      },
+                    ],
+                  };
+                }
+                return prisma.productTemplate.create({ data });
+              });
               insertedRows += 1;
             }
           } catch (error: any) {

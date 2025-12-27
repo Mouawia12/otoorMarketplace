@@ -670,7 +670,7 @@ router.post(
         originalFilename: req.file.originalname,
         mode,
         downloadImages,
-        createdById: req.user?.id,
+        createdById: req.user?.id ?? null,
       });
 
       await logAdminAction(req, {
