@@ -11,6 +11,7 @@ import apiRouter from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { getUploadRoot } from "./utils/uploads";
 import { initAuctionRealtime, shutdownAuctionRealtime } from "./realtime/auctionRealtime";
+import { resumePendingPerfumeImports } from "./services/perfumeImportService";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -59,6 +60,9 @@ initAuctionRealtime(httpServer, corsOptions);
 
 const server = httpServer.listen(config.port, () => {
   console.log(`🚀 API server running on http://localhost:${config.port}`);
+  resumePendingPerfumeImports().catch((error) => {
+    console.error("Failed to resume perfume imports", error);
+  });
 });
 
 const gracefulShutdown = async (signal: string) => {

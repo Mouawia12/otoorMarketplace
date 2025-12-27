@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { FooterPageKey, LocaleCode } from '../../types/staticPages';
 import { getDefaultFooterPage } from '../../content/footerPages';
 import { fetchPublishedFooterPage } from '../../services/footerPages';
@@ -76,7 +77,10 @@ export default function InfoPage() {
                 {page?.label?.[lang] || heroTitle}
               </span>
               <h1 className="text-3xl sm:text-4xl font-extrabold mb-4 leading-tight">{heroTitle}</h1>
-              <p className="text-sm sm:text-base text-ivory/80 leading-relaxed">{heroSubtitle}</p>
+              <div
+                className="text-sm sm:text-base text-ivory/80 leading-relaxed prose prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(heroSubtitle) }}
+              />
 
               {highlights.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-6">
@@ -132,14 +136,10 @@ export default function InfoPage() {
                     {page?.label?.[lang]}
                   </div>
                   <h2 className="text-2xl font-bold text-charcoal mb-3">{section.title[lang]}</h2>
-                  <div className="text-charcoal/80 leading-relaxed space-y-4">
-                    {section.body[lang]
-                      ?.split('\n')
-                      .filter(Boolean)
-                      .map((paragraph, idx) => (
-                        <p key={`${section.id}-p-${idx}`}>{paragraph}</p>
-                      ))}
-                  </div>
+                  <div
+                    className="text-charcoal/80 leading-relaxed space-y-4 prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(section.body[lang] ?? '') }}
+                  />
 
                   {(section.highlights ?? []).length > 0 && (
                     <div className="mt-6 grid sm:grid-cols-2 gap-3">

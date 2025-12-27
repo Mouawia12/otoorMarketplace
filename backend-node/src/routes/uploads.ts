@@ -54,21 +54,26 @@ const sellerOnly = authenticate({ roles: sellerRoles });
 router.post(
   "/image",
   sellerOnly,
-  upload.single("image"),
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "upload", maxCount: 1 },
+  ]),
   (req, res, next) => {
-    if (!req.file) {
+    const files = (req.files ?? {}) as Record<string, Express.Multer.File[]>;
+    const file = files.image?.[0] ?? files.upload?.[0];
+    if (!file) {
       return next(AppError.badRequest("No image file received"));
     }
 
-    const publicPath = buildPublicUploadPath(req.file.filename);
+    const publicPath = buildPublicUploadPath(file.filename);
     const absoluteUrl = `${req.protocol}://${req.get("host")}${publicPath}`;
 
     res.json({
       url: absoluteUrl,
       path: publicPath,
-      filename: req.file.filename,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
+      filename: file.filename,
+      size: file.size,
+      mimetype: file.mimetype,
     });
   }
 );

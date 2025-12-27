@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { FooterPageContent, FooterPageKey, LocaleCode } from '../types/staticPages';
 import { defaultFooterPages, footerPageKeys, footerPageList, getDefaultFooterPage } from '../content/footerPages';
 import {
@@ -8,6 +9,7 @@ import {
   saveFooterPageDraft,
   type FooterPageRecord,
 } from '../services/footerPages';
+import RichTextEditorModal from '../components/common/RichTextEditorModal';
 
 type EditableField = 'heroTitle' | 'heroSubtitle' | 'seoDescription';
 
@@ -43,6 +45,10 @@ export default function AdminSitePagesPage() {
   const [savingSlug, setSavingSlug] = useState<FooterPageKey | null>(null);
   const [publishingSlug, setPublishingSlug] = useState<FooterPageKey | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorTitle, setEditorTitle] = useState('');
+  const [editorValue, setEditorValue] = useState('');
+  const editorSaveRef = useRef<(value: string) => void>(() => undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -100,6 +106,13 @@ export default function AdminSitePagesPage() {
       ...prev,
       [slug]: true,
     }));
+
+  const openEditor = (title: string, value: string, onSave: (value: string) => void) => {
+    setEditorTitle(title);
+    setEditorValue(value);
+    editorSaveRef.current = onSave;
+    setEditorOpen(true);
+  };
 
   const handleHeroFieldChange = (field: EditableField, value: string) => {
     setPages((prev) => {
@@ -288,6 +301,9 @@ export default function AdminSitePagesPage() {
     );
   }
 
+  const renderPreview = (value: string) =>
+    value ? DOMPurify.sanitize(value) : `<p>${t('admin.noContent', 'لا يوجد محتوى بعد.')}</p>`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -400,29 +416,75 @@ export default function AdminSitePagesPage() {
             <div className="grid gap-4">
               <label className="text-sm font-semibold text-charcoal">
                 {t('admin.pagesManager.heroTitle')}
-                <textarea
-                  value={page.heroTitle[editingLocale] ?? ''}
-                  onChange={(e) => handleHeroFieldChange('heroTitle', e.target.value)}
-                  className="mt-2 w-full border border-sand rounded-2xl px-4 py-3 focus:outline-none focus:border-gold"
-                />
+                <div className="mt-2 border border-sand rounded-2xl px-4 py-3 bg-white">
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: renderPreview(page.heroTitle[editingLocale] ?? '') }}
+                  />
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEditor(
+                        t('admin.pagesManager.heroTitle'),
+                        page.heroTitle[editingLocale] ?? '',
+                        (value) => handleHeroFieldChange('heroTitle', value)
+                      )
+                    }
+                    className="px-3 py-1.5 rounded-luxury border border-sand text-charcoal text-xs font-semibold hover:bg-sand/60"
+                  >
+                    {t('admin.editContent', 'تحرير المحتوى')}
+                  </button>
+                </div>
               </label>
               <label className="text-sm font-semibold text-charcoal">
                 {t('admin.pagesManager.heroSubtitle')}
-                <textarea
-                  value={page.heroSubtitle[editingLocale] ?? ''}
-                  onChange={(e) => handleHeroFieldChange('heroSubtitle', e.target.value)}
-                  className="mt-2 w-full border border-sand rounded-2xl px-4 py-3 focus:outline-none focus:border-gold"
-                  rows={3}
-                />
+                <div className="mt-2 border border-sand rounded-2xl px-4 py-3 bg-white">
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: renderPreview(page.heroSubtitle[editingLocale] ?? '') }}
+                  />
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEditor(
+                        t('admin.pagesManager.heroSubtitle'),
+                        page.heroSubtitle[editingLocale] ?? '',
+                        (value) => handleHeroFieldChange('heroSubtitle', value)
+                      )
+                    }
+                    className="px-3 py-1.5 rounded-luxury border border-sand text-charcoal text-xs font-semibold hover:bg-sand/60"
+                  >
+                    {t('admin.editContent', 'تحرير المحتوى')}
+                  </button>
+                </div>
               </label>
               <label className="text-sm font-semibold text-charcoal">
                 {t('admin.pagesManager.seoDescription')}
-                <textarea
-                  value={page.seoDescription[editingLocale] ?? ''}
-                  onChange={(e) => handleHeroFieldChange('seoDescription', e.target.value)}
-                  className="mt-2 w-full border border-sand rounded-2xl px-4 py-3 focus:outline-none focus:border-gold"
-                  rows={2}
-                />
+                <div className="mt-2 border border-sand rounded-2xl px-4 py-3 bg-white">
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: renderPreview(page.seoDescription[editingLocale] ?? '') }}
+                  />
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEditor(
+                        t('admin.pagesManager.seoDescription'),
+                        page.seoDescription[editingLocale] ?? '',
+                        (value) => handleHeroFieldChange('seoDescription', value)
+                      )
+                    }
+                    className="px-3 py-1.5 rounded-luxury border border-sand text-charcoal text-xs font-semibold hover:bg-sand/60"
+                  >
+                    {t('admin.editContent', 'تحرير المحتوى')}
+                  </button>
+                </div>
               </label>
               <label className="text-sm font-semibold text-charcoal">
                 {t('admin.pagesManager.heroImage')}
@@ -460,21 +522,52 @@ export default function AdminSitePagesPage() {
 
               <label className="text-sm font-semibold text-charcoal">
                 {t('admin.pagesManager.sectionTitle')}
-                <input
-                  value={section.title[editingLocale] ?? ''}
-                  onChange={(e) => handleSectionFieldChange(section.id, 'title', e.target.value)}
-                  className="mt-2 w-full border border-sand rounded-2xl px-4 py-3 focus:outline-none focus:border-gold"
-                />
+                <div className="mt-2 border border-sand rounded-2xl px-4 py-3 bg-white">
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: renderPreview(section.title[editingLocale] ?? '') }}
+                  />
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEditor(
+                        t('admin.pagesManager.sectionTitle'),
+                        section.title[editingLocale] ?? '',
+                        (value) => handleSectionFieldChange(section.id, 'title', value)
+                      )
+                    }
+                    className="px-3 py-1.5 rounded-luxury border border-sand text-charcoal text-xs font-semibold hover:bg-sand/60"
+                  >
+                    {t('admin.editContent', 'تحرير المحتوى')}
+                  </button>
+                </div>
               </label>
 
               <label className="text-sm font-semibold text-charcoal">
                 {t('admin.pagesManager.sectionBody')}
-                <textarea
-                  value={section.body[editingLocale] ?? ''}
-                  onChange={(e) => handleSectionFieldChange(section.id, 'body', e.target.value)}
-                  className="mt-2 w-full border border-sand rounded-2xl px-4 py-3 focus:outline-none focus:border-gold"
-                  rows={4}
-                />
+                <div className="mt-2 border border-sand rounded-2xl px-4 py-3 bg-white">
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: renderPreview(section.body[editingLocale] ?? '') }}
+                  />
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEditor(
+                        t('admin.pagesManager.sectionBody'),
+                        section.body[editingLocale] ?? '',
+                        (value) => handleSectionFieldChange(section.id, 'body', value)
+                      )
+                    }
+                    className="px-3 py-1.5 rounded-luxury border border-sand text-charcoal text-xs font-semibold hover:bg-sand/60"
+                  >
+                    {t('admin.editContent', 'تحرير المحتوى')}
+                  </button>
+                </div>
               </label>
 
               <label className="text-sm font-semibold text-charcoal">
@@ -529,6 +622,14 @@ export default function AdminSitePagesPage() {
           </button>
         </section>
       </div>
+
+      <RichTextEditorModal
+        isOpen={editorOpen}
+        title={editorTitle}
+        value={editorValue}
+        onSave={(value) => editorSaveRef.current(value)}
+        onClose={() => setEditorOpen(false)}
+      />
     </div>
   );
 }

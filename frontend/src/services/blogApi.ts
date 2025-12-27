@@ -1,5 +1,5 @@
-import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 import api from '../lib/api';
 
 export type BlogPost = {
@@ -21,12 +21,27 @@ export type BlogPost = {
 
 const cache: Record<string, BlogPost[]> = {};
 
-const sanitizeHtml = (markdown: string) =>
-  DOMPurify.sanitize(marked(markdown || '') as string);
+const looksLikeHtml = (value: string) => /<\/?[a-z][\s\S]*>/i.test(value);
+
+const sanitizeHtml = (content: string) => {
+  const raw = content || '';
+  if (looksLikeHtml(raw)) {
+    return DOMPurify.sanitize(raw);
+  }
+  return DOMPurify.sanitize(marked(raw) as string);
+};
+
+const extractText = (html: string) => {
+  if (typeof window !== 'undefined' && 'DOMParser' in window) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  }
+  return html.replace(/<[^>]*>/g, ' ');
+};
 
 const estimateReadingTime = (text: string): number => {
   const wordsPerMinute = 200;
-  const words = text.trim().split(/\s+/).length;
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
   return Math.ceil(words / wordsPerMinute);
 };
 
@@ -44,7 +59,7 @@ export async function fetchPosts(lang: 'ar' | 'en', status: 'published' | 'draft
       lang: normalizedLang,
       status: normalizedStatus,
       html: sanitizeHtml(p.content),
-      readingTime: estimateReadingTime(p.content),
+      readingTime: estimateReadingTime(extractText(p.content)),
     };
   });
   cache[key] = posts;
@@ -64,7 +79,7 @@ export async function fetchPost(slug: string, lang: 'ar' | 'en'): Promise<BlogPo
       lang: normalizedLang,
       status: normalizedStatus,
       html: sanitizeHtml(p.content),
-      readingTime: estimateReadingTime(p.content),
+      readingTime: estimateReadingTime(extractText(p.content)),
     };
   } catch (_err) {
     return null;

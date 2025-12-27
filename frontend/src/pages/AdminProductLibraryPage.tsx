@@ -8,6 +8,13 @@ import {
   adminListTemplates,
   adminUpdateTemplate,
 } from '../services/productTemplateService';
+import {
+  buildPerfumeImportErrorsUrl,
+  fetchPerfumeImportStatus,
+  startPerfumeImport,
+  type ImportMode,
+  type ImportStatusResponse,
+} from '../services/perfumeImportService';
 import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
 import { compressImageFile } from '../utils/imageCompression';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
@@ -77,6 +84,8 @@ export default function AdminProductLibraryPage() {
   const [modalMode, setModalMode] = useState<ModalMode>('create');
   const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -98,7 +107,7 @@ export default function AdminProductLibraryPage() {
       }
     };
     fetchData();
-  }, [debouncedSearch]);
+  }, [debouncedSearch, refreshKey]);
 
   const openCreateModal = () => {
     setModalMode('create');
@@ -143,12 +152,20 @@ export default function AdminProductLibraryPage() {
           <h1 className="text-h2 text-charcoal">{t('admin.productLibrary', 'مكتبة المنتجات')}</h1>
           <p className="text-taupe">{t('admin.productLibrarySubtitle', 'أضف قوالب احترافية ليستخدمها التجار عند إدراج منتجاتهم.')}</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="bg-gold text-charcoal px-4 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
-        >
-          + {t('admin.addTemplate', 'إضافة قالب')}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setImportOpen(true)}
+            className="bg-charcoal text-ivory px-4 py-2 rounded-luxury font-semibold hover:bg-charcoal-light transition"
+          >
+            {t('admin.importPerfumes', 'استيراد عطور')}
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="bg-gold text-charcoal px-4 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
+          >
+            + {t('admin.addTemplate', 'إضافة قالب')}
+          </button>
+        </div>
       </header>
 
       <div className="bg-white rounded-luxury shadow-luxury p-4 md:p-6">
@@ -221,6 +238,12 @@ export default function AdminProductLibraryPage() {
             setTemplates((prev) => [template, ...prev]);
           }
         }}
+      />
+
+      <PerfumeImportModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImportComplete={() => setRefreshKey((prev) => prev + 1)}
       />
     </div>
   );
@@ -600,6 +623,203 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+type PerfumeImportModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onImportComplete: () => void;
+};
+
+function PerfumeImportModal({ isOpen, onClose, onImportComplete }: PerfumeImportModalProps) {
+  const { t } = useTranslation();
+  const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<ImportMode>('insert_only');
+  const [downloadImages, setDownloadImages] = useState(false);
+  const [jobId, setJobId] = useState<number | null>(null);
+  const [status, setStatus] = useState<ImportStatusResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setError(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!jobId) return;
+    let isActive = true;
+    let interval: number | undefined;
+    const fetchStatus = async () => {
+      try {
+        const data = await fetchPerfumeImportStatus(jobId);
+        if (!isActive) return;
+        setStatus(data);
+        if (data.status === 'completed' || data.status === 'failed') {
+          if (interval) clearInterval(interval);
+          if (data.status === 'completed') {
+            onImportComplete();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load import status', err);
+      }
+    };
+
+    fetchStatus();
+    interval = window.setInterval(fetchStatus, 3000);
+    return () => {
+      isActive = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [jobId]);
+
+  const handleStartImport = async () => {
+    if (!file) {
+      setError(t('admin.importFileRequired', 'يرجى اختيار ملف أولاً.'));
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await startPerfumeImport(file, mode, downloadImages);
+      setJobId(response.jobId);
+    } catch (err: any) {
+      console.error('Failed to start import', err);
+      setError(err?.response?.data?.detail ?? t('common.error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const progress =
+    status && status.total_rows > 0 ? Math.min(100, Math.round((status.processed_rows / status.total_rows) * 100)) : 0;
+  const errorsUrl = jobId ? buildPerfumeImportErrorsUrl(jobId) : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-h3 text-charcoal">{t('admin.importPerfumes', 'استيراد عطور')}</h3>
+          <button onClick={onClose} className="text-charcoal-light hover:text-charcoal">
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold mb-2">{t('admin.importFile', 'ملف Excel/CSV')}</label>
+            <input
+              type="file"
+              accept=".csv,.xlsx"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              className="w-full border border-sand rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold mb-2">{t('admin.importMode', 'وضع الاستيراد')}</label>
+              <select
+                value={mode}
+                onChange={(event) => setMode(event.target.value as ImportMode)}
+                className="w-full border border-sand rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="insert_only">{t('admin.importInsertOnly', 'Insert only')}</option>
+                <option value="upsert">{t('admin.importUpsert', 'Upsert by unique key')}</option>
+                <option value="replace">{t('admin.importReplace', 'Replace')}</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm font-medium text-charcoal">
+              <input
+                type="checkbox"
+                checked={downloadImages}
+                onChange={(event) => setDownloadImages(event.target.checked)}
+                className="h-4 w-4 rounded border-sand text-gold focus:ring-gold"
+              />
+              {t('admin.importDownloadImages', 'تحميل الصور أثناء الاستيراد')}
+            </label>
+          </div>
+
+          {error && <p className="text-sm text-alert">{error}</p>}
+        </div>
+
+        <div className="flex items-center justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-luxury border border-sand text-charcoal"
+          >
+            {t('common.close', 'إغلاق')}
+          </button>
+          <button
+            onClick={handleStartImport}
+            disabled={loading}
+            className="px-5 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover disabled:opacity-60"
+          >
+            {loading ? t('common.loading') : t('admin.startImport', 'بدء الاستيراد')}
+          </button>
+        </div>
+
+        {status && (
+          <div className="rounded-luxury border border-sand p-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-charcoal">
+                {t('admin.importStatus', 'الحالة')}: {status.status}
+              </span>
+              <span className="text-taupe">{progress}%</span>
+            </div>
+            <div className="h-2 w-full bg-sand rounded-full overflow-hidden">
+              <div className="h-full bg-gold transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-charcoal-light">
+              <span>{t('admin.importRead', 'المقروء')}: {status.processed_rows}</span>
+              <span>{t('admin.importInserted', 'المضاف')}: {status.inserted_rows}</span>
+              <span>{t('admin.importUpdated', 'المحدث')}: {status.updated_rows}</span>
+              <span>{t('admin.importSkipped', 'المتجاهل')}: {status.skipped_rows}</span>
+              <span>{t('admin.importFailed', 'المرفوض')}: {status.failed_rows}</span>
+              <span>{t('admin.importTotal', 'الإجمالي')}: {status.total_rows}</span>
+            </div>
+
+            {status.error_samples?.length > 0 && (
+              <div className="text-xs text-alert space-y-1">
+                {status.error_samples.map((sample) => (
+                  <p key={`${sample.row}-${sample.reason}`}>
+                    {t('admin.importRow', 'صف')} #{sample.row}: {sample.reason}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {status.error_count > 0 && errorsUrl && (
+              <a
+                href={errorsUrl}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700"
+              >
+                {t('admin.importDownloadErrors', 'تنزيل ملف الأخطاء')}
+              </a>
+            )}
+
+            {(status.status === 'completed' || status.status === 'failed') && (
+              <button
+                onClick={() => {
+                  setJobId(null);
+                  setStatus(null);
+                  setFile(null);
+                }}
+                className="w-full mt-2 px-4 py-2 rounded-luxury border border-sand text-charcoal text-sm font-semibold hover:bg-sand/60 transition"
+              >
+                {t('admin.startNewImport', 'بدء استيراد جديد')}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -45,6 +45,7 @@ model User {
   publishedFooterPages FooterPage[] @relation("FooterPagePublishedBy")
   notifications   Notification[]
   adminAuditLogs  AdminAuditLog[] @relation("AdminAuditLogAdmin")
+  perfumeImportJobs PerfumeImportJob[]
 }
 
 model Role {
@@ -287,6 +288,74 @@ model ProductTemplateImage {
   @@map("product_template_images")
 }
 
+model Perfume {
+  id             Int      @id @default(autoincrement())
+  sourceUrl      String?  @unique @map("source_url")
+  nameEn         String   @map("name_en")
+  nameAr         String?  @map("name_ar")
+  brand          String
+  brandAr        String?  @map("brand_ar")
+  ingredients    Json?
+  ingredientsAr  Json?    @map("ingredients_ar")
+  family         String?
+  familyAr       String?  @map("family_ar")
+  subFamily      String?  @map("sub_family")
+  subFamilyAr    String?  @map("sub_family_ar")
+  descriptionEn  String?  @map("description_en") @db.Text
+  descriptionAr  String?  @map("description_ar") @db.Text
+  perfumeClass   String?  @map("class")
+  perfumer       String?
+  price          Decimal? @db.Decimal(10, 2)
+  origin         String?
+  originAr       String?  @map("origin_ar")
+  gender         String?
+  genderAr       String?  @map("gender_ar")
+  year           Int?
+  concepts       Json?
+  conceptsAr     Json?    @map("concepts_ar")
+  imageLink      String?  @map("image_link")
+  imageName      String?  @map("image_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([nameEn, brand, year])
+  @@index([nameEn])
+  @@index([brand])
+  @@index([gender])
+  @@index([family])
+  @@index([year])
+  @@map("perfumes")
+}
+
+model PerfumeImportJob {
+  id              Int                 @id @default(autoincrement())
+  status          PerfumeImportStatus @default(QUEUED)
+  mode            PerfumeImportMode
+  originalFilename String            @map("original_filename")
+  storedFilename  String             @map("stored_filename")
+  filePath        String             @map("file_path")
+  totalRows       Int                @default(0) @map("total_rows")
+  processedRows   Int                @default(0) @map("processed_rows")
+  insertedRows    Int                @default(0) @map("inserted_rows")
+  updatedRows     Int                @default(0) @map("updated_rows")
+  skippedRows     Int                @default(0) @map("skipped_rows")
+  failedRows      Int                @default(0) @map("failed_rows")
+  errorCount      Int                @default(0) @map("error_count")
+  errorFilePath   String?            @map("error_file_path")
+  errorSamples    Json?              @map("error_samples")
+  downloadImages  Boolean            @default(false) @map("download_images")
+  createdById     Int?               @map("created_by_id")
+  startedAt       DateTime?          @map("started_at")
+  finishedAt      DateTime?          @map("finished_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("perfume_import_jobs")
+}
+
 model Setting {
   key       String   @id
   value     Json?
@@ -369,6 +438,19 @@ enum PostStatus {
 enum PostLang {
   AR
   EN
+}
+
+enum PerfumeImportStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum PerfumeImportMode {
+  INSERT_ONLY
+  UPSERT
+  REPLACE
 }
 
 model Post {

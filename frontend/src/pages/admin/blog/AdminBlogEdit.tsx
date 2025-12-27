@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import slugify from "slugify";
-import { marked } from "marked";
+import DOMPurify from "dompurify";
 import api from "../../../lib/api";
 import { normalizeImagePathForStorage, resolveImageUrl } from "../../../utils/image";
 import { compressImageFile } from "../../../utils/imageCompression";
+import RichTextEditorModal from "../../../components/common/RichTextEditorModal";
 
 const MAX_COVER_BYTES = 3 * 1024 * 1024; // 3MB
 
@@ -33,6 +34,7 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
     status:"draft", content:""
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   useEffect(() => {
     if (mode === "edit" && id) {
@@ -81,10 +83,7 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
       return next;
     });
   };
-  const html = useMemo(
-    () => marked.parse(form.content || "") as string,
-    [form.content]
-  );
+  const html = useMemo(() => DOMPurify.sanitize(form.content || ""), [form.content]);
   const autoSlug = ()=> form.title && on("slug", slugify(form.title,{lower:true,strict:true}));
 
   const readFileAsDataUrl = (file: File) =>
@@ -325,10 +324,23 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
           </div>
 
           <div>
-            <label className="block mb-1">{t("common.content","المحتوى (Markdown)")}</label>
-            <textarea value={form.content} onChange={e=>on("content",e.target.value)}
-                      className={`${fieldBorder("content")} min-h-[260px] font-mono`}
-                      placeholder={`## عنوان فرعي\n\nنص…`} />
+            <label className="block mb-1">{t("common.content","المحتوى")}</label>
+            <div className={`${fieldBorder("content")} min-h-[160px] bg-white rounded-lg p-3`}>
+              {form.content ? (
+                <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
+              ) : (
+                <p className="text-sm text-charcoal-light">{t("admin.noContent", "لا يوجد محتوى بعد.")}</p>
+              )}
+            </div>
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setEditorOpen(true)}
+                className="px-4 py-2 rounded-luxury border border-sand text-charcoal text-sm font-semibold hover:bg-sand/60"
+              >
+                {t("admin.editContent", "تحرير المحتوى")}
+              </button>
+            </div>
             {errors.content && <p className="text-sm text-red-600 mt-1">{errors.content}</p>}
           </div>
         </div>
@@ -392,10 +404,20 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
             </div>
           </div>
 
-          <article className="prose max-w-none bg-white rounded-xl border border-sand p-4"
-                   dangerouslySetInnerHTML={{ __html: html || "<h2>Heading</h2><p>Content…</p>" }} />
+          <article
+            className="prose max-w-none bg-white rounded-xl border border-sand p-4"
+            dangerouslySetInnerHTML={{ __html: html || "<h2>Heading</h2><p>Content…</p>" }}
+          />
         </div>
       </div>
+
+      <RichTextEditorModal
+        isOpen={editorOpen}
+        title={t("admin.editContent", "تحرير المحتوى")}
+        value={form.content}
+        onSave={(value) => on("content", value)}
+        onClose={() => setEditorOpen(false)}
+      />
     </div>
   );
 }

@@ -1,7 +1,11 @@
 import { Router } from "express";
-import { RoleName, AuctionStatus } from "@prisma/client";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
+import { RoleName, AuctionStatus, PerfumeImportMode } from "@prisma/client";
 
 import { authenticate } from "../middleware/auth";
+import { rateLimit } from "../middleware/rateLimit";
 import {
   getAdminDashboardStats,
   getAdminModerationQueue,
@@ -38,10 +42,56 @@ import {
   updatePlatformSettings,
   updateSocialLinks,
 } from "../services/settingService";
+import {
+  createPerfumeImportJob,
+  getPerfumeImportErrorsPath,
+  getPerfumeImportStatus,
+} from "../services/perfumeImportService";
+import { getUploadRoot } from "../utils/uploads";
 
 const router = Router();
 
 const adminOnly = authenticate({ roles: [RoleName.ADMIN, RoleName.SUPER_ADMIN] });
+
+const perfumeImportDir = path.join(getUploadRoot(), "perfume-imports");
+if (!fs.existsSync(perfumeImportDir)) {
+  fs.mkdirSync(perfumeImportDir, { recursive: true });
+}
+
+const importStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, perfumeImportDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".csv";
+    const baseName = path
+      .basename(file.originalname, ext)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "");
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${baseName || "perfumes"}-${uniqueSuffix}${ext}`);
+  },
+});
+
+const allowedImportTypes = new Set([
+  "text/csv",
+  "text/plain",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
+const importUpload = multer({
+  storage: importStorage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedImportTypes.has(file.mimetype) || ext === ".csv" || ext === ".xlsx") {
+      cb(null, true);
+      return;
+    }
+    cb(AppError.badRequest("Only CSV or XLSX files are allowed"));
+  },
+});
 
 type AuditDetails = {
   action: string;
@@ -586,6 +636,79 @@ router.delete("/blog/:id", adminOnly, async (req, res, next) => {
     });
 
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post(
+  "/perfumes/import",
+  adminOnly,
+  rateLimit({ windowMs: 10 * 60 * 1000, max: 5, keyGenerator: (req) => `${req.ip}-${req.user?.id ?? "admin"}` }),
+  importUpload.single("file"),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        throw AppError.badRequest("No import file received");
+      }
+
+      const modeParam = typeof req.body?.mode === "string" ? req.body.mode.toLowerCase() : "insert_only";
+      const mode =
+        modeParam === "replace"
+          ? PerfumeImportMode.REPLACE
+          : modeParam === "upsert"
+          ? PerfumeImportMode.UPSERT
+          : PerfumeImportMode.INSERT_ONLY;
+      const downloadImages =
+        typeof req.body?.downloadImages === "string"
+          ? req.body.downloadImages.toLowerCase() === "true"
+          : Boolean(req.body?.downloadImages);
+
+      const job = await createPerfumeImportJob({
+        storedFilename: req.file.filename,
+        filePath: req.file.path,
+        originalFilename: req.file.originalname,
+        mode,
+        downloadImages,
+        createdById: req.user?.id,
+      });
+
+      await logAdminAction(req, {
+        action: "perfume.import",
+        targetType: "perfume_import",
+        targetId: job.id,
+        description: `Started perfume import ${job.id}`,
+        metadata: { mode: mode.toLowerCase(), filename: req.file.originalname },
+      });
+
+      res.status(202).json({ jobId: job.id });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get("/perfumes/import/:jobId/status", adminOnly, async (req, res, next) => {
+  try {
+    const jobId = Number(req.params.jobId);
+    if (Number.isNaN(jobId)) {
+      throw AppError.badRequest("Invalid job id");
+    }
+    const status = await getPerfumeImportStatus(jobId);
+    res.json(status);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/perfumes/import/:jobId/errors.csv", adminOnly, async (req, res, next) => {
+  try {
+    const jobId = Number(req.params.jobId);
+    if (Number.isNaN(jobId)) {
+      throw AppError.badRequest("Invalid job id");
+    }
+    const filePath = await getPerfumeImportErrorsPath(jobId);
+    res.download(filePath, `perfume-import-${jobId}-errors.csv`);
   } catch (error) {
     next(error);
   }

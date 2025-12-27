@@ -1,6 +1,5 @@
 -- AlterTable
-ALTER TABLE `Order` ADD COLUMN `platform_fee` DECIMAL(10, 2) NOT NULL DEFAULT 0,
-    ADD COLUMN `shipping_method` VARCHAR(191) NOT NULL DEFAULT 'standard';
+ALTER TABLE `Order` ADD COLUMN `shipping_method` VARCHAR(191) NOT NULL DEFAULT 'standard';
 
 -- CreateTable
 CREATE TABLE `product_templates` (
