@@ -90,7 +90,7 @@ export default function RichTextEditorModal({
 
         <div dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
           <CKEditor
-            editor={ClassicEditor}
+            editor={ClassicEditor as unknown as { create: (...args: unknown[]) => Promise<unknown> }}
             data={draft}
             config={editorConfig}
             onChange={(_event, editor) => {
