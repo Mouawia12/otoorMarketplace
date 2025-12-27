@@ -134,3 +134,6 @@ docker-compose.override.yml
 # Logs
 logs/
 *.log
+
+# uploads & temp files
+backend-node/uploads/
