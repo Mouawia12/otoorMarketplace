@@ -240,7 +240,7 @@ export default function CheckoutPage() {
     phoneCode: "+966",
     address: "",
     city: "",
-    paymentMethod: "cod" as "card" | "applepay" | "mada" | "cod" | "bank",
+    paymentMethod: "bank" as "card" | "applepay" | "mada" | "cod" | "bank",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -646,19 +646,6 @@ export default function CheckoutPage() {
             <div className="bg-ivory rounded-luxury p-6 shadow-sm">
               <h2 className="text-2xl font-bold text-charcoal mb-6">{t('checkout.payment')}</h2>
               <div className="space-y-3">
-                <label className="flex items-center gap-4 p-4 border border-charcoal-light rounded-lg cursor-pointer hover:bg-sand transition">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={formData.paymentMethod === "cod"}
-                    onChange={() => setFormData({ ...formData, paymentMethod: "cod" })}
-                    className="w-5 h-5 text-gold"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-charcoal">{t('checkout.cashOnDelivery')}</p>
-                  </div>
-                </label>
-
                 <label className="flex items-center gap-4 p-4 border border-charcoal-light rounded-lg cursor-pointer hover:bg-sand transition opacity-50">
                   <input
                     type="radio"
