@@ -86,6 +86,9 @@ export default function AdminProductLibraryPage() {
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -123,6 +126,22 @@ export default function AdminProductLibraryPage() {
 
   const visibleTemplates = useMemo(() => templates, [templates]);
 
+  const fetchAllTemplateIds = async () => {
+    const limit = 100;
+    let skip = 0;
+    const ids: number[] = [];
+
+    while (true) {
+      const batch = await adminListTemplates({ limit, skip });
+      if (!batch.length) break;
+      ids.push(...batch.map((template) => template.id));
+      if (batch.length < limit) break;
+      skip += limit;
+    }
+
+    return ids;
+  };
+
   const handleDelete = async (id: number) => {
     if (confirmingId !== id) {
       setConfirmingId(id);
@@ -145,6 +164,60 @@ export default function AdminProductLibraryPage() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (bulkDeleting) return;
+    const confirmed = window.confirm(
+      t('admin.confirmDeleteAllTemplates', 'سيتم حذف جميع قوالب المكتبة بالكامل. هل أنت متأكد؟')
+    );
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+    setBulkProgress({ current: 0, total: 0 });
+    setBulkError(null);
+    let failedCount = 0;
+
+    let targetIds: number[] = [];
+    try {
+      targetIds = await fetchAllTemplateIds();
+    } catch (error) {
+      console.error('Failed to load templates list', error);
+      setBulkError(t('admin.loadTemplatesFailed', 'تعذر تحميل قائمة القوالب.'));
+      setBulkDeleting(false);
+      return;
+    }
+
+    if (targetIds.length === 0) {
+      setBulkDeleting(false);
+      return;
+    }
+
+    setBulkProgress({ current: 0, total: targetIds.length });
+
+    for (const id of targetIds) {
+      try {
+        await adminDeleteTemplate(id);
+      } catch (error) {
+        failedCount += 1;
+        console.error('Failed to delete template', error);
+      } finally {
+        setBulkProgress((prev) => ({
+          current: Math.min(prev.current + 1, prev.total),
+          total: prev.total,
+        }));
+      }
+    }
+
+    if (failedCount > 0) {
+      setBulkError(
+        t('admin.deleteAllTemplatesFailed', `تعذر حذف ${failedCount} قالب/قوالب.`)
+      );
+    }
+
+    setBulkDeleting(false);
+    setTemplates([]);
+    setRefreshKey((prev) => prev + 1);
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -153,6 +226,19 @@ export default function AdminProductLibraryPage() {
           <p className="text-taupe">{t('admin.productLibrarySubtitle', 'أضف قوالب احترافية ليستخدمها التجار عند إدراج منتجاتهم.')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleDeleteAll}
+            disabled={bulkDeleting}
+            className={`px-4 py-2 rounded-luxury font-semibold border transition ${
+              bulkDeleting
+                ? 'border-red-200 text-red-300 cursor-not-allowed'
+                : 'border-red-300 text-red-600 hover:bg-red-50'
+            }`}
+          >
+            {bulkDeleting
+              ? t('admin.deletingAll', 'جارٍ حذف القوالب...')
+              : t('admin.deleteAllTemplates', 'حذف الكل')}
+          </button>
           <button
             onClick={() => setImportOpen(true)}
             className="bg-charcoal text-ivory px-4 py-2 rounded-luxury font-semibold hover:bg-charcoal-light transition"
@@ -178,6 +264,31 @@ export default function AdminProductLibraryPage() {
             className="flex-1 px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
           />
         </div>
+
+        {(bulkDeleting || bulkProgress.total > 0) && (
+          <div className="mb-6 space-y-2">
+            <div className="flex items-center justify-between text-sm text-charcoal">
+              <span>{t('admin.bulkDeleteProgress', 'تقدم الحذف')}</span>
+              <span>
+                {bulkProgress.total === 0
+                  ? t('admin.preparingDelete', 'جارٍ تجهيز القائمة...')
+                  : `${bulkProgress.current}/${bulkProgress.total}`}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-sand overflow-hidden">
+              <div
+                className="h-full bg-red-500 transition-all"
+                style={{
+                  width:
+                    bulkProgress.total === 0
+                      ? '0%'
+                      : `${Math.round((bulkProgress.current / bulkProgress.total) * 100)}%`,
+                }}
+              />
+            </div>
+            {bulkError && <p className="text-sm text-red-600">{bulkError}</p>}
+          </div>
+        )}
 
         {loading ? (
           <p className="text-center text-taupe py-6">{t('common.loading')}</p>

@@ -30,6 +30,7 @@ const listTemplatesSchema = z.object({
   brand: z.string().optional(),
   category: z.string().optional(),
   limit: z.coerce.number().int().positive().max(100).default(50),
+  skip: z.coerce.number().int().min(0).default(0),
 });
 
 const normalizeTemplate = (template: any) => {
@@ -185,7 +186,7 @@ export const getProductTemplateById = async (templateId: number) => {
 };
 
 export const listProductTemplates = async (query: unknown) => {
-  const { search, brand, category, limit } = listTemplatesSchema.parse(query ?? {});
+  const { search, brand, category, limit, skip } = listTemplatesSchema.parse(query ?? {});
 
   const where: Prisma.ProductTemplateWhereInput = {};
 
@@ -209,6 +210,7 @@ export const listProductTemplates = async (query: unknown) => {
     },
     orderBy: { updatedAt: "desc" },
     take: limit,
+    skip,
   });
 
   return templates.map((template) => normalizeTemplate(template));
