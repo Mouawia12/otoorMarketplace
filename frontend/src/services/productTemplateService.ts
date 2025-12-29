@@ -1,8 +1,14 @@
 import api from '../lib/api';
 import { ProductTemplate } from '../types';
 
+type TemplateListResponse = {
+  items: ProductTemplate[];
+  total: number;
+  total_all: number;
+};
+
 export const adminListTemplates = async (params?: Record<string, unknown>) => {
-  const { data } = await api.get<ProductTemplate[]>('/admin/product-templates', { params });
+  const { data } = await api.get<TemplateListResponse>('/admin/product-templates', { params });
   return data;
 };
 
@@ -26,7 +32,7 @@ export const adminDeleteTemplate = async (id: number) => {
 };
 
 export const sellerSearchTemplates = async (params?: Record<string, unknown>) => {
-  const { data } = await api.get<ProductTemplate[]>('/seller/product-templates', { params });
+  const { data } = await api.get<TemplateListResponse>('/seller/product-templates', { params });
   return data;
 };
 

@@ -89,6 +89,7 @@ export default function AdminProductLibraryPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -102,7 +103,8 @@ export default function AdminProductLibraryPage() {
         const results = await adminListTemplates({
           ...(debouncedSearch ? { search: debouncedSearch } : {}),
         });
-        setTemplates(results);
+        setTemplates(results.items);
+        setTotalCount(results.total_all);
       } catch (error) {
         console.error('Failed to load templates', error);
       } finally {
@@ -133,9 +135,10 @@ export default function AdminProductLibraryPage() {
 
     while (true) {
       const batch = await adminListTemplates({ limit, skip });
-      if (!batch.length) break;
-      ids.push(...batch.map((template) => template.id));
-      if (batch.length < limit) break;
+      const items = batch.items;
+      if (!items.length) break;
+      ids.push(...items.map((template) => template.id));
+      if (items.length < limit) break;
       skip += limit;
     }
 
@@ -224,6 +227,9 @@ export default function AdminProductLibraryPage() {
         <div>
           <h1 className="text-h2 text-charcoal">{t('admin.productLibrary', 'مكتبة المنتجات')}</h1>
           <p className="text-taupe">{t('admin.productLibrarySubtitle', 'أضف قوالب احترافية ليستخدمها التجار عند إدراج منتجاتهم.')}</p>
+          <p className="text-sm text-charcoal-light mt-2">
+            {t('admin.templateCount', 'عدد القوالب')}: {totalCount}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -293,7 +299,7 @@ export default function AdminProductLibraryPage() {
         {loading ? (
           <p className="text-center text-taupe py-6">{t('common.loading')}</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {visibleTemplates.map((template) => {
               const name = i18n.language === 'ar' ? template.name_ar : template.name_en;
               const image = resolveImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;

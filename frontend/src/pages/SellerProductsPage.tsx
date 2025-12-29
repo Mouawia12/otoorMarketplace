@@ -462,7 +462,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
           ...(term ? { search: term } : {}),
         });
         if (!cancelled) {
-          setTemplateResults(templates);
+          setTemplateResults(templates.items);
           setTemplateError(null);
         }
       } catch (_error) {

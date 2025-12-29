@@ -202,16 +202,24 @@ export const listProductTemplates = async (query: unknown) => {
     ];
   }
 
-  const templates = await prisma.productTemplate.findMany({
-    where,
-    include: {
-      images: { orderBy: { sortOrder: "asc" } },
-      createdBy: { select: { id: true, fullName: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-    take: limit,
-    skip,
-  });
+  const [templates, total, totalAll] = await prisma.$transaction([
+    prisma.productTemplate.findMany({
+      where,
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        createdBy: { select: { id: true, fullName: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: limit,
+      skip,
+    }),
+    prisma.productTemplate.count({ where }),
+    prisma.productTemplate.count(),
+  ]);
 
-  return templates.map((template) => normalizeTemplate(template));
+  return {
+    items: templates.map((template) => normalizeTemplate(template)),
+    total,
+    total_all: totalAll,
+  };
 };

@@ -175,8 +175,8 @@ router.get("/auctions", sellerOnly, async (req, res, next) => {
 
 router.get("/product-templates", sellerOnly, async (req, res, next) => {
   try {
-    const templates = await listProductTemplates(req.query);
-    res.json(templates);
+    const result = await listProductTemplates(req.query);
+    res.json(result);
   } catch (error) {
     next(error);
   }

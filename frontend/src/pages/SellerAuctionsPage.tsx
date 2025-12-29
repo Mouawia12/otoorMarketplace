@@ -313,7 +313,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
           ...(term ? { search: term } : {}),
         });
         if (!cancelled) {
-          setTemplates(response);
+          setTemplates(response.items);
           setTemplateError(null);
         }
       } catch (_err) {
