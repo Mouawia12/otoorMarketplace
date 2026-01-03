@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
 import SARIcon from '../common/SARIcon';
 import { formatSAR } from '../../utils/currency';
-import { resolveImageUrl } from '../../utils/image';
+import { resolveProductImageUrl } from '../../utils/image';
 import CountdownTimer from '../auctions/CountdownTimer';
 import { PLACEHOLDER_PERFUME } from '../../utils/staticAssets';
 
@@ -38,7 +38,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const navigate = useNavigate();
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
-  const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+  const resolvedImage = resolveProductImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const displayPriceRaw = type === 'auction' && currentBid ? currentBid : product.base_price;
   const displayPrice = typeof displayPriceRaw === 'number' && !Number.isNaN(displayPriceRaw) ? displayPriceRaw : 0;
   const isAuction = type === 'auction';
@@ -53,6 +53,8 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
     product.condition === 'used'
       ? 'bg-charcoal/85 text-ivory'
       : 'bg-gold text-charcoal';
+  const isTester = Boolean(product.is_tester);
+  const testerLabel = t('products.tester', 'Tester');
   
   const defaultAuctionEnd = auctionEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -111,7 +113,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
             src={resolvedImage}
             alt={name}
             loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="w-full h-full object-contain bg-white"
           />
           {isAuctionEnded && (
             <div className="absolute inset-0 bg-charcoal/60 flex items-center justify-center">
@@ -121,10 +123,15 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
             </div>
           )}
         </Link>
-        <div className="absolute top-2" style={{ insetInlineEnd: '8px' }}>
+        <div className="absolute top-2 flex flex-col gap-2 items-end" style={{ insetInlineEnd: '8px' }}>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold shadow-md leading-none ${conditionTone}`}>
             {conditionLabel}
           </span>
+          {isTester && (
+            <span className="px-3 py-1 rounded-full text-xs font-semibold shadow-md leading-none bg-rose-500 text-white">
+              {testerLabel}
+            </span>
+          )}
         </div>
 
         {/* المفضلة */}

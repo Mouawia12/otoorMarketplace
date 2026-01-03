@@ -50,6 +50,7 @@ export const normalizeProduct = (product: any) => {
     concentration: plain.concentration,
     condition: plain.condition?.toLowerCase?.() ?? plain.condition,
     stock_quantity: plain.stockQuantity,
+    is_tester: Boolean(plain.isTester),
     image_urls: images,
     status: normalizeStatus(plain.status),
     created_at: plain.createdAt,
@@ -357,6 +358,7 @@ const productInputSchema = z.object({
   concentration: z.string().min(1),
   condition: z.nativeEnum(ProductCondition),
   stockQuantity: z.coerce.number().int().nonnegative(),
+  isTester: z.boolean().optional(),
   status: z.nativeEnum(ProductStatus).default(ProductStatus.PUBLISHED),
   imageUrls: z.array(imageUrlSchema).default([]),
 });
@@ -396,6 +398,7 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
       concentration: data.concentration,
       condition: data.condition,
       stockQuantity: data.stockQuantity,
+      isTester: data.isTester ?? false,
       status: initialStatus,
       images: {
         create: sanitizedImages.map((url, index) => ({
@@ -449,6 +452,7 @@ const updateProductSchema = z.object({
   concentration: z.string().min(1).optional(),
   condition: z.nativeEnum(ProductCondition).optional(),
   stockQuantity: z.coerce.number().int().nonnegative().optional(),
+  isTester: z.boolean().optional(),
   status: z
     .union([
       z.nativeEnum(ProductStatus),
@@ -487,6 +491,7 @@ export const updateProduct = async (
   if (data.concentration !== undefined) updateData.concentration = data.concentration;
   if (data.condition !== undefined) updateData.condition = data.condition;
   if (data.stockQuantity !== undefined) updateData.stockQuantity = data.stockQuantity;
+  if (data.isTester !== undefined) updateData.isTester = data.isTester;
   if (data.status !== undefined) {
     if (typeof data.status === "string") {
       const normalized = data.status.toLowerCase();

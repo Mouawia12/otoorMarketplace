@@ -5,7 +5,7 @@ import { Order } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
-import { resolveImageUrl } from '../utils/image';
+import { resolveProductImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import { submitProductReview } from '../services/reviewService';
 import api from '../lib/api';
@@ -248,7 +248,7 @@ export default function Orders({ view }: OrdersProps = {}) {
             const items = itemListFromOrder(order);
             const primary = items[0]?.product ?? order.product;
             const name = primary ? (language === 'ar' ? primary.name_ar : primary.name_en) : t('products.unknownProduct');
-            const image = resolveImageUrl(primary?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+            const image = resolveProductImageUrl(primary?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
             const qty = order.quantity || items.reduce((sum, i) => sum + (i.quantity || 0), 0);
             return (
               <button
@@ -263,7 +263,7 @@ export default function Orders({ view }: OrdersProps = {}) {
                   <img
                     src={image}
                     alt={name}
-                    className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-sand/60"
+                    className="w-14 h-14 sm:w-16 sm:h-16 object-contain bg-white rounded-lg border border-sand/60"
                     onError={(e) => {
                       e.currentTarget.src = PLACEHOLDER_PERFUME;
                     }}
@@ -376,7 +376,7 @@ export default function Orders({ view }: OrdersProps = {}) {
               {(activeOrder.items && activeOrder.items.length ? activeOrder.items : itemListFromOrder(activeOrder)).map((item, idx) => {
                 const p = item.product;
                 const name = p ? (language === 'ar' ? p.name_ar : p.name_en) : t('products.unknownProduct');
-                const img = resolveImageUrl(p?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+                const img = resolveProductImageUrl(p?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
                 const reviewKey = `${activeOrder.id}-${item.product_id}`;
                 const reviewDraft = reviewDrafts[reviewKey] || { rating: 5, comment: '', submitted: false };
                 return (
@@ -384,7 +384,7 @@ export default function Orders({ view }: OrdersProps = {}) {
                     <img
                       src={img}
                       alt={name}
-                          className="w-14 h-14 object-cover rounded-lg border border-sand/60"
+                          className="w-14 h-14 object-contain bg-white rounded-lg border border-sand/60"
                           onError={(e) => {
                             e.currentTarget.src = PLACEHOLDER_PERFUME;
                           }}

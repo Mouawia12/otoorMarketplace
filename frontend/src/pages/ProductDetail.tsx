@@ -7,7 +7,7 @@ import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
 import SARIcon from '../components/common/SARIcon';
-import { resolveImageUrl } from '../utils/image';
+import { resolveProductImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME, PLACEHOLDER_PERFUME_KEY } from '../utils/staticAssets';
 import ProductImageCarousel from '../components/products/ProductImageCarousel';
 
@@ -84,7 +84,7 @@ export default function ProductDetail() {
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
   const baseImages = product.image_urls?.length > 0 ? product.image_urls : [PLACEHOLDER_PERFUME_KEY];
-  const images = baseImages.map((img) => resolveImageUrl(img) || PLACEHOLDER_PERFUME);
+  const images = baseImages.map((img) => resolveProductImageUrl(img) || PLACEHOLDER_PERFUME);
   const isInStock = product.stock_quantity > 0;
   const sellerName = product.seller?.full_name;
   const sellerVerified = product.seller?.verified_seller;

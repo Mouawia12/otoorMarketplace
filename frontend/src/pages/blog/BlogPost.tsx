@@ -205,9 +205,6 @@ export default function BlogPost() {
         <meta property="article:published_time" content={post.date} />
         <meta property="article:author" content={post.author} />
         <meta property="article:section" content={post.category} />
-        {post.tags.map(tag => (
-          <meta key={tag} property="article:tag" content={tag} />
-        ))}
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
@@ -297,21 +294,6 @@ export default function BlogPost() {
               />
 
               <div className="space-y-6">
-                {post.tags.length > 0 && (
-                  <div className="bg-ivory/70 border border-ivory/60 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-2">
-                    <span className="text-taupe font-semibold">{t('blog.tags')}:</span>
-                    {post.tags.map(tag => (
-                      <Link
-                        key={tag}
-                        to={`/blog/tag/${tag}`}
-                        className="px-3 py-1 rounded-full bg-white text-charcoal/80 text-xs sm:text-sm border border-sand hover:border-gold hover:text-gold transition"
-                      >
-                        #{tag}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
                 <div className="bg-ivory/80 border border-ivory/60 rounded-2xl p-4 sm:p-6">
                   <p className="text-taupe font-semibold mb-3">{t('blog.share')}</p>
                   <div className="flex flex-wrap gap-3 sm:gap-4">

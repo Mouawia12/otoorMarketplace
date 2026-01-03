@@ -75,7 +75,7 @@ export default function WishlistPage() {
                 <div className="col-span-1">
                   <div className="aspect-square rounded-lg overflow-hidden bg-sand/60">
                     {item.image ? (
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={item.image} alt={item.name} className="w-full h-full object-contain bg-white" loading="lazy" />
                     ) : (
                       <div className="w-full h-full grid place-items-center text-taupe">
                         <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">

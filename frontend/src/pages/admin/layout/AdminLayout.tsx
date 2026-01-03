@@ -26,8 +26,15 @@ export default function AdminLayout() {
   }
 
   // ملاحظة: استخدم startsWith بدل مساواة كاملة ليشمل المسارات الفرعية
-  const isActive = (path: string) =>
-    location.pathname === path || location.pathname.startsWith(path + '/');
+  const isActive = (path: string) => {
+    if (path.includes('?')) {
+      return `${location.pathname}${location.search}` === path;
+    }
+    if (path === '/admin/ads' && location.search) {
+      return false;
+    }
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
 
   // إن احتجت تقييد عنصر "المدونة" على أدوار معيّنة، فعّل السطرين التاليين وفلتر العناصر بناءً على الدور:
   // const { user } = useAuthStore();
@@ -47,6 +54,7 @@ export default function AdminLayout() {
     // إن أردت تقييده على أدوار: أضِف شرط canManageBlog هنا
     { path: '/admin/blog',      label: t('admin.blog', 'المدونة'), icon: '📝' },
 
+    { path: '/admin/ads?type=HERO', label: t('admin.heroSlider', 'سلايدر الرئيسية'), icon: '🎞️' },
     { path: '/admin/ads',       label: t('admin.ads'),       icon: '📢' },
     { path: '/admin/support',   label: t('admin.support'),   icon: '💬' },
     { path: '/admin/reports',   label: t('admin.reports'),   icon: '📈' },

@@ -15,7 +15,7 @@ import {
   type ImportMode,
   type ImportStatusResponse,
 } from '../services/perfumeImportService';
-import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
+import { normalizeImagePathForStorage, resolveProductImageUrl } from '../utils/image';
 import { compressImageFile } from '../utils/imageCompression';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import api from '../lib/api';
@@ -302,28 +302,33 @@ export default function AdminProductLibraryPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {visibleTemplates.map((template) => {
               const name = i18n.language === 'ar' ? template.name_ar : template.name_en;
-              const image = resolveImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+              const image = resolveProductImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
               return (
-                <div key={template.id} className="border border-gray-200 rounded-luxury overflow-hidden bg-white flex flex-col">
-                  <img src={image} alt={name} className="w-full h-40 object-cover" />
-                  <div className="p-4 flex-1 flex flex-col">
-                    <h3 className="text-lg font-semibold text-charcoal">{name}</h3>
-                    <p className="text-sm text-taupe mb-2">{template.brand}</p>
-                    <div className="text-sm text-charcoal-light flex flex-col gap-1">
+                <div
+                  key={template.id}
+                  className="border border-gray-200 rounded-2xl overflow-hidden bg-white flex flex-col"
+                >
+                  <img src={image} alt={name} className="w-full h-36 object-contain bg-white" />
+                  <div className="p-3 flex-1 flex flex-col">
+                    <h3 className="text-base font-semibold text-charcoal line-clamp-2 min-h-[40px]">
+                      {name}
+                    </h3>
+                    <p className="text-xs text-taupe mb-2">{template.brand}</p>
+                    <div className="text-xs text-charcoal-light flex flex-col gap-1">
                       <span>{t('products.category', 'الفئة')}: {template.category}</span>
                       <span>{t('products.type', 'النوع')}: {template.product_type}</span>
                       <span>{t('products.size', 'الحجم')}: {template.size_ml} ml</span>
                     </div>
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-auto pt-3 flex gap-2">
                       <button
                         onClick={() => openEditModal(template)}
-                        className="flex-1 px-3 py-2 rounded-luxury border border-gold text-charcoal hover:bg-gold/10"
+                        className="flex-1 px-2.5 py-1.5 rounded-lg border border-gold text-charcoal text-xs font-semibold hover:bg-gold/10"
                       >
                         {t('common.edit', 'تعديل')}
                       </button>
                       <button
                         onClick={() => handleDelete(template.id)}
-                        className="flex-1 px-3 py-2 rounded-luxury border border-red-300 text-red-600 hover:bg-red-50"
+                        className="flex-1 px-2.5 py-1.5 rounded-lg border border-red-300 text-red-600 text-xs font-semibold hover:bg-red-50"
                       >
                         {confirmingId === template.id
                           ? t('common.confirm', 'تأكيد')
@@ -691,7 +696,7 @@ function TemplateModal({ isOpen, mode, template, onClose, onSuccess }: TemplateM
             {formData.image_urls.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                     {formData.image_urls.map((url) => {
-                      const preview = resolveImageUrl(url) || url;
+                      const preview = resolveProductImageUrl(url) || url;
                       return (
                         <div
                           key={url}

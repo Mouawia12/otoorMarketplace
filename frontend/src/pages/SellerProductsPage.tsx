@@ -5,7 +5,7 @@ import api from '../lib/api';
 import { Product, ProductTemplate } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
-import { normalizeImagePathForStorage, resolveImageUrl } from '../utils/image';
+import { normalizeImagePathForStorage, resolveProductImageUrl } from '../utils/image';
 import { compressImageFile } from '../utils/imageCompression';
 import { sellerSearchTemplates } from '../services/productTemplateService';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
@@ -93,7 +93,11 @@ export default function SellerProductsPage() {
       setLoading(true);
       const params = statusFilter !== 'all' ? { status: statusFilter } : undefined;
       const response = await api.get('/seller/products', { params });
-      setProducts(response.data);
+      const items = Array.isArray(response.data) ? response.data : [];
+      const withoutAuctions = items.filter(
+        (product) => !product.is_auction_product && !product.has_active_auction
+      );
+      setProducts(withoutAuctions);
     } catch (error) {
       console.error('Failed to load seller products', error);
     } finally {
@@ -386,6 +390,7 @@ type ProductFormState = {
   description_ar: string;
   image_urls: string[];
   condition: 'NEW' | 'USED';
+  is_tester: boolean;
 };
 
 const createInitialFormState = (): ProductFormState => ({
@@ -402,6 +407,7 @@ const createInitialFormState = (): ProductFormState => ({
   description_ar: '',
   image_urls: [],
   condition: 'NEW',
+  is_tester: false,
 });
 
 function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: ProductFormModalProps) {
@@ -438,6 +444,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
               .filter(Boolean)
           : [],
         condition: (product.condition?.toUpperCase?.() === 'USED' ? 'USED' : 'NEW'),
+        is_tester: Boolean(product.is_tester),
       });
       setSelectedTemplateId(null);
     } else if (mode === 'add') {
@@ -515,6 +522,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         descriptionEn: formData.description_en,
         descriptionAr: formData.description_ar,
         condition: formData.condition || 'NEW',
+        isTester: formData.is_tester,
         imageUrls,
         status: intent === 'draft' ? 'DRAFT' : 'PENDING_REVIEW',
       };
@@ -558,7 +566,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
   };
 
   const handleChange =
-    (field: keyof Omit<ProductFormState, 'image_urls'>) =>
+    (field: keyof Omit<ProductFormState, 'image_urls' | 'is_tester'>) =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       setFormData((prev) => ({ ...prev, [field]: event.target.value }));
     };
@@ -579,6 +587,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       description_ar: template.description_ar || '',
       image_urls: template.image_urls?.slice?.() || [],
       condition: 'NEW',
+      is_tester: false,
     });
   };
 
@@ -687,7 +696,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {templateResults.map((template) => {
                       const title = i18n.language === 'ar' ? template.name_ar : template.name_en;
-                      const preview = resolveImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+                      const preview = resolveProductImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
                       const isActive = selectedTemplateId === template.id;
                       return (
                         <button
@@ -698,7 +707,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                             isActive ? 'border-gold bg-white' : 'border-gray-200 bg-white'
                           }`}
                         >
-                          <img src={preview} alt={title} className="w-20 h-20 rounded-lg object-cover" />
+                          <img src={preview} alt={title} className="w-20 h-20 rounded-lg object-contain bg-white" />
                           <div className="flex-1">
                             <p className="font-semibold text-charcoal">{title}</p>
                             <p className="text-sm text-taupe">{template.brand}</p>
@@ -809,6 +818,20 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                 <option value="USED">{t('seller.conditionUsed', 'Used')}</option>
               </select>
             </div>
+            <div className="flex items-center gap-3 pt-7">
+              <input
+                id="seller-product-tester"
+                type="checkbox"
+                checked={formData.is_tester}
+                onChange={(event) =>
+                  setFormData((prev) => ({ ...prev, is_tester: event.target.checked }))
+                }
+                className="h-4 w-4 accent-gold"
+              />
+              <label htmlFor="seller-product-tester" className="text-charcoal font-semibold">
+                {t('products.tester', 'Tester')}
+              </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -864,10 +887,10 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
               {formData.image_urls.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {formData.image_urls.map((url) => {
-                    const preview = resolveImageUrl(url) || url;
+                    const preview = resolveProductImageUrl(url) || url;
                     return (
                     <div key={url} className="relative border border-gray-200 rounded-lg overflow-hidden">
-                      <img src={preview} alt="Product" className="w-full h-28 object-cover" />
+                      <img src={preview} alt="Product" className="w-full h-28 object-contain bg-white" />
                       <button
                         type="button"
                         onClick={() => handleRemoveImage(url)}

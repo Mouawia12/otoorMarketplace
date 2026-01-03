@@ -85,6 +85,7 @@ model Product {
   concentration String
   condition     ProductCondition
   stockQuantity Int              @map("stock_quantity")
+  isTester      Boolean          @default(false) @map("is_tester")
   status        ProductStatus    @default(DRAFT)
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")

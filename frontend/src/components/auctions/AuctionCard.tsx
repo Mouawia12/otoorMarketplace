@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Auction } from '../../types';
-import { resolveImageUrl } from '../../utils/image';
+import { resolveProductImageUrl } from '../../utils/image';
 import { useUIStore } from '../../store/uiStore';
 import { formatPrice } from '../../utils/currency';
 import Countdown from '../common/Countdown';
@@ -17,7 +17,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
 
   const product = auction.product;
   const name = product ? (language === 'ar' ? product.name_ar : product.name_en) : 'Unknown Product';
-  const imageUrl = resolveImageUrl(product?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+  const imageUrl = resolveProductImageUrl(product?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const isActive = auction.status === 'running';
   const bidsCount = auction.total_bids || 0;
 
@@ -28,7 +28,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
           <img 
             src={imageUrl} 
             alt={name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain bg-white"
             onError={(e) => {
               e.currentTarget.src = PLACEHOLDER_PERFUME;
             }}

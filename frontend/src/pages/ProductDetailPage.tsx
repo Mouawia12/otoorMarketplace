@@ -12,7 +12,7 @@ import { Product, Auction, ProductReview } from '../types';
 import { fetchProductReviews } from '../services/reviewService';
 import { formatPrice } from '../utils/currency';
 import SARIcon from '../components/common/SARIcon';
-import { resolveImageUrl } from '../utils/image';
+import { resolveProductImageUrl } from '../utils/image';
 import Countdown from '../components/common/Countdown';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import ProductImageCarousel from '../components/products/ProductImageCarousel';
@@ -105,7 +105,7 @@ export default function ProductDetailPage() {
       </div>
     );
   }
-  const resolvedImage = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+  const resolvedImage = resolveProductImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const hasInWishlist = product ? wishlistHas(String(product.id)) : false;
   const toggleWishlist = async () => {
     if (!product) return;
@@ -148,7 +148,7 @@ export default function ProductDetailPage() {
   const name = language === 'ar' ? product.name_ar : product.name_en;
   const description = language === 'ar' ? product.description_ar : product.description_en;
   const resolvedImages = (product.image_urls || [])
-    .map((img) => resolveImageUrl(img) || '')
+    .map((img) => resolveProductImageUrl(img) || '')
     .filter(Boolean);
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isInStock = product.stock_quantity > 0;

@@ -1,5 +1,6 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import {
   Promotion,
   PromotionType,
@@ -79,6 +80,7 @@ const parseDateTimeValue = (value: string) => (value ? new Date(value).toISOStri
 
 export default function AdminAdsPage() {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -86,6 +88,15 @@ export default function AdminAdsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingHeroImage, setUploadingHeroImage] = useState(false);
+  const lockedType = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const value = params.get('type');
+    if (!value) return null;
+    const normalized = value.toUpperCase();
+    return ['HERO', 'STRIP', 'FLOATING'].includes(normalized)
+      ? (normalized as PromotionType)
+      : null;
+  }, [location.search]);
 
   const loadPromotions = async () => {
     try {
@@ -126,6 +137,11 @@ export default function AdminAdsPage() {
     };
   }, [promotions]);
 
+  const visiblePromotions = useMemo(() => {
+    if (!lockedType) return promotions;
+    return promotions.filter((promo) => promo.type === lockedType);
+  }, [lockedType, promotions]);
+
   const openModal = (promotion?: Promotion) => {
     if (promotion) {
       setForm({
@@ -153,7 +169,7 @@ export default function AdminAdsPage() {
         end_at: formatDateTimeValue(promotion.end_at),
       });
     } else {
-      setForm(defaultForm);
+      setForm({ ...defaultForm, type: lockedType ?? defaultForm.type });
     }
     setModalOpen(true);
   };
@@ -164,7 +180,7 @@ export default function AdminAdsPage() {
     setError(null);
 
     const payload = {
-      type: form.type,
+      type: lockedType ?? form.type,
       title_en: form.title_en,
       title_ar: form.title_ar,
       subtitle_en: form.subtitle_en || null,
@@ -175,11 +191,11 @@ export default function AdminAdsPage() {
       badge_text_ar: form.badge_text_ar || null,
       button_text_en: form.button_text_en || null,
       button_text_ar: form.button_text_ar || null,
-      image_url: form.type === 'HERO' ? form.image_url || null : null,
+      image_url: (lockedType ?? form.type) === 'HERO' ? form.image_url || null : null,
       link_url: form.link_url || null,
       background_color: form.background_color || null,
       text_color: form.text_color || null,
-      floating_position: form.type === 'FLOATING' ? form.floating_position : null,
+      floating_position: (lockedType ?? form.type) === 'FLOATING' ? form.floating_position : null,
       is_active: form.is_active,
       sort_order: form.sort_order,
       start_at: form.start_at ? parseDateTimeValue(form.start_at) : null,
@@ -361,7 +377,7 @@ export default function AdminAdsPage() {
 
         {loading ? (
           <div className="py-16 text-center text-taupe">{t('common.loading')}</div>
-        ) : promotions.length === 0 ? (
+        ) : visiblePromotions.length === 0 ? (
           <div className="py-12 text-center text-charcoal-light">
             {t('adminPromotions.empty')}
           </div>
@@ -378,7 +394,7 @@ export default function AdminAdsPage() {
                 </tr>
               </thead>
               <tbody>
-                {promotions.map((promotion) => {
+                {visiblePromotions.map((promotion) => {
                   const lang = i18n.language === 'ar' ? 'ar' : 'en';
                   const title = lang === 'ar' ? promotion.title_ar : promotion.title_en;
                   const schedule =
@@ -518,9 +534,12 @@ export default function AdminAdsPage() {
                   <div>
                     <label className="block text-sm font-semibold mb-1">{t('admin.type')}</label>
                     <select
-                      value={form.type}
-                      onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value as PromotionType }))}
+                      value={lockedType ?? form.type}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, type: e.target.value as PromotionType }))
+                      }
                       className="w-full border border-sand rounded-lg px-3 py-2"
+                      disabled={Boolean(lockedType)}
                     >
                       <option value="HERO">{t('adminPromotions.type.hero')}</option>
                       <option value="STRIP">{t('adminPromotions.type.strip')}</option>
@@ -550,7 +569,7 @@ export default function AdminAdsPage() {
                 </div>
               </div>
 
-                {form.type === 'HERO' && (
+                {(lockedType ?? form.type) === 'HERO' && (
                   <div className="space-y-3 rounded-2xl border border-sand/70 p-4 bg-sand/20">
                     <div className="flex items-center justify-between">
                       <label className="block text-sm font-semibold">
@@ -625,7 +644,7 @@ export default function AdminAdsPage() {
                       className="w-full border border-sand rounded-lg h-11"
                     />
                   </div>
-                  {form.type === 'FLOATING' && (
+                  {(lockedType ?? form.type) === 'FLOATING' && (
                     <div>
                       <label className="block text-sm font-semibold mb-1">{t('adminPromotions.floatingPosition')}</label>
                       <select

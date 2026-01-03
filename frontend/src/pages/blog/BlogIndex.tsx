@@ -44,7 +44,6 @@ export default function BlogIndex() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedTag, setSelectedTag] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,20 +67,11 @@ export default function BlogIndex() {
     () => Array.from(new Set(posts.map((p) => p.category).filter(Boolean))),
     [posts]
   );
-  const tags = useMemo(
-    () => Array.from(new Set(posts.flatMap((p) => p.tags || []).filter(Boolean))),
-    [posts]
-  );
-
   const filteredPosts = useMemo(() => {
     let filtered = posts;
 
     if (selectedCategory) {
       filtered = filtered.filter((p) => normalizeSlug(p.category) === normalizeSlug(selectedCategory));
-    }
-
-    if (selectedTag) {
-      filtered = filtered.filter((p) => (p.tags || []).some((tg: string) => normalizeSlug(tg) === normalizeSlug(selectedTag)));
     }
 
     if (searchQuery.trim()) {
@@ -94,7 +84,7 @@ export default function BlogIndex() {
     }
 
     return filtered;
-  }, [posts, selectedCategory, selectedTag, searchQuery]);
+  }, [posts, selectedCategory, searchQuery]);
 
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
   const paginatedPosts = filteredPosts.slice(
@@ -211,40 +201,6 @@ export default function BlogIndex() {
               </select>
             </div>
 
-            {/* Tag Filter (مُترجم للعرض) */}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => {
-                    setSelectedTag('');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-3 py-2 rounded-full text-sm transition ${
-                    !selectedTag
-                      ? 'bg-gold text-charcoal'
-                      : 'bg-ivory text-taupe hover:bg-charcoal-light'
-                  }`}
-                >
-                  {t('blog.allTags')}
-                </button>
-                {tags.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => {
-                      setSelectedTag(tag);
-                      setCurrentPage(1);
-                    }}
-                    className={`px-3 py-2 rounded-full text-sm transition ${
-                      normalizeSlug(selectedTag) === normalizeSlug(tag)
-                        ? 'bg-gold text-charcoal'
-                        : 'bg-ivory text-taupe hover:bg-charcoal-light'
-                    }`}
-                  >
-                    {translateBlogKey(t, tag)}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Results Count */}

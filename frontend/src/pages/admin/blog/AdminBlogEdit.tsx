@@ -13,7 +13,7 @@ const MAX_COVER_BYTES = 3 * 1024 * 1024; // 3MB
 type Mode = "create" | "edit";
 type Form = {
   title: string; slug: string; description: string; cover?: string;
-  author?: string; category?: string; tags: string;
+  author?: string; category?: string;
   lang: "ar"|"en"; date: string; status: "draft"|"published";
   content: string;
 };
@@ -30,7 +30,7 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Form>({
     title:"", slug:"", description:"", cover:"", author:"", category:"",
-    tags:"", lang:"ar", date:new Date().toISOString().slice(0,10),
+    lang:"ar", date:new Date().toISOString().slice(0,10),
     status:"draft", content:""
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -42,9 +42,6 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
         try {
           const res = await api.get(`/admin/blog/${id}`);
           const existing = res.data as AdminBlogPost;
-          const tagsValue = Array.isArray(existing.tags)
-            ? existing.tags.join(", ")
-            : existing.tags || "";
 
           const sanitizedCover = normalizeImagePathForStorage(existing.cover) || existing.cover || "";
           setForm({
@@ -54,7 +51,6 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
             cover: sanitizedCover,
             author: existing.author,
             category: existing.category,
-            tags: tagsValue,
             lang: existing.lang,
             date: existing.date,
             status: existing.status,
@@ -124,7 +120,6 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
       const coverData = coverFile ? await readFileAsDataUrl(coverFile) : undefined;
       const payload = {
         ...form,
-        tags: tagsList,
         coverData,
         coverUrl: !coverFile ? coverPreview || form.cover : undefined,
       };
@@ -159,11 +154,6 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
       setCoverPreview(resolved);
     }
   }, [coverFile, form.cover, coverPreview]);
-
-  const tagsList = useMemo(
-    () => (form.tags || "").split(",").map(t => t.trim()).filter(Boolean),
-    [form.tags]
-  );
 
   const handleCoverInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -286,15 +276,10 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block mb-1">{t("common.category","التصنيف")}</label>
               <input value={form.category} onChange={e=>on("category",e.target.value)}
-                     className="w-full bg-white border border-sand rounded-lg px-3 py-2" />
-            </div>
-            <div>
-              <label className="block mb-1">{t("common.tags","الوسوم")}</label>
-              <input value={form.tags} onChange={e=>on("tags",e.target.value)} placeholder="tag1, tag2"
                      className="w-full bg-white border border-sand rounded-lg px-3 py-2" />
             </div>
             <div>
@@ -384,18 +369,6 @@ export default function AdminBlogEdit({ mode }: { mode: Mode }) {
                 <span>{form.author || t("common.author","المؤلف")}</span>
                 <span>•</span>
                 <span>{form.date || "—"}</span>
-                {tagsList.length > 0 && (
-                  <>
-                    <span>•</span>
-                    <div className="flex flex-wrap gap-1">
-                      {tagsList.map(tag => (
-                        <span key={tag} className="px-2 py-1 bg-sand/60 rounded-full text-charcoal text-[11px]">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
               </div>
               <p className="text-charcoal font-semibold text-lg">{form.title || "Heading"}</p>
               <p className="text-charcoal-light text-sm line-clamp-2">

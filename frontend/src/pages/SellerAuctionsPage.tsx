@@ -4,7 +4,7 @@ import api from "../lib/api";
 import type { Auction, Product, ProductTemplate } from "../types";
 import { useUIStore } from "../store/uiStore";
 import { formatPrice } from "../utils/currency";
-import { normalizeImagePathForStorage, resolveImageUrl } from "../utils/image";
+import { normalizeImagePathForStorage, resolveProductImageUrl } from "../utils/image";
 import { compressImageFile } from "../utils/imageCompression";
 import { sellerSearchTemplates } from "../services/productTemplateService";
 import { PLACEHOLDER_PERFUME } from "../utils/staticAssets";
@@ -243,6 +243,7 @@ type ProductFormState = {
   stock_quantity: string;
   condition: "NEW" | "USED";
   image_urls: string[];
+  is_tester: boolean;
 };
 
 const createProductFormState = (): ProductFormState => ({
@@ -259,6 +260,7 @@ const createProductFormState = (): ProductFormState => ({
   stock_quantity: "1",
   condition: "NEW",
   image_urls: [],
+  is_tester: false,
 });
 
 function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
@@ -415,6 +417,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
       descriptionEn: productForm.description_en,
       descriptionAr: productForm.description_ar,
       condition: productForm.condition,
+      isTester: productForm.is_tester,
       status: "PUBLISHED",
       imageUrls: productForm.image_urls,
     };
@@ -423,7 +426,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
   };
 
   const handleProductChange =
-    (field: keyof Omit<ProductFormState, "image_urls">) =>
+    (field: keyof Omit<ProductFormState, "image_urls" | "is_tester">) =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       setProductForm((prev) => ({ ...prev, [field]: event.target.value }));
     };
@@ -496,6 +499,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
       stock_quantity: "1",
       condition: "NEW",
       image_urls: template.image_urls?.slice?.() || [],
+      is_tester: false,
     });
   };
 
@@ -574,7 +578,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {templates.map((template) => {
                     const title = i18n.language === "ar" ? template.name_ar : template.name_en;
-                    const preview = resolveImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+                    const preview = resolveProductImageUrl(template.image_urls?.[0]) || PLACEHOLDER_PERFUME;
                     const isActive = selectedTemplateId === template.id;
                     return (
                       <button
@@ -585,7 +589,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                           isActive ? "border-gold bg-white" : "border-gray-200 bg-white"
                         }`}
                       >
-                        <img src={preview} alt={title} className="w-14 h-14 rounded-lg object-cover" />
+                        <img src={preview} alt={title} className="w-14 h-14 rounded-lg object-contain bg-white" />
                         <div>
                           <p className="font-semibold text-charcoal">{title}</p>
                           <p className="text-sm text-taupe">{template.brand}</p>
@@ -716,6 +720,20 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                     <option value="USED">{t("seller.conditionUsed", "Used")}</option>
                   </select>
                 </div>
+                <div className="flex items-center gap-3 pt-7">
+                  <input
+                    id="auction-product-tester"
+                    type="checkbox"
+                    checked={productForm.is_tester}
+                    onChange={(event) =>
+                      setProductForm((prev) => ({ ...prev, is_tester: event.target.checked }))
+                    }
+                    className="h-4 w-4 accent-gold"
+                  />
+                  <label htmlFor="auction-product-tester" className="text-charcoal font-semibold">
+                    {t("products.tester", "Tester")}
+                  </label>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -752,10 +770,10 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                 {productForm.image_urls.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                     {productForm.image_urls.map((url) => {
-                      const preview = resolveImageUrl(url) || url;
+                      const preview = resolveProductImageUrl(url) || url;
                       return (
                         <div key={url} className="relative border border-gray-200 rounded-lg overflow-hidden">
-                          <img src={preview} alt="Product" className="w-full h-24 object-cover" />
+                          <img src={preview} alt="Product" className="w-full h-24 object-contain bg-white" />
                           <button
                             type="button"
                             onClick={() => handleRemoveImage(url)}

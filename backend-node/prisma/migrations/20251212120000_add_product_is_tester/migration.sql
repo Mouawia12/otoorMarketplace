@@ -1,0 +1,2 @@
+ALTER TABLE `Product`
+  ADD COLUMN `is_tester` BOOLEAN NOT NULL DEFAULT false;

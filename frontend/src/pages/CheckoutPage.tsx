@@ -733,7 +733,7 @@ export default function CheckoutPage() {
                   <div key={`${item.id}-${item.variantId || 'default'}`} className="flex gap-3">
                     <div className="w-16 h-16 bg-sand rounded-lg flex-shrink-0 overflow-hidden">
                       {item.image ? (
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={item.image} alt={item.name} className="w-full h-full object-contain bg-white" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <svg className="w-8 h-8 text-taupe" fill="currentColor" viewBox="0 0 20 20">

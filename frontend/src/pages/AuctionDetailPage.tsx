@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import { fetchAuctionById, fetchAuctionBids, placeBid } from '../services/auctionService';
 import { Auction, Bid, Product } from '../types';
 import { formatPrice } from '../utils/currency';
-import { resolveImageUrl } from '../utils/image';
+import { resolveProductImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 import Countdown from '../components/common/Countdown';
 import ProductImageCarousel from '../components/products/ProductImageCarousel';
@@ -284,7 +284,7 @@ export default function AuctionDetailPage() {
   const description = language === 'ar' ? product.description_ar : product.description_en;
   const resolvedImages =
     (product.image_urls || [])
-      .map((img) => resolveImageUrl(img) || '')
+      .map((img) => resolveProductImageUrl(img) || '')
       .filter(Boolean);
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
   const isEnded = new Date(auction.end_time).getTime() < new Date().getTime();

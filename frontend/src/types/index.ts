@@ -37,6 +37,7 @@ export interface Product {
   concentration: string;
   condition?: 'new' | 'used';
   stock_quantity: number;
+  is_tester?: boolean;
   image_urls: string[];
   status: string;
   created_at: string;

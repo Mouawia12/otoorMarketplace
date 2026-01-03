@@ -6,7 +6,7 @@ import { Product, User } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
-import { resolveImageUrl } from '../utils/image';
+import { resolveProductImageUrl } from '../utils/image';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
 
 interface DashboardStats {
@@ -170,7 +170,7 @@ export default function Admin() {
                 pendingProducts.map(product => {
                   const name = language === 'ar' ? product.name_ar : product.name_en;
                   const description = language === 'ar' ? product.description_ar : product.description_en;
-                  const imageUrl = resolveImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+                  const imageUrl = resolveProductImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
 
                   return (
                     <div key={product.id} className="bg-white rounded-luxury shadow-luxury p-6">
@@ -178,7 +178,7 @@ export default function Admin() {
                         <img
                           src={imageUrl}
                           alt={name}
-                          className="w-24 h-24 object-cover rounded-luxury"
+                          className="w-24 h-24 object-contain bg-white rounded-luxury"
                           onError={(e) => {
                             e.currentTarget.src = PLACEHOLDER_PERFUME;
                           }}

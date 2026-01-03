@@ -58,15 +58,8 @@ export default function Home() {
   }, [t]);
 
   const combinedHeroSlides = useMemo(() => {
-    if (!heroPromotionSlides.length) return heroSlides;
-    const seen = new Set<string>();
-    return [...heroPromotionSlides, ...heroSlides].filter((slide) => {
-      if (seen.has(slide.id)) {
-        return false;
-      }
-      seen.add(slide.id);
-      return true;
-    });
+    if (heroPromotionSlides.length) return heroPromotionSlides;
+    return heroSlides;
   }, [heroSlides, heroPromotionSlides]);
 
   if (loading) {

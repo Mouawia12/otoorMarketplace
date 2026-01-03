@@ -23,6 +23,7 @@ const isLocalhostUrl = (url: string) =>
 
 type ResolveImageOptions = {
   disableOptimization?: boolean;
+  fit?: 'cover' | 'contain';
 };
 
 const applyImageOptimization = (url: string, options?: ResolveImageOptions) => {
@@ -48,7 +49,11 @@ const applyImageOptimization = (url: string, options?: ResolveImageOptions) => {
     return url;
   }
 
-  return config.template.replace('{{url}}', encodeURIComponent(url));
+  let template = config.template;
+  if (options?.fit) {
+    template = template.replace(/([?&]fit=)[^&]+/i, `$1${options.fit}`);
+  }
+  return template.replace('{{url}}', encodeURIComponent(url));
 };
 
 export const resolveImageUrl = (input?: string | null, options?: ResolveImageOptions) => {
@@ -78,6 +83,9 @@ export const resolveImageUrl = (input?: string | null, options?: ResolveImageOpt
   const resolved = `${getAssetBaseUrl()}${prefix}${value}`;
   return applyImageOptimization(resolved, options);
 };
+
+export const resolveProductImageUrl = (input?: string | null, options?: ResolveImageOptions) =>
+  resolveImageUrl(input, { ...options, fit: options?.fit ?? 'contain' });
 
 export const normalizeImagePathForStorage = (input?: string | null) => {
   if (!input) return undefined;
