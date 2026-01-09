@@ -6,6 +6,7 @@ import {
   getAuctionBids,
   placeBid,
   getAuctionByProductId,
+  listUserBids,
 } from "../services/auctionService";
 import { authenticate } from "../middleware/auth";
 import { AppError } from "../utils/errors";
@@ -24,6 +25,22 @@ router.get("/", async (req, res, next) => {
     next(error);
   }
 });
+
+router.get(
+  "/my-bids",
+  authenticate({ roles: ["BUYER", "SELLER", "ADMIN", "SUPER_ADMIN"] }),
+  async (req, res, next) => {
+    try {
+      if (!req.user) {
+        throw AppError.unauthorized();
+      }
+      const bids = await listUserBids(req.user.id);
+      res.json({ bids });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 router.get("/product/:productId", async (req, res, next) => {
   try {

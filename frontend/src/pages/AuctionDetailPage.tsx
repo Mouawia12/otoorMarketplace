@@ -196,7 +196,8 @@ export default function AuctionDetailPage() {
 
     if (!auction) return;
 
-    if (new Date(auction.end_time).getTime() <= Date.now()) {
+    const now = Date.now();
+    if (auction.status !== 'active' || new Date(auction.end_time).getTime() <= now) {
       setBidError(t('auction.ended'));
       return;
     }
@@ -287,7 +288,10 @@ export default function AuctionDetailPage() {
       .map((img) => resolveProductImageUrl(img) || '')
       .filter(Boolean);
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
-  const isEnded = new Date(auction.end_time).getTime() < new Date().getTime();
+  const nowMs = Date.now();
+  const isEndedByStatus = auction.status === 'completed' || auction.status === 'cancelled';
+  const isEnded = isEndedByStatus || new Date(auction.end_time).getTime() <= nowMs;
+  const isLive = auction.status === 'active' && !isEnded && new Date(auction.start_time).getTime() <= nowMs;
   const seller = auction.seller || { id: 0, full_name: 'Unknown', verified_seller: false };
   const liveBadgeTone =
     liveStatus === 'connected'
@@ -313,7 +317,7 @@ export default function AuctionDetailPage() {
             {product.condition === 'new' ? t('catalog.new') : t('catalog.used')}
           </span>
         )}
-        {!isEnded && (
+        {isLive && (
           <span className={`inline-flex items-center gap-2 px-4 py-1 rounded-luxury text-xs font-semibold ${liveBadgeTone}`}>
             <span className={`h-2 w-2 rounded-full ${liveDotTone}`} />
             {t('auction.liveBadge')}
@@ -399,7 +403,7 @@ export default function AuctionDetailPage() {
             </div>
 
             {/* Bid Controls */}
-            {!isEnded ? (
+            {isLive ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <button

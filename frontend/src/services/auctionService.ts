@@ -21,6 +21,21 @@ export const placeBid = async (auctionId: number, amount: number): Promise<Bid> 
   return response.data;
 };
 
+export const fetchMyBids = async (): Promise<
+  Array<{
+    auctionId: number;
+    auctionName: string;
+    auctionNameAr: string;
+    yourMaxBid: number;
+    currentPrice: number;
+    status: "winning" | "outbid" | "ended_won" | "ended_lost";
+    endTime: string;
+  }>
+> => {
+  const response = await api.get('/auctions/my-bids');
+  return response.data.bids;
+};
+
 export const fetchAuctionByProductId = async (productId: number): Promise<Auction | null> => {
   const response = await api.get(`/auctions/product/${productId}`);
   return response.data.auction;

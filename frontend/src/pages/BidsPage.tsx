@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
 import SARIcon from '../components/common/SARIcon';
-import { fetchAuctions } from '../services/auctionService';
+import { fetchMyBids } from '../services/auctionService';
 
 interface Bid {
   id: number;
@@ -28,21 +28,16 @@ export default function BidsPage() {
     const loadAuctions = async () => {
       try {
         setLoading(true);
-        const auctions = await fetchAuctions();
-        const mapped: Bid[] = auctions.map((auction) => ({
-          id: auction.id,
-          auctionId: auction.id,
-          auctionName: auction.product?.name_en ?? `Auction #${auction.id}`,
-          auctionNameAr: auction.product?.name_ar ?? `مزاد #${auction.id}`,
-          yourMaxBid: auction.current_price,
-          currentPrice: auction.current_price,
-          status:
-            auction.status === 'active'
-              ? 'winning'
-              : auction.status === 'completed'
-                ? 'ended_won'
-                : 'ended_lost',
-          endTime: auction.end_time,
+        const response = await fetchMyBids();
+        const mapped: Bid[] = response.map((bid) => ({
+          id: bid.auctionId,
+          auctionId: bid.auctionId,
+          auctionName: bid.auctionName,
+          auctionNameAr: bid.auctionNameAr,
+          yourMaxBid: bid.yourMaxBid,
+          currentPrice: bid.currentPrice,
+          status: bid.status,
+          endTime: bid.endTime,
         }));
         setBids(mapped);
       } catch (error) {

@@ -55,6 +55,9 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
       : 'bg-gold text-charcoal';
   const isTester = Boolean(product.is_tester);
   const testerLabel = t('products.tester', 'Tester');
+  const goodsLabel = t('products.goods', 'Goods');
+  const testerBadgeLabel = isTester ? testerLabel : goodsLabel;
+  const testerBadgeTone = isTester ? 'bg-rose-500 text-white' : 'bg-emerald-600 text-white';
   
   const defaultAuctionEnd = auctionEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -127,11 +130,9 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
           <span className={`px-3 py-1 rounded-full text-xs font-semibold shadow-md leading-none ${conditionTone}`}>
             {conditionLabel}
           </span>
-          {isTester && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold shadow-md leading-none bg-rose-500 text-white">
-              {testerLabel}
-            </span>
-          )}
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold shadow-md leading-none ${testerBadgeTone}`}>
+            {testerBadgeLabel}
+          </span>
         </div>
 
         {/* المفضلة */}

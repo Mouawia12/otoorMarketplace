@@ -73,6 +73,9 @@ const normalizeBid = (bid: any) => {
   };
 };
 
+const hasWonAuction = (currentPrice: number, userMaxBid: number) =>
+  Math.abs(currentPrice - userMaxBid) < 0.0001;
+
 const listAuctionsSchema = z.object({
   status: z.nativeEnum(AuctionStatus).optional(),
   seller_id: z.coerce.number().optional(),
@@ -171,6 +174,71 @@ export const listAuctions = async (query: unknown) => {
       status: statusById.get(auction.id) ?? auction.status,
       total_bids: auction._count.bids,
     })
+  );
+};
+
+export const listUserBids = async (bidderId: number) => {
+  const bids = await prisma.bid.findMany({
+    where: { bidderId },
+    include: {
+      auction: {
+        include: {
+          product: {
+            select: {
+              nameEn: true,
+              nameAr: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const now = new Date();
+  const grouped = new Map<
+    number,
+    {
+      auctionId: number;
+      auctionName: string;
+      auctionNameAr: string;
+      yourMaxBid: number;
+      currentPrice: number;
+      endTime: Date;
+      status: "winning" | "outbid" | "ended_won" | "ended_lost";
+    }
+  >();
+
+  for (const bid of bids) {
+    const auction = bid.auction;
+    if (!auction) continue;
+
+    const currentPrice = Number(auction.currentPrice ?? auction.startingPrice ?? 0);
+    const entry = grouped.get(auction.id);
+    const nextMax = Math.max(entry?.yourMaxBid ?? 0, Number(bid.amount ?? 0));
+    const nameEn = auction.product?.nameEn ?? `Auction #${auction.id}`;
+    const nameAr = auction.product?.nameAr ?? `مزاد #${auction.id}`;
+
+    const isEnded =
+      auction.status === AuctionStatus.COMPLETED ||
+      auction.status === AuctionStatus.CANCELLED ||
+      auction.endTime <= now;
+    const isWinning = hasWonAuction(currentPrice, nextMax);
+    const status = isEnded ? (isWinning ? "ended_won" : "ended_lost") : isWinning ? "winning" : "outbid";
+
+    grouped.set(auction.id, {
+      auctionId: auction.id,
+      auctionName: nameEn,
+      auctionNameAr: nameAr,
+      yourMaxBid: nextMax,
+      currentPrice,
+      endTime: auction.endTime,
+      status,
+    });
+  }
+
+  return Array.from(grouped.values()).sort(
+    (a, b) => b.endTime.getTime() - a.endTime.getTime()
   );
 };
 
