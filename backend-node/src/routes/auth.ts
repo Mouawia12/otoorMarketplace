@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { z } from "zod";
 
 import {
@@ -15,12 +15,24 @@ import { authenticate } from "../middleware/auth";
 import { getUserProfile, updateUserProfile } from "../services/userService";
 import { toPlainObject } from "../utils/serializer";
 import { AppError } from "../utils/errors";
+import { config } from "../config/env";
 
 const router = Router();
+
+const setAuthCookie = (res: Response, token: string) => {
+  res.cookie(config.auth.cookieName, token, {
+    httpOnly: true,
+    secure: config.nodeEnv === "production",
+    sameSite: "lax",
+    maxAge: config.auth.cookieMaxAgeSeconds * 1000,
+    path: "/",
+  });
+};
 
 router.post("/register", async (req, res, next) => {
   try {
     const payload = await registerUser(req.body);
+    setAuthCookie(res, payload.token);
     res.status(201).json({
       access_token: payload.token,
       user: payload.user,
@@ -34,6 +46,7 @@ router.post("/login", async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
     const payload = await authenticateUser(data);
+    setAuthCookie(res, payload.token);
     res.json({
       access_token: payload.token,
       user: payload.user,
@@ -46,6 +59,7 @@ router.post("/login", async (req, res, next) => {
 router.post("/google", async (req, res, next) => {
   try {
     const payload = await authenticateWithGoogle(req.body);
+    setAuthCookie(res, payload.token);
     res.json({
       access_token: payload.token,
       user: payload.user,
@@ -53,6 +67,16 @@ router.post("/google", async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+router.post("/logout", (_req, res) => {
+  res.clearCookie(config.auth.cookieName, {
+    httpOnly: true,
+    secure: config.nodeEnv === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+  res.json({ success: true });
 });
 
 router.post("/forgot-password", async (req, res, next) => {

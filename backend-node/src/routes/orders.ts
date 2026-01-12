@@ -7,6 +7,7 @@ import {
   listAllOrders,
   listOrdersByUser,
   listOrdersForSeller,
+  listOrdersWithPagination,
   updateOrderStatus,
   confirmOrderDelivery,
   getOrderLabel,
@@ -44,14 +45,42 @@ router.get(
       }
 
       const roles = req.user.roles.map((r) => r.toUpperCase());
-      let orders;
+      const page = typeof req.query.page === "string" ? Number(req.query.page) : undefined;
+      const pageSize =
+        typeof req.query.page_size === "string" ? Number(req.query.page_size) : undefined;
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const wantsPagination =
+        Number.isFinite(page) || Number.isFinite(pageSize) || typeof search === "string";
 
       if (roles.includes(RoleName.ADMIN) || roles.includes(RoleName.SUPER_ADMIN)) {
-        orders = await listAllOrders(statusQuery);
-      } else {
-        orders = await listOrdersForSeller(req.user.id, statusQuery);
+        if (wantsPagination) {
+          const result = await listOrdersWithPagination({
+            status: statusQuery,
+            page: Number.isFinite(page) ? page : undefined,
+            page_size: Number.isFinite(pageSize) ? pageSize : undefined,
+            search,
+          });
+          res.json(result);
+          return;
+        }
+        const orders = await listAllOrders(statusQuery);
+        res.json(orders);
+        return;
       }
 
+      if (wantsPagination) {
+        const result = await listOrdersWithPagination({
+          status: statusQuery,
+          page: Number.isFinite(page) ? page : undefined,
+          page_size: Number.isFinite(pageSize) ? pageSize : undefined,
+          search,
+          sellerId: req.user.id,
+        });
+        res.json(result);
+        return;
+      }
+
+      const orders = await listOrdersForSeller(req.user.id, statusQuery);
       res.json(orders);
     } catch (error) {
       next(error);
@@ -133,6 +162,9 @@ router.post("/", authenticate(), async (req, res, next) => {
       shipping: shippingInput,
       items,
       couponCode: typeof body.coupon_code === "string" ? body.coupon_code : undefined,
+      couponCodes: Array.isArray(body.coupon_codes)
+        ? body.coupon_codes.filter((code) => typeof code === "string")
+        : undefined,
     });
 
     res.status(201).json(order);

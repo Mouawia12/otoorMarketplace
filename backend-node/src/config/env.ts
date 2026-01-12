@@ -36,6 +36,7 @@ const envSchema = z.object({
     .string()
     .url()
     .default("http://localhost:5173/reset-password"),
+  AUTH_COOKIE_NAME: z.string().default("otoor_session"),
   ADMIN_PROTECTED_EMAIL: z
     .string()
     .email()
@@ -78,6 +79,7 @@ const {
   MAIL_FROM_ADDRESS,
   MAIL_FROM_NAME,
   PASSWORD_RESET_URL,
+  AUTH_COOKIE_NAME,
   ADMIN_PROTECTED_EMAIL,
   REDBOX_API_TOKEN,
   REDBOX_BUSINESS_ID,
@@ -130,6 +132,11 @@ export const config = {
   },
   auth: {
     passwordResetUrl: PASSWORD_RESET_URL.replace(/\/+$/, ""),
+    cookieName: AUTH_COOKIE_NAME,
+    cookieMaxAgeSeconds: (() => {
+      const numericExpires = Number(JWT_EXPIRES_IN);
+      return Number.isNaN(numericExpires) ? 86400 : numericExpires;
+    })(),
   },
   accounts: {
     protectedAdminEmail: ADMIN_PROTECTED_EMAIL.toLowerCase(),

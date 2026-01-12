@@ -1,4 +1,4 @@
-import { AuctionStatus, NotificationType, Prisma, ProductCondition, ProductStatus } from "@prisma/client";
+import { AuctionStatus, NotificationType, Prisma, ProductCondition, ProductStatus, RoleName } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "../prisma/client";
@@ -7,6 +7,7 @@ import { toPlainObject } from "../utils/serializer";
 import { makeSlug } from "../utils/slugify";
 import { normalizeImagePathForStorage, toPublicAssetUrl } from "../utils/assets";
 import { createNotificationForUser, notifyAdmins } from "./notificationService";
+import { buildSearchVariants } from "../utils/search";
 
 const normalizeStatus = (status: string | null | undefined) => {
   if (!status) return status ?? "";
@@ -161,11 +162,14 @@ export const listProducts = async (query: unknown) => {
   }
 
   if (search) {
-    filters.OR = [
-      { nameEn: { contains: search } },
-      { nameAr: { contains: search } },
-      { brand: { contains: search } },
-    ];
+    const variants = buildSearchVariants(search);
+    if (variants.length > 0) {
+      filters.OR = variants.flatMap((term) => ([
+        { nameEn: { contains: term } },
+        { nameAr: { contains: term } },
+        { brand: { contains: term } },
+      ]));
+    }
   }
 
   if (min_price !== undefined || max_price !== undefined) {
@@ -226,6 +230,56 @@ export const listProducts = async (query: unknown) => {
     page_size,
     total_pages: Math.ceil(total / page_size),
   };
+};
+
+const suggestionSchema = z.object({
+  q: z.string().min(2),
+  limit: z.coerce.number().min(1).max(10).default(6),
+});
+
+export const listProductSuggestions = async (query: unknown) => {
+  const { q, limit } = suggestionSchema.parse(query ?? {});
+  const variants = buildSearchVariants(q);
+  if (variants.length === 0) {
+    return [];
+  }
+
+  const now = new Date();
+  const filters: Prisma.ProductWhereInput = {
+    status: ProductStatus.PUBLISHED,
+    auctions: {
+      none: {
+        status: { in: [AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED] },
+        endTime: { gt: now },
+      },
+    },
+    OR: variants.flatMap((term) => ([
+      { nameEn: { contains: term } },
+      { nameAr: { contains: term } },
+      { brand: { contains: term } },
+    ])),
+  };
+
+  const items = await prisma.product.findMany({
+    where: filters,
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+
+  return items.map((product) => {
+    const normalized = normalizeProduct(product);
+    return {
+      id: normalized.id,
+      name_ar: normalized.name_ar,
+      name_en: normalized.name_en,
+      brand: normalized.brand,
+      image_url: normalized.image_urls?.[0] ?? null,
+      base_price: normalized.base_price,
+    };
+  });
 };
 
 export const getProductById = async (id: number) => {
@@ -363,9 +417,19 @@ const productInputSchema = z.object({
   imageUrls: z.array(imageUrlSchema).default([]),
 });
 
-export const createProduct = async (input: z.infer<typeof productInputSchema>) => {
+export const createProduct = async (
+  input: z.infer<typeof productInputSchema>,
+  options?: { roles?: RoleName[] }
+) => {
   const data = productInputSchema.parse(input);
-  const initialStatus = ProductStatus.PUBLISHED;
+  const isAdmin = options?.roles?.some((role) =>
+    [RoleName.ADMIN, RoleName.SUPER_ADMIN].includes(role)
+  ) ?? false;
+  const requestedStatus = data.status ?? ProductStatus.PUBLISHED;
+  const initialStatus =
+    !isAdmin && requestedStatus === ProductStatus.PUBLISHED
+      ? ProductStatus.PENDING_REVIEW
+      : requestedStatus;
   const slugBase = makeSlug(data.nameEn);
 
   const existingSlug = await prisma.product.findFirst({
@@ -420,21 +484,39 @@ export const createProduct = async (input: z.infer<typeof productInputSchema>) =
     },
   });
 
-  await createNotificationForUser({
-    userId: product.sellerId,
-    type: NotificationType.PRODUCT_APPROVED,
-    title: "تم نشر منتجك",
-    message: `${product.nameEn ?? product.nameAr} متاح الآن في المتجر ويمكنك مراقبته من لوحة البائع.`,
-    data: { productId: product.id, status: initialStatus },
-  });
+  if (initialStatus === ProductStatus.PUBLISHED) {
+    await createNotificationForUser({
+      userId: product.sellerId,
+      type: NotificationType.PRODUCT_APPROVED,
+      title: "تم نشر منتجك",
+      message: `${product.nameEn ?? product.nameAr} متاح الآن في المتجر ويمكنك مراقبته من لوحة البائع.`,
+      data: { productId: product.id, status: initialStatus },
+    });
 
-  await notifyAdmins({
-    type: NotificationType.PRODUCT_SUBMITTED,
-    title: "منتج جديد تم نشره تلقائياً",
-    message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn ?? product.nameAr} وتم نشره مباشرة.`,
-    data: { productId: product.id, sellerId: product.sellerId, status: initialStatus },
-    fallbackToSupport: true,
-  });
+    await notifyAdmins({
+      type: NotificationType.PRODUCT_SUBMITTED,
+      title: "منتج جديد تم نشره تلقائياً",
+      message: `${product.seller?.fullName ?? "بائع"} أضاف المنتج ${product.nameEn ?? product.nameAr} وتم نشره مباشرة.`,
+      data: { productId: product.id, sellerId: product.sellerId, status: initialStatus },
+      fallbackToSupport: true,
+    });
+  } else if (initialStatus === ProductStatus.PENDING_REVIEW) {
+    await createNotificationForUser({
+      userId: product.sellerId,
+      type: NotificationType.SYSTEM,
+      title: "تم إرسال المنتج للمراجعة",
+      message: `${product.nameEn ?? product.nameAr} بانتظار موافقة الإدارة.`,
+      data: { productId: product.id, status: initialStatus },
+    });
+
+    await notifyAdmins({
+      type: NotificationType.PRODUCT_SUBMITTED,
+      title: "منتج بانتظار المراجعة",
+      message: `${product.seller?.fullName ?? "بائع"} أرسل المنتج ${product.nameEn ?? product.nameAr} للمراجعة.`,
+      data: { productId: product.id, sellerId: product.sellerId, status: initialStatus },
+      fallbackToSupport: true,
+    });
+  }
 
   return normalizeProduct(product);
 };
@@ -465,7 +547,8 @@ const updateProductSchema = z.object({
 export const updateProduct = async (
   productId: number,
   sellerId: number,
-  payload: unknown
+  payload: unknown,
+  options?: { roles?: RoleName[] }
 ) => {
   const data = updateProductSchema.parse(payload);
 
@@ -493,16 +576,21 @@ export const updateProduct = async (
   if (data.stockQuantity !== undefined) updateData.stockQuantity = data.stockQuantity;
   if (data.isTester !== undefined) updateData.isTester = data.isTester;
   if (data.status !== undefined) {
+    const isAdmin = options?.roles?.some((role) =>
+      [RoleName.ADMIN, RoleName.SUPER_ADMIN].includes(role)
+    ) ?? false;
     if (typeof data.status === "string") {
       const normalized = data.status.toLowerCase();
-      // treat "pending" or "published" as published for instant approval
       if (normalized === "pending" || normalized === "published") {
-        updateData.status = ProductStatus.PUBLISHED;
+        updateData.status = isAdmin ? ProductStatus.PUBLISHED : ProductStatus.PENDING_REVIEW;
       } else {
         updateData.status = normalized.toUpperCase() as ProductStatus;
       }
     } else {
-      updateData.status = data.status;
+      updateData.status =
+        !isAdmin && data.status === ProductStatus.PUBLISHED
+          ? ProductStatus.PENDING_REVIEW
+          : data.status;
     }
   }
 
@@ -537,6 +625,16 @@ export const updateProduct = async (
       },
     },
   });
+
+  if (updateData.status === ProductStatus.PENDING_REVIEW) {
+    await notifyAdmins({
+      type: NotificationType.PRODUCT_SUBMITTED,
+      title: "منتج بانتظار المراجعة",
+      message: `${updated.seller?.fullName ?? "بائع"} أرسل المنتج ${updated.nameEn ?? updated.nameAr} للمراجعة.`,
+      data: { productId: updated.id, sellerId: updated.sellerId, status: updateData.status },
+      fallbackToSupport: true,
+    });
+  }
 
   return normalizeProduct(updated);
 };

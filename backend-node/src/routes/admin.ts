@@ -227,9 +227,9 @@ router.put("/settings/social-links", adminOnly, async (req, res, next) => {
   }
 });
 
-router.get("/users", adminOnly, async (_req, res, next) => {
+router.get("/users", adminOnly, async (req, res, next) => {
   try {
-    const users = await listUsersForAdmin();
+    const users = await listUsersForAdmin(req.query);
     res.json(users);
   } catch (error) {
     next(error);
@@ -359,8 +359,7 @@ router.patch("/products/:id/moderate", adminOnly, async (req, res, next) => {
 
 router.get("/products", adminOnly, async (req, res, next) => {
   try {
-    const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    const products = await listProductsForAdmin(status);
+    const products = await listProductsForAdmin(req.query);
     res.json(products);
   } catch (error) {
     next(error);

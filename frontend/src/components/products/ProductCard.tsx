@@ -163,19 +163,21 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
 
       {/* المحتوى */}
       <div className="p-3 sm:p-4 flex-1 flex flex-col">
-        {product.brand && (
-          <Link
-            to={`/products?brand=${encodeURIComponent(product.brand)}&status=published`}
-            className="text-xs text-taupe/90 mb-1 hover:text-gold transition-colors"
-          >
-            {product.brand}
-          </Link>
-        )}
+        <div className="min-h-[18px] mb-1">
+          {product.brand && (
+            <Link
+              to={`/products?brand=${encodeURIComponent(product.brand)}&status=published`}
+              className="text-xs text-taupe/90 hover:text-gold transition-colors line-clamp-1"
+            >
+              {product.brand}
+            </Link>
+          )}
+        </div>
 
         {/* عنوان بسطرين ثابتين لثبات الارتفاع */}
         <Link
           to={targetLink}
-          className="block text-sm sm:text-base text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2 min-h-[36px] sm:min-h-[44px]"
+          className="block text-sm sm:text-base text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2 min-h-[40px] sm:min-h-[48px] break-words"
         >
           {name}
         </Link>

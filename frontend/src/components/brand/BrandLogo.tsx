@@ -25,6 +25,7 @@ export default function BrandLogo({
   srcOverride,
 }: BrandLogoProps) {
   const { language } = useUIStore();
+  const allowRemote = Boolean(import.meta.env?.VITE_CDN_BASE_URL);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const basePath = import.meta.env?.VITE_CDN_BASE_URL
@@ -38,12 +39,13 @@ export default function BrandLogo({
 
   const remoteCandidates = useMemo(() => {
     if (srcOverride) return [srcOverride];
+    if (!allowRemote) return [];
     return [
       `${basePath}/${fileBase}.svg`,
       `${basePath}/${fileBase}.png`,
       `${basePath}/${fileBase}`,
     ];
-  }, [srcOverride, basePath, fileBase]);
+  }, [srcOverride, basePath, fileBase, allowRemote]);
 
   const [currentSrc, setCurrentSrc] = useState(srcOverride ?? localFallback);
 
@@ -52,7 +54,7 @@ export default function BrandLogo({
   }, [srcOverride, localFallback]);
 
   useEffect(() => {
-    if (srcOverride) return;
+    if (srcOverride || !allowRemote) return;
     let cancelled = false;
 
     const tryLoad = (index: number) => {

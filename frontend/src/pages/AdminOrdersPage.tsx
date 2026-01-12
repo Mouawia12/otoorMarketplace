@@ -60,17 +60,30 @@ export default function AdminOrdersPage() {
   const { language } = useUIStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<OrderFilter>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [printingLabelId, setPrintingLabelId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
       setError(null);
-      const params = filter !== "all" ? { status: filter } : undefined;
-      const response = await api.get<Order[]>("/orders", { params });
-      setOrders(response.data);
+      const params: Record<string, string | number> = {
+        page,
+        page_size: 20,
+      };
+      if (filter !== "all") params.status = filter;
+      if (searchTerm.trim()) params.search = searchTerm.trim();
+      const response = await api.get("/orders", { params });
+      const payload = response.data;
+      setOrders(payload.orders ?? []);
+      setTotalPages(payload.total_pages ?? 1);
+      setStatusCounts(payload.status_counts ?? {});
     } catch (err: any) {
       console.error("Failed to load admin orders", err);
       setError(err?.response?.data?.detail ?? t("common.errorLoading"));
@@ -81,7 +94,7 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     loadOrders();
-  }, [filter]);
+  }, [filter, page, searchTerm]);
 
   const grouped = useMemo(() => {
     return orders.reduce<Record<string, Order[]>>((acc, order) => {
@@ -95,9 +108,16 @@ export default function AdminOrdersPage() {
     try {
       await api.patch(`/orders/${orderId}/status`, { status });
       await loadOrders();
+      setNotice({
+        tone: "success",
+        message: t("orders.updateSuccess", "تم تحديث الحالة بنجاح"),
+      });
     } catch (err: any) {
       console.error("Failed to update order status", err);
-      alert(err?.response?.data?.detail ?? t("orders.updateFailed", "Failed to update order"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("orders.updateFailed", "Failed to update order"),
+      });
     }
   };
 
@@ -146,6 +166,17 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <div
+          className={`rounded-luxury border px-4 py-3 text-sm ${
+            notice.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-h2 text-charcoal">{t("admin.orders")}</h1>
@@ -153,7 +184,10 @@ export default function AdminOrdersPage() {
             {uniqueFilters.map((status) => (
               <button
                 key={status}
-                onClick={() => setFilter(status)}
+                onClick={() => {
+                  setFilter(status);
+                  setPage(1);
+                }}
                 className={`px-4 py-2 rounded-luxury text-sm font-semibold ${
                   filter === status ? "bg-gold text-charcoal" : "bg-sand text-charcoal-light"
                 }`}
@@ -166,6 +200,18 @@ export default function AdminOrdersPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mb-4 flex flex-col sm:flex-row gap-3">
+          <input
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
+            placeholder={t("admin.searchOrders", "ابحث برقم الطلب أو المشتري أو المنتج")}
+            className="flex-1 px-4 py-2 rounded-luxury border border-sand focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]"
+          />
         </div>
 
         <div className="overflow-x-auto">
@@ -251,15 +297,38 @@ export default function AdminOrdersPage() {
             <p className="text-taupe">{t("orders.noOrders")}</p>
           </div>
         )}
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p className="text-sm text-charcoal-light">
+            {t("admin.pageIndicator", { page, total: totalPages })}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page <= 1}
+              className="px-4 py-2 rounded-luxury border border-sand text-charcoal disabled:opacity-50"
+            >
+              {t("common.previous", "Previous")}
+            </button>
+            <button
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page >= totalPages}
+              className="px-4 py-2 rounded-luxury border border-sand text-charcoal disabled:opacity-50"
+            >
+              {t("common.next", "Next")}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
         <h2 className="text-h3 text-charcoal mb-4">{t("admin.orderSummary", "ملخص الطلبات")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(grouped).map(([status, items]) => (
+          {(Object.keys(statusCounts).length ? Object.entries(statusCounts) : Object.entries(grouped).map(([k, v]) => [k, v.length])) 
+            .map(([status, count]) => (
             <div key={status} className="bg-sand/50 rounded-luxury p-4">
               <p className="text-sm text-taupe mb-1">{t(`orders.statuses.${status}`)}</p>
-              <p className="text-2xl font-bold text-charcoal">{items.length}</p>
+              <p className="text-2xl font-bold text-charcoal">{count}</p>
             </div>
           ))}
         </div>

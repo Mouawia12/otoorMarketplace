@@ -7,6 +7,10 @@ import { extractToc } from '../../services/blogService';
 import { BLOG_PLACEHOLDER } from '../../utils/staticAssets';
 import { resolveImageUrl } from '../../utils/image';
 import { BlogPost as BlogPostType, fetchPost, fetchPosts } from '../../services/blogApi';
+import { fetchProductSuggestions, type ProductSuggestion } from '../../services/productService';
+import { resolveProductImageUrl } from '../../utils/image';
+import { formatSAR } from '../../utils/currency';
+import SARIcon from '../../components/common/SARIcon';
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -16,6 +20,7 @@ export default function BlogPost() {
   const [post, setPost] = useState<BlogPostType | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<BlogPostType[]>([]);
   const [toc, setToc] = useState<{ id: string; text: string; level: number }[]>([]);
+  const [productSuggestions, setProductSuggestions] = useState<ProductSuggestion[]>([]);
   const [copySuccess, setCopySuccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [contentLanguage, setContentLanguage] = useState<'ar' | 'en'>(language);
@@ -64,6 +69,22 @@ export default function BlogPost() {
         setContentLanguage(langUsed);
         setToc(extractToc(foundPost.html || ''));
         setRelatedPosts(related);
+        const seed =
+          foundPost.tags?.[0] ||
+          foundPost.category ||
+          foundPost.title.split(' ')[0];
+        if (seed) {
+          try {
+            const suggestions = await fetchProductSuggestions(seed, 6);
+            if (!cancelled) {
+              setProductSuggestions(suggestions);
+            }
+          } catch (_error) {
+            if (!cancelled) {
+              setProductSuggestions([]);
+            }
+          }
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -292,6 +313,55 @@ export default function BlogPost() {
                 dangerouslySetInnerHTML={{ __html: post.html || '' }}
                 style={{ direction: i18n.language === 'ar' ? 'rtl' : 'ltr' }}
               />
+
+              {productSuggestions.length > 0 && (
+                <div className="rounded-[28px] border border-sand bg-white p-5 sm:p-6 mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg sm:text-xl font-bold text-charcoal">
+                      {t('blog.shopRelated', 'تسوق منتجات مرتبطة')}
+                    </h3>
+                    <Link
+                      to={`/products?search=${encodeURIComponent(post.category || post.title)}`}
+                      className="text-sm text-gold hover:text-charcoal transition"
+                    >
+                      {t('blog.viewAllProducts', 'عرض جميع المنتجات')}
+                    </Link>
+                  </div>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {productSuggestions.map((suggestion) => {
+                      const name = contentLanguage === 'ar' ? suggestion.name_ar : suggestion.name_en;
+                      const image =
+                        resolveProductImageUrl(suggestion.image_url) || BLOG_PLACEHOLDER;
+                      return (
+                        <Link
+                          key={suggestion.id}
+                          to={`/p/${suggestion.id}`}
+                          className="group rounded-2xl border border-ivory/70 overflow-hidden bg-ivory/50 hover:bg-white hover:shadow-lg transition"
+                        >
+                          <div className="aspect-[4/5] bg-sand/50 flex items-center justify-center">
+                            <img
+                              src={image}
+                              alt={name}
+                              loading="lazy"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <div className="p-4 space-y-1">
+                            <p className="text-xs text-taupe">{suggestion.brand}</p>
+                            <h4 className="text-sm font-semibold text-charcoal line-clamp-2">
+                              {name}
+                            </h4>
+                            <div className="text-gold font-bold inline-flex items-center gap-1 text-sm">
+                              {formatSAR(suggestion.base_price, contentLanguage === 'ar' ? 'ar-SA' : 'en-US')}
+                              <SARIcon size={14} />
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-6">
                 <div className="bg-ivory/80 border border-ivory/60 rounded-2xl p-4 sm:p-6">

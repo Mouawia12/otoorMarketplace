@@ -168,6 +168,23 @@ export default function AuctionDetailPage() {
   }, [bids, obfuscateName]);
 
   const winner = useMemo(() => {
+    if (auction?.winner) {
+      return {
+        bid: {
+          id: auction.winner.bid_id,
+          auction_id: auction.id,
+          bidder_id: auction.winner.bidder_id,
+          amount: auction.winner.amount,
+          created_at: auction.end_time,
+          bidder: auction.winner.bidder,
+        },
+        label: obfuscateName(
+          auction.winner.bidder?.full_name,
+          auction.winner.bidder?.email,
+          auction.winner.bidder_id
+        ),
+      };
+    }
     if (!bids.length) return null;
     const topBid = [...bids].sort(
       (a, b) => b.amount - a.amount || new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -178,7 +195,7 @@ export default function AuctionDetailPage() {
           label: obfuscateName(topBid.bidder?.full_name, topBid.bidder?.email, topBid.bidder_id),
         }
       : null;
-  }, [bids, obfuscateName]);
+  }, [auction?.winner, auction?.end_time, auction?.id, bids, obfuscateName]);
 
   const minBidValue = auction ? auction.current_price + auction.minimum_increment : 0;
   const stepValue = auction?.minimum_increment ?? 1;

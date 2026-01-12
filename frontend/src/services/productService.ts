@@ -30,6 +30,15 @@ export interface ProductFiltersMeta {
   max_price?: number;
 }
 
+export interface ProductSuggestion {
+  id: number;
+  name_ar: string;
+  name_en: string;
+  brand: string;
+  image_url: string | null;
+  base_price: number;
+}
+
 export const fetchProducts = async (params: FetchProductsParams = {}): Promise<ProductsResponse> => {
   const response = await api.get('/products', { params });
   return response.data;
@@ -50,4 +59,11 @@ export const fetchRelatedProducts = async (productId: number, limit = 4): Promis
 export const fetchProductFiltersMeta = async (): Promise<ProductFiltersMeta> => {
   const response = await api.get('/products/meta');
   return response.data;
+};
+
+export const fetchProductSuggestions = async (query: string, limit = 6): Promise<ProductSuggestion[]> => {
+  const response = await api.get('/products/suggestions', {
+    params: { q: query, limit },
+  });
+  return response.data?.suggestions ?? [];
 };

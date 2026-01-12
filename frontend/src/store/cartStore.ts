@@ -28,13 +28,14 @@ type AppliedCoupon = {
 
 type CartState = {
   items: CartItem[];
-  coupon?: AppliedCoupon | null;
+  coupons: AppliedCoupon[];
   shipping: ShippingMethod;
   add: (p: Omit<CartItem, "qty">, qty?: number) => void;
   remove: (id: string, variantId?: string) => void;
   setQty: (id: string, qty: number, variantId?: string) => void;
   clear: () => void;
-  setCoupon: (c: AppliedCoupon | null) => void;
+  setCoupons: (c: AppliedCoupon[]) => void;
+  removeCoupon: (code: string) => void;
   setShipping: (m: ShippingMethod) => void;
   totals: () => { sub: number; discount: number; shipping: number; total: number };
   count: () => number;
@@ -44,7 +45,7 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
-      coupon: null,
+      coupons: [],
       shipping: "redbox",
       add: (p, qty = 1) => {
         const items = [...get().items];
@@ -66,13 +67,22 @@ export const useCartStore = create<CartState>()(
             i.id === id && i.variantId === variantId ? { ...i, qty: Math.max(1, qty) } : i
           ),
         }),
-      clear: () => set({ items: [], coupon: null }),
-      setCoupon: (c) => set({ coupon: c }),
+      clear: () => set({ items: [], coupons: [] }),
+      setCoupons: (c) => set({ coupons: c }),
+      removeCoupon: (code) =>
+        set({
+          coupons: get().coupons.filter(
+            (coupon) => coupon.code.toUpperCase() !== code.toUpperCase()
+          ),
+        }),
       setShipping: (m) => set({ shipping: m }),
       totals: () => {
         const sub = get().items.reduce((s, i) => s + i.price * i.qty, 0);
-        const coupon = get().coupon;
-        const discount = Math.min(coupon?.amount ?? 0, sub);
+        const totalDiscount = get().coupons.reduce(
+          (sum, coupon) => sum + (coupon.amount || 0),
+          0
+        );
+        const discount = Math.min(totalDiscount, sub);
         const ship = get().shipping === "express" ? 35 : 0;
         const total = Math.max(0, sub - discount) + ship;
         return { sub, discount, shipping: ship, total };

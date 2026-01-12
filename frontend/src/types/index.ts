@@ -84,6 +84,12 @@ export interface Auction {
   product?: Product;
   seller?: { id: number; full_name: string; verified_seller: boolean };
   total_bids?: number;
+  winner?: {
+    bid_id: number;
+    bidder_id: number;
+    amount: number;
+    bidder?: { id: number; full_name: string; email: string };
+  } | null;
 }
 
 export interface Bid {

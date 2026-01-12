@@ -8,6 +8,7 @@ import {
   SellerStatus,
   UserStatus,
 } from "@prisma/client";
+import { z } from "zod";
 
 import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
@@ -51,25 +52,82 @@ export const getAdminDashboardStats = async () => {
   };
 };
 
-export const listUsersForAdmin = async () => {
-  const users = (await prisma.user.findMany({
-    include: {
-      roles: {
-        include: { role: true },
+const listUsersSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  page_size: z.coerce.number().int().min(1).max(200).default(25).optional(),
+  search: z.string().optional(),
+  status: z.string().optional(),
+  role: z.string().optional(),
+  seller_status: z.string().optional(),
+});
+
+export const listUsersForAdmin = async (query?: unknown) => {
+  const { page = 1, page_size = 25, search, status, role, seller_status } =
+    listUsersSchema.parse(query ?? {});
+
+  const where: Prisma.UserWhereInput = {};
+
+  if (status) {
+    const normalized = status.toUpperCase();
+    if (Object.values(UserStatus).includes(normalized as UserStatus)) {
+      where.status = normalized as UserStatus;
+    }
+  }
+
+  if (seller_status) {
+    const normalized = seller_status.toUpperCase();
+    if (Object.values(SellerStatus).includes(normalized as SellerStatus)) {
+      where.sellerStatus = normalized as SellerStatus;
+    }
+  }
+
+  if (role) {
+    const normalized = role.toUpperCase();
+    if (Object.values(RoleName).includes(normalized as RoleName)) {
+      where.roles = {
+        some: {
+          role: { name: normalized as RoleName },
+        },
+      };
+    }
+  }
+
+  if (search) {
+    const term = search.trim();
+    if (term) {
+      const maybeId = Number(term);
+      where.OR = [
+        { email: { contains: term } },
+        { fullName: { contains: term } },
+        ...(Number.isNaN(maybeId) ? [] : [{ id: maybeId }]),
+      ];
+    }
+  }
+
+  const [total, users] = await prisma.$transaction([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      include: {
+        roles: {
+          include: { role: true },
+        },
+        sellerProfile: {
+          select: { status: true },
+        },
       },
-      sellerProfile: {
-        select: { status: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  })) as Prisma.UserGetPayload<{
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * page_size,
+      take: page_size,
+    }),
+  ]);
+
+  const items = (users as Prisma.UserGetPayload<{
     include: {
       roles: { include: { role: true } };
       sellerProfile: { select: { status: true } };
     };
-  }>[];
-
-  return users.map((user) => ({
+  }>[]).map((user) => ({
     id: user.id,
     email: user.email,
     full_name: user.fullName,
@@ -80,6 +138,14 @@ export const listUsersForAdmin = async () => {
     seller_profile_status: user.sellerProfile?.status?.toLowerCase?.(),
     verified_seller: user.verifiedSeller,
   }));
+
+  return {
+    users: items,
+    total,
+    page,
+    page_size,
+    total_pages: Math.ceil(total / page_size),
+  };
 };
 
 type AdminUserUpdatePayload = {
@@ -383,7 +449,18 @@ const friendlyToProductStatus = (status: string): ProductStatus => {
   }
 };
 
-export const listProductsForAdmin = async (status?: string) => {
+const listProductsSchema = z.object({
+  status: z.string().optional(),
+  search: z.string().optional(),
+  seller_id: z.coerce.number().optional(),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  page_size: z.coerce.number().int().min(1).max(200).default(25).optional(),
+});
+
+export const listProductsForAdmin = async (query?: unknown) => {
+  const { status, search, seller_id, page = 1, page_size = 25 } =
+    listProductsSchema.parse(query ?? {});
+
   const where: Prisma.ProductWhereInput = {};
 
   if (status) {
@@ -392,22 +469,62 @@ export const listProductsForAdmin = async (status?: string) => {
     where.status = { not: ProductStatus.DRAFT };
   }
 
-  const products = await prisma.product.findMany({
-    where,
-    include: {
-      images: { orderBy: { sortOrder: "asc" } },
-      seller: {
-        select: {
-          id: true,
-          fullName: true,
-          verifiedSeller: true,
+  if (seller_id) {
+    where.sellerId = seller_id;
+  }
+
+  if (search) {
+    const term = search.trim();
+    if (term) {
+      const maybeId = Number(term);
+      where.OR = [
+        { nameEn: { contains: term } },
+        { nameAr: { contains: term } },
+        { brand: { contains: term } },
+        { slug: { contains: term } },
+        ...(Number.isNaN(maybeId) ? [] : [{ id: maybeId }]),
+      ];
+    }
+  }
+
+  const [total, products, statusCounts] = await prisma.$transaction([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        seller: {
+          select: {
+            id: true,
+            fullName: true,
+            verifiedSeller: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * page_size,
+      take: page_size,
+    }),
+    prisma.product.groupBy({
+      by: ["status"],
+      where: seller_id ? { sellerId: seller_id } : undefined,
+      _count: { status: true },
+    }),
+  ]);
 
-  return products.map((product) => normalizeProduct(product));
+  const counts = statusCounts.reduce<Record<string, number>>((acc, row) => {
+    acc[row.status] = row._count.status ?? 0;
+    return acc;
+  }, {});
+
+  return {
+    products: products.map((product) => normalizeProduct(product)),
+    total,
+    page,
+    page_size,
+    total_pages: Math.ceil(total / page_size),
+    status_counts: counts,
+  };
 };
 
 export const updateProductStatusAsAdmin = async (

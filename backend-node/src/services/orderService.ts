@@ -7,7 +7,9 @@ import { normalizeProduct } from "./productService";
 import { config } from "../config/env";
 import {
   prepareCouponForOrder,
+  prepareCouponsForOrder,
   finalizeCouponUsage,
+  finalizeCouponsUsage,
 } from "./couponService";
 import {
   createShipmentAgency,
@@ -23,6 +25,14 @@ const orderItemSchema = z.object({
   productId: z.coerce.number().int().positive(),
   quantity: z.coerce.number().int().positive(),
   unitPrice: z.coerce.number().positive().optional(),
+});
+
+const listOrdersSchema = z.object({
+  status: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  page_size: z.coerce.number().int().min(1).max(200).default(25).optional(),
+  search: z.string().optional(),
+  sellerId: z.coerce.number().optional(),
 });
 
 const normalizeShippingType = (value?: unknown) => {
@@ -103,12 +113,31 @@ const createOrderSchema = z.object({
   shipping: shippingDetailsSchema.optional(),
   items: z.array(orderItemSchema).min(1),
   couponCode: z.string().min(3).optional(),
+  couponCodes: z.array(z.string().min(3)).max(5).optional(),
 });
 
 export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   const data = createOrderSchema.parse(input);
   if (!data.shipping) {
     throw AppError.badRequest("Shipping details are required");
+  }
+
+  const itemMap = new Map<number, { productId: number; quantity: number }>();
+  for (const item of data.items) {
+    const existing = itemMap.get(item.productId);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      itemMap.set(item.productId, {
+        productId: item.productId,
+        quantity: item.quantity,
+      });
+    }
+  }
+
+  const aggregatedItems = Array.from(itemMap.values());
+  if (aggregatedItems.length === 0) {
+    throw AppError.badRequest("Order items are required");
   }
 
   const shipping = data.shipping;
@@ -143,7 +172,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   // validate products and stock
   const products = await prisma.product.findMany({
     where: {
-      id: { in: data.items.map((item) => item.productId) },
+      id: { in: aggregatedItems.map((item) => item.productId) },
     },
     select: {
       id: true,
@@ -156,11 +185,11 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
 
   const productMap = new Map(products.map((product) => [product.id, product]));
 
-  if (productMap.size !== data.items.length) {
+  if (productMap.size !== aggregatedItems.length) {
     throw AppError.badRequest("One or more products are unavailable");
   }
 
-  const subtotal = data.items.reduce((total, item) => {
+  const subtotal = aggregatedItems.reduce((total, item) => {
     const product = productMap.get(item.productId);
     if (!product) {
       throw AppError.badRequest(`Product ${item.productId} not found`);
@@ -172,7 +201,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     throw AppError.badRequest("Order subtotal must be greater than zero");
   }
 
-  for (const item of data.items) {
+  for (const item of aggregatedItems) {
     const product = productMap.get(item.productId);
     if (!product) {
       throw AppError.badRequest(`Product ${item.productId} not found`);
@@ -187,7 +216,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     }
   }
 
-  const normalizedItems = data.items.map((item) => {
+  const normalizedItems = aggregatedItems.map((item) => {
     const product = productMap.get(item.productId)!;
     const basePriceNumber = product.basePrice.toNumber();
     const unitPrice = new Prisma.Decimal(basePriceNumber);
@@ -199,7 +228,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     };
   });
 
-  const couponLines = data.items.map((item) => {
+  const couponLines = aggregatedItems.map((item) => {
     const product = productMap.get(item.productId)!;
     return {
       productId: item.productId,
@@ -210,13 +239,32 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   });
 
   let appliedCoupon: { coupon: Coupon; discountAmount: number } | null = null;
-  if (data.couponCode) {
+  let appliedCoupons: Array<{ coupon: Coupon; discountAmount: number }> = [];
+  let appliedCouponCodes: string[] = [];
+
+  if (data.couponCodes && data.couponCodes.length > 0) {
+    const prepared = await prisma.$transaction((tx) =>
+      prepareCouponsForOrder(tx, data.couponCodes!, couponLines)
+    );
+    appliedCoupons = prepared.coupons.map((entry) => ({
+      coupon: entry.coupon,
+      discountAmount: entry.discountAmount,
+    }));
+    appliedCouponCodes = appliedCoupons.map((entry) => entry.coupon.code);
+  } else if (data.couponCode) {
     appliedCoupon = await prisma.$transaction((tx) =>
       prepareCouponForOrder(tx, data.couponCode!, couponLines)
     );
+    if (appliedCoupon) {
+      appliedCoupons = [appliedCoupon];
+      appliedCouponCodes = [appliedCoupon.coupon.code];
+    }
   }
 
-  const discountAmount = appliedCoupon?.discountAmount ?? 0;
+  const discountAmount = appliedCoupons.reduce(
+    (total, entry) => total + entry.discountAmount,
+    0
+  );
   const totalBeforeShipping = Math.max(0, subtotal - discountAmount);
   const totalAmount = totalBeforeShipping + shippingFeeValue;
   const platformFee =
@@ -258,8 +306,12 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         shippingFee: new Prisma.Decimal(shippingFeeValue),
         totalAmount: new Prisma.Decimal(totalAmount),
         platformFee: new Prisma.Decimal(platformFee),
-        couponId: appliedCoupon?.coupon.id ?? null,
-        couponCode: appliedCoupon?.coupon.code ?? null,
+        couponId:
+          appliedCoupon && appliedCoupons.length === 1
+            ? appliedCoupon.coupon.id
+            : null,
+        couponCode:
+          appliedCouponCodes.length > 0 ? appliedCouponCodes.join(",") : null,
         codAmount:
           codAmount !== undefined
             ? new Prisma.Decimal(codAmount)
@@ -277,14 +329,21 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     });
 
     for (const item of normalizedItems) {
-      await tx.product.update({
-        where: { id: item.productId },
+      const updateResult = await tx.product.updateMany({
+        where: {
+          id: item.productId,
+          stockQuantity: { gte: item.quantity },
+          status: "PUBLISHED",
+        },
         data: {
           stockQuantity: {
             decrement: item.quantity,
           },
         },
       });
+      if (updateResult.count === 0) {
+        throw AppError.badRequest(`Insufficient stock for product ${item.productId}`);
+      }
     }
 
     return created;
@@ -360,9 +419,12 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     }
   }
 
-  if (appliedCoupon) {
+  if (appliedCoupons.length > 0) {
     await prisma.$transaction((tx) =>
-      finalizeCouponUsage(tx, appliedCoupon.coupon)
+      finalizeCouponsUsage(
+        tx,
+        appliedCoupons.map((entry) => entry.coupon)
+      )
     );
   }
 
@@ -521,6 +583,144 @@ export const listOrdersByUser = async (userId: number) => {
   return orders.map(mapOrderToDto);
 };
 
+type ListOrdersOptions = {
+  status?: string;
+  page?: number;
+  page_size?: number;
+  search?: string;
+  sellerId?: number;
+};
+
+const buildOrdersSearchWhere = (search?: string): Prisma.OrderWhereInput | undefined => {
+  if (!search) {
+    return undefined;
+  }
+  const term = search.trim();
+  if (!term) {
+    return undefined;
+  }
+  const maybeId = Number(term);
+  const numericFilters = Number.isNaN(maybeId)
+    ? []
+    : [
+        { id: maybeId },
+        { buyerId: maybeId },
+      ];
+
+  return {
+    OR: [
+      { shippingName: { contains: term } },
+      { shippingPhone: { contains: term } },
+      { couponCode: { contains: term } },
+      {
+        items: {
+          some: {
+            product: {
+              OR: [
+                { nameEn: { contains: term } },
+                { nameAr: { contains: term } },
+                { brand: { contains: term } },
+              ],
+            },
+          },
+        },
+      },
+      ...numericFilters,
+    ],
+  };
+};
+
+const mapOrdersForSeller = (orders: Prisma.OrderGetPayload<{ include: typeof orderInclude }>[], sellerId: number) =>
+  orders.map((order) => {
+    const dto = mapOrderToDto(order);
+    const sellerItems = dto.items?.filter(
+      (item) => item.product?.seller_id === sellerId
+    );
+
+    if (!sellerItems || sellerItems.length === 0) {
+      return dto;
+    }
+
+    const [primary] = sellerItems;
+
+    return {
+      ...dto,
+      product: primary?.product ?? dto.product,
+      product_id: primary?.product_id ?? dto.product_id,
+      quantity: sellerItems.reduce((total, item) => total + item.quantity, 0),
+      unit_price: primary?.unit_price ?? dto.unit_price,
+      items: sellerItems,
+    };
+  });
+
+export const listOrdersWithPagination = async (options: ListOrdersOptions = {}) => {
+  const { status, page = 1, page_size = 25, search, sellerId } = listOrdersSchema.parse(
+    options ?? {}
+  );
+  const where: Prisma.OrderWhereInput = {};
+
+  if (status) {
+    where.status = friendlyToStatus(status);
+  }
+
+  if (sellerId) {
+    where.items = {
+      some: {
+        product: { sellerId },
+      },
+    };
+  }
+
+  const searchWhere = buildOrdersSearchWhere(search);
+  if (searchWhere) {
+    Object.assign(where, searchWhere);
+  }
+
+  const countsWhere: Prisma.OrderWhereInput = {
+    ...(sellerId
+      ? {
+          items: {
+            some: {
+              product: { sellerId },
+            },
+          },
+        }
+      : {}),
+    ...(searchWhere ?? {}),
+  };
+
+  const [total, orders, statusCounts] = await prisma.$transaction([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      include: orderInclude,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * page_size,
+      take: page_size,
+    }),
+    prisma.order.groupBy({
+      by: ["status"],
+      where: countsWhere,
+      _count: { status: true },
+    }),
+  ]);
+
+  const mapped = sellerId ? mapOrdersForSeller(orders, sellerId) : orders.map(mapOrderToDto);
+  const status_counts = statusCounts.reduce<Record<string, number>>((acc, row) => {
+    acc[statusToFriendly(row.status)] = row._count.status ?? 0;
+    return acc;
+  }, {});
+
+  return {
+    orders: mapped,
+    total,
+    page,
+    page_size,
+    total_pages: Math.ceil(total / page_size),
+    status_counts,
+  };
+};
+
 export const listAllOrders = async (status?: string) => {
   const where: Prisma.OrderWhereInput = {};
   if (status) {
@@ -557,27 +757,7 @@ export const listOrdersForSeller = async (sellerId: number, status?: string) => 
     orderBy: { createdAt: "desc" },
   });
 
-  return orders.map((order) => {
-    const dto = mapOrderToDto(order);
-    const sellerItems = dto.items?.filter(
-      (item) => item.product?.seller_id === sellerId
-    );
-
-    if (!sellerItems || sellerItems.length === 0) {
-      return dto;
-    }
-
-    const [primary] = sellerItems;
-
-    return {
-      ...dto,
-      product: primary?.product ?? dto.product,
-      product_id: primary?.product_id ?? dto.product_id,
-      quantity: sellerItems.reduce((total, item) => total + item.quantity, 0),
-      unit_price: primary?.unit_price ?? dto.unit_price,
-      items: sellerItems,
-    };
-  });
+  return mapOrdersForSeller(orders, sellerId);
 };
 
 export const confirmOrderDelivery = async (orderId: number, buyerId: number) => {

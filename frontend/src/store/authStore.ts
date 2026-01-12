@@ -29,7 +29,6 @@ export interface User {
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
   loginWithGoogle: (idToken: string, role?: 'buyer' | 'seller') => Promise<User>;
@@ -43,23 +42,20 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      token: null,
       isAuthenticated: false,
 
       login: async (email: string, password: string) => {
         const response = await api.post('/auth/login', { email, password });
 
-        const { access_token, user } = response.data;
-        localStorage.setItem('auth_token', access_token);
-        set({ token: access_token, isAuthenticated: true, user });
+        const { user } = response.data;
+        set({ isAuthenticated: true, user });
         return user;
       },
 
       loginWithGoogle: async (idToken: string, role?: 'buyer' | 'seller') => {
         const response = await api.post('/auth/google', { idToken, role });
-        const { access_token, user } = response.data;
-        localStorage.setItem('auth_token', access_token);
-        set({ token: access_token, isAuthenticated: true, user });
+        const { user } = response.data;
+        set({ isAuthenticated: true, user });
         return user;
       },
 
@@ -72,9 +68,8 @@ export const useAuthStore = create<AuthState>()(
           ...(data.roles ? { roles: data.roles } : {}),
         };
         const response = await api.post('/auth/register', payload);
-        const { access_token, user } = response.data;
-        localStorage.setItem('auth_token', access_token);
-        set({ token: access_token, user, isAuthenticated: true });
+        const { user } = response.data;
+        set({ user, isAuthenticated: true });
         return user;
       },
 
@@ -86,28 +81,21 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        localStorage.removeItem('auth_token');
+        void api.post('/auth/logout');
         useWishlistStore.getState().clear();
         if (typeof window !== 'undefined') {
           window.location.replace('/');
           return;
         }
-        set({ user: null, token: null, isAuthenticated: false });
+        set({ user: null, isAuthenticated: false });
       },
 
       fetchUser: async () => {
         try {
-          const token = localStorage.getItem('auth_token');
-          if (!token) {
-            set({ user: null, token: null, isAuthenticated: false });
-            return;
-          }
-
           const response = await api.get('/auth/me');
-          set({ user: response.data, isAuthenticated: true, token: token });
+          set({ user: response.data, isAuthenticated: true });
         } catch (_error) {
-          localStorage.removeItem('auth_token');
-          set({ user: null, token: null, isAuthenticated: false });
+          set({ user: null, isAuthenticated: false });
         }
       },
     }),
@@ -115,14 +103,10 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth',
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        const token = state?.token || localStorage.getItem('auth_token');
-        if (token) {
-          state?.fetchUser?.();
-        }
+        state?.fetchUser?.();
       },
     }
   )

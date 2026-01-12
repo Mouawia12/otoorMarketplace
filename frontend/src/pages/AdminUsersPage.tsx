@@ -28,9 +28,15 @@ export default function AdminUsersPage() {
   const { t, i18n } = useTranslation();
   const [users, setUsers] = useState<(User & { created_at?: string })[]>([]);
   const [sellerRequests, setSellerRequests] = useState<SellerRequest[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [selectedUser, setSelectedUser] = useState<(User & { created_at?: string }) | null>(null);
   const [editStatus, setEditStatus] = useState<User["status"]>("ACTIVE");
   const [editRoles, setEditRoles] = useState<string[]>([]);
@@ -41,8 +47,18 @@ export default function AdminUsersPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<(User & { created_at?: string })[]>("/admin/users");
-      setUsers(response.data);
+      const params: Record<string, string | number> = {
+        page,
+        page_size: 20,
+      };
+      if (searchTerm.trim()) params.search = searchTerm.trim();
+      if (statusFilter !== "all") params.status = statusFilter;
+      if (roleFilter !== "all") params.role = roleFilter;
+
+      const response = await api.get("/admin/users", { params });
+      const payload = response.data;
+      setUsers(payload.users ?? []);
+      setTotalPages(payload.total_pages ?? 1);
     } catch (err: any) {
       console.error("Failed to load admin users", err);
       setError(err?.response?.data?.detail ?? t("common.errorLoading"));
@@ -67,6 +83,9 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadUsers();
+  }, [page, statusFilter, roleFilter, searchTerm]);
+
+  useEffect(() => {
     loadSellerRequests();
   }, []);
 
@@ -74,9 +93,16 @@ export default function AdminUsersPage() {
     try {
       await api.patch(`/seller/profile/${userId}/status`, { status });
       await Promise.all([loadSellerRequests(), loadUsers()]);
+      setNotice({
+        tone: "success",
+        message: t("admin.updateSuccess", "تم تحديث الحالة بنجاح"),
+      });
     } catch (err: any) {
       console.error("Failed to update seller request", err);
-      alert(err?.response?.data?.detail ?? t("common.error"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("common.error"),
+      });
     }
   };
 
@@ -121,9 +147,16 @@ export default function AdminUsersPage() {
       });
       await loadUsers();
       closeEditModal();
+      setNotice({
+        tone: "success",
+        message: t("admin.updateSuccess", "تم تحديث المستخدم بنجاح"),
+      });
     } catch (err: any) {
       console.error("Failed to update user", err);
-      alert(err?.response?.data?.detail ?? t("admin.updateUserFailed"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("admin.updateUserFailed"),
+      });
       setSavingUser(false);
     }
   };
@@ -142,9 +175,16 @@ export default function AdminUsersPage() {
     try {
       await api.delete(`/admin/users/${user.id}`);
       await loadUsers();
+      setNotice({
+        tone: "success",
+        message: t("admin.deleteSuccess", "تم حذف المستخدم بنجاح"),
+      });
     } catch (err: any) {
       console.error("Failed to delete user", err);
-      alert(err?.response?.data?.detail ?? t("admin.deleteUserFailed", "فشل حذف المستخدم"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("admin.deleteUserFailed", "فشل حذف المستخدم"),
+      });
     }
   };
 
@@ -181,6 +221,17 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <div
+          className={`rounded-luxury border px-4 py-3 text-sm ${
+            notice.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
         <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h2 className="text-h3 text-charcoal">{t("admin.sellerRequests", "طلبات التحويل إلى تاجر")}</h2>
@@ -255,6 +306,47 @@ export default function AdminUsersPage() {
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
         <h1 className="text-h2 text-charcoal mb-6">{t("admin.users")}</h1>
 
+        <div className="flex flex-col lg:flex-row gap-3 mb-4">
+          <div className="flex-1">
+            <input
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              placeholder={t("admin.searchUsers", "ابحث بالاسم أو البريد")}
+              className="w-full px-4 py-2 rounded-luxury border border-sand focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            className="px-4 py-2 rounded-luxury border border-sand min-h-[44px]"
+          >
+            <option value="all">{t("admin.allStatuses", "كل الحالات")}</option>
+            <option value="active">{t("admin.activate", "تفعيل")}</option>
+            <option value="suspended">{t("admin.suspend", "تعليق")}</option>
+          </select>
+          <select
+            value={roleFilter}
+            onChange={(e) => {
+              setRoleFilter(e.target.value);
+              setPage(1);
+            }}
+            className="px-4 py-2 rounded-luxury border border-sand min-h-[44px]"
+          >
+            <option value="all">{t("admin.allRoles", "كل الأدوار")}</option>
+            {roleOptions.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -269,9 +361,9 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {usersWithProtection.map((user, index) => (
-                <tr key={user.id} className="border-b border-gray-100 hover:bg-sand">
-                  <td className="px-4 py-4 text-charcoal-light">#{index + 1}</td>
+                {usersWithProtection.map((user, index) => (
+                  <tr key={user.id} className="border-b border-gray-100 hover:bg-sand">
+                  <td className="px-4 py-4 text-charcoal-light">#{(page - 1) * 20 + index + 1}</td>
                   <td className="px-4 py-4 text-charcoal font-medium">{user.full_name}</td>
                   <td className="px-4 py-4 text-charcoal-light">{user.email}</td>
                   <td className="px-4 py-4">
@@ -331,6 +423,28 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p className="text-sm text-charcoal-light">
+            {t("admin.pageIndicator", { page, total: totalPages })}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page <= 1}
+              className="px-4 py-2 rounded-luxury border border-sand text-charcoal disabled:opacity-50"
+            >
+              {t("common.previous", "Previous")}
+            </button>
+            <button
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page >= totalPages}
+              className="px-4 py-2 rounded-luxury border border-sand text-charcoal disabled:opacity-50"
+            >
+              {t("common.next", "Next")}
+            </button>
+          </div>
         </div>
       </div>
 

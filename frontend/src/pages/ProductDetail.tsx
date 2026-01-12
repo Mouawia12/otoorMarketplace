@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../lib/api';
 import { Product } from '../types';
@@ -89,9 +89,16 @@ export default function ProductDetail() {
   const sellerName = product.seller?.full_name;
   const sellerVerified = product.seller?.verified_seller;
   const conditionLabel = product.condition === 'used' ? t('products.conditionUsed') : t('products.conditionNew');
+  const handleBuyNow = () => {
+    if (!isInStock) return;
+    handleOrder();
+  };
+  const brandLink = product.brand
+    ? `/products?brand=${encodeURIComponent(product.brand)}&status=published`
+    : '/products';
 
   return (
-    <div>
+    <div className="pb-24 lg:pb-0">
       <button
         onClick={() => navigate('/products')}
         className="mb-6 text-gold hover:text-gold-light transition"
@@ -189,7 +196,7 @@ export default function ProductDetail() {
             )}
 
             <button
-              onClick={handleOrder}
+              onClick={handleBuyNow}
               disabled={!isInStock}
               className="w-full bg-gold text-charcoal font-semibold py-3 rounded-luxury hover:bg-gold-light transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -202,6 +209,31 @@ export default function ProductDetail() {
               )}
             </button>
           </div>
+          {product.brand && (
+            <Link
+              to={brandLink}
+              className="inline-flex items-center gap-2 text-sm text-gold hover:text-charcoal transition mt-4"
+            >
+              {t('productDetail.viewBrand', 'عرض العلامة')}
+              <span>{language === 'ar' ? '←' : '→'}</span>
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 px-4 py-3 shadow-[0_-12px_24px_rgba(0,0,0,0.08)] lg:hidden z-40">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-gold font-bold text-lg inline-flex items-center gap-1">
+            {formatPrice(product.base_price, language).replace(/\s?(SAR|﷼)$/i, '')}
+            <SARIcon size={16} className="text-gold" />
+          </div>
+          <button
+            disabled={!isInStock}
+            onClick={handleBuyNow}
+            className="bg-gold text-charcoal px-5 py-2.5 rounded-luxury font-semibold hover:bg-gold-light transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isInStock ? t('products.addToCart') : t('products.outOfStock')}
+          </button>
         </div>
       </div>
     </div>

@@ -16,7 +16,6 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import NewPerfumes from './pages/NewPerfumes';
 import UsedPerfumes from './pages/UsedPerfumes';
 import AuctionsPerfumes from './pages/AuctionsPerfumes';
-import AuctionDetail from './pages/AuctionDetail';
 import AuctionDetailPage from './pages/AuctionDetailPage';
 import Orders from './pages/Orders';
 
@@ -124,7 +123,7 @@ function App() {
           <Route path="products/:id" element={<ProductDetail />} />
           <Route path="p/:id" element={<ProductDetailPage />} />
 
-          <Route path="auctions/:id" element={<AuctionDetail />} />
+          <Route path="auctions/:id" element={<AuctionDetailPage />} />
           <Route path="auction/:id" element={<AuctionDetailPage />} />
 
           <Route path="orders" element={<Orders />} />

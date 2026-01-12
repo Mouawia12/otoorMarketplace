@@ -6,6 +6,7 @@ import {
   getRelatedProducts,
   createProduct,
   getProductFiltersMeta,
+  listProductSuggestions,
 } from "../services/productService";
 import {
   createProductReview,
@@ -29,6 +30,15 @@ router.get("/meta", async (_req, res, next) => {
   try {
     const meta = await getProductFiltersMeta();
     res.json(meta);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/suggestions", async (req, res, next) => {
+  try {
+    const suggestions = await listProductSuggestions(req.query);
+    res.json({ suggestions });
   } catch (error) {
     next(error);
   }
@@ -110,10 +120,13 @@ router.post("/", authenticate({ roles: ["SELLER", "ADMIN", "SUPER_ADMIN"] }), as
       throw AppError.unauthorized();
     }
 
-    const product = await createProduct({
-      ...req.body,
-      sellerId: req.user.id,
-    });
+    const product = await createProduct(
+      {
+        ...req.body,
+        sellerId: req.user.id,
+      },
+      { roles: req.user.roles as RoleName[] }
+    );
 
     res.status(201).json(product);
   } catch (error) {

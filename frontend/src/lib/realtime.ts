@@ -3,8 +3,6 @@ import { getResolvedApiBaseUrl } from './runtimeConfig';
 import type { Bid } from '../types';
 
 let socket: Socket | null = null;
-let currentAuthToken: string | null = null;
-
 const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const stripApiSuffix = (baseUrl: string) => baseUrl.replace(/\/api$/i, '');
 
@@ -24,21 +22,14 @@ const getSocketBaseUrl = () => {
 
   // fallback for local/dev: derive from API base without the /api suffix
   const apiBase = getResolvedApiBaseUrl();
-  return stripTrailingSlash(stripApiSuffix(apiBase));
+  const derived = stripTrailingSlash(stripApiSuffix(apiBase));
+  if (!derived || derived.startsWith('/')) {
+    return typeof window !== 'undefined' ? window.location.origin : derived;
+  }
+  return derived;
 };
 
 const refreshSocketAuth = (instance: Socket) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  if (currentAuthToken !== token) {
-    instance.auth = token ? { token } : {};
-    currentAuthToken = token;
-    if (instance.connected) {
-      instance.disconnect();
-      instance.connect();
-      return;
-    }
-  }
-
   if (!instance.connected) {
     instance.connect();
   }

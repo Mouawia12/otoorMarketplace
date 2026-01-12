@@ -3,6 +3,8 @@ import type { CorsOptions } from "cors";
 import { Server } from "socket.io";
 
 import { verifyAccessToken } from "../utils/jwt";
+import { parseCookies } from "../utils/cookies";
+import { config } from "../config/env";
 
 let io: Server | null = null;
 
@@ -81,6 +83,8 @@ export const initAuctionRealtime = (server: HTTPServer, corsOptions: CorsOptions
       cookie: socket.handshake.headers.cookie,
     });
 
+    const cookies = parseCookies(socket.handshake.headers.cookie);
+    const cookieToken = cookies[config.auth.cookieName];
     const tokenRaw =
       (typeof socket.handshake.auth?.token === "string" && socket.handshake.auth.token.trim().length > 0
         ? socket.handshake.auth.token
@@ -88,7 +92,8 @@ export const initAuctionRealtime = (server: HTTPServer, corsOptions: CorsOptions
       (typeof socket.handshake.query?.token === "string" ? (socket.handshake.query.token as string) : undefined) ||
       (typeof socket.handshake.headers?.authorization === "string"
         ? socket.handshake.headers.authorization.replace(/^Bearer\s+/i, "")
-        : undefined);
+        : undefined) ||
+      cookieToken;
 
     if (tokenRaw) {
       try {

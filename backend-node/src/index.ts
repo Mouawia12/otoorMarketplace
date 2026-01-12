@@ -11,6 +11,7 @@ import apiRouter from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { getUploadRoot } from "./utils/uploads";
 import { initAuctionRealtime, shutdownAuctionRealtime } from "./realtime/auctionRealtime";
+import { startAuctionFinalizer, stopAuctionFinalizer } from "./services/auctionService";
 import { resumePendingPerfumeImports } from "./services/perfumeImportService";
 
 const app = express();
@@ -63,12 +64,14 @@ const server = httpServer.listen(config.port, () => {
   resumePendingPerfumeImports().catch((error) => {
     console.error("Failed to resume perfume imports", error);
   });
+  startAuctionFinalizer();
 });
 
 const gracefulShutdown = async (signal: string) => {
   console.log(`\nReceived ${signal}. Shutting down gracefully...`);
   server.close(async () => {
     shutdownAuctionRealtime();
+    stopAuctionFinalizer();
     await prisma.$disconnect();
     process.exit(0);
   });

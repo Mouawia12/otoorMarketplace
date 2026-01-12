@@ -55,7 +55,7 @@ const formatPointAddress = (point: any, lang: "ar" | "en") => {
 export default function CheckoutPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { items, shipping, setShipping, coupon, setCoupon, totals, clear } = useCartStore();
+  const { items, shipping, setShipping, coupons, setCoupons, totals, clear } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   const { sub, discount, shipping: shippingCost, total } = totals();
   const lang = i18n.language as 'ar' | 'en';
@@ -75,11 +75,11 @@ export default function CheckoutPage() {
   const [redboxError, setRedboxError] = useState<string | null>(null);
 
   useEffect(() => {
-    setCoupon(null);
+    setCoupons([]);
     setCouponCode("");
     setCouponError("");
     setCouponSuccess("");
-  }, [setCoupon]);
+  }, [setCoupons]);
 
   useEffect(() => {
     setShipping("redbox");
@@ -276,28 +276,36 @@ export default function CheckoutPage() {
       return;
     }
 
+    const newCode = couponCode.trim().toUpperCase();
+    if (coupons.some((coupon) => coupon.code.toUpperCase() === newCode)) {
+      setCouponError(t('checkout.couponAlreadyApplied', 'هذا الكوبون مضاف بالفعل'));
+      return;
+    }
+
     setCouponLoading(true);
     setCouponError("");
     setCouponSuccess("");
 
     try {
+      const codes = [...coupons.map((coupon) => coupon.code), newCode];
       const response = await api.post("/coupons/validate", {
-        code: couponCode.toUpperCase(),
+        codes,
         items: buildCouponItemsPayload(),
       });
       const payload = response.data;
-      const couponData = payload.coupon;
-      const discountAmount = Number(payload.discount_amount ?? 0);
-      setCoupon({
-        code: couponData.code,
-        amount: discountAmount,
+      const validatedCoupons = Array.isArray(payload.coupons) ? payload.coupons : [];
+      const nextCoupons = validatedCoupons.map((entry: any) => ({
+        code: entry.coupon.code,
+        amount: Number(entry.discount_amount ?? 0),
         meta: {
-          discount_type: couponData.discount_type,
-          discount_value: Number(couponData.discount_value),
-          seller_id: couponData.seller_id ?? null,
+          discount_type: entry.coupon.discount_type,
+          discount_value: Number(entry.coupon.discount_value),
+          seller_id: entry.coupon.seller_id ?? null,
         },
-      });
+      }));
+      setCoupons(nextCoupons);
       setCouponSuccess(t('checkout.couponApplied'));
+      setCouponCode("");
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message || error?.response?.data?.detail;
       setCouponError(apiMessage ?? t('checkout.invalidCoupon'));
@@ -354,7 +362,7 @@ export default function CheckoutPage() {
         quantity: item.qty,
         unitPrice: item.price,
       })),
-      coupon_code: coupon?.code ?? undefined,
+      coupon_codes: coupons.length > 0 ? coupons.map((coupon) => coupon.code) : undefined,
     };
   };
 
@@ -761,36 +769,77 @@ export default function CheckoutPage() {
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                     className="flex-1 px-4 py-2 rounded-lg border border-charcoal-light focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]"
                     placeholder={t('checkout.couponPlaceholder')}
-                    disabled={!!coupon}
                   />
-                  {coupon ? (
-                    <button
-                      onClick={() => {
-                        setCoupon(null);
-                        setCouponCode("");
-                        setCouponError("");
-                        setCouponSuccess("");
-                      }}
-                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-semibold min-h-[44px]"
-                    >
-                      {t('checkout.remove')}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleApplyCoupon}
-                      disabled={couponLoading}
-                      className="px-4 py-2 bg-charcoal text-ivory rounded-lg hover:bg-charcoal-light transition font-semibold min-h-[44px] disabled:opacity-50"
-                    >
-                      {couponLoading ? "..." : t('checkout.apply')}
-                    </button>
-                  )}
+                  <button
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading}
+                    className="px-4 py-2 bg-charcoal text-ivory rounded-lg hover:bg-charcoal-light transition font-semibold min-h-[44px] disabled:opacity-50"
+                  >
+                    {couponLoading ? "..." : t('checkout.apply')}
+                  </button>
                 </div>
-                {couponSuccess && coupon && (
+                {couponSuccess && coupons.length > 0 && (
                   <p className="text-green-600 text-sm mt-2">
-                    {couponSuccess}: {coupon.code} (-{formatPrice(discount, lang)})
+                    {couponSuccess}
                   </p>
                 )}
                 {couponError && <p className="text-red-500 text-sm mt-2">{couponError}</p>}
+                {coupons.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {coupons.map((coupon) => (
+                      <div key={coupon.code} className="flex items-center justify-between text-sm bg-white rounded-lg px-3 py-2 border border-sand">
+                        <span className="font-semibold text-charcoal">{coupon.code}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-green-600">
+                            -{formatPrice(coupon.amount, lang)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = coupons.filter((c) => c.code !== coupon.code);
+                              if (remaining.length === 0) {
+                                setCoupons([]);
+                                setCouponError("");
+                                setCouponSuccess("");
+                                return;
+                              }
+                              setCouponLoading(true);
+                              api.post("/coupons/validate", {
+                                codes: remaining.map((c) => c.code),
+                                items: buildCouponItemsPayload(),
+                              })
+                                .then((response) => {
+                                  const payload = response.data;
+                                  const validatedCoupons = Array.isArray(payload.coupons)
+                                    ? payload.coupons
+                                    : [];
+                                  const nextCoupons = validatedCoupons.map((entry: any) => ({
+                                    code: entry.coupon.code,
+                                    amount: Number(entry.discount_amount ?? 0),
+                                    meta: {
+                                      discount_type: entry.coupon.discount_type,
+                                      discount_value: Number(entry.coupon.discount_value),
+                                      seller_id: entry.coupon.seller_id ?? null,
+                                    },
+                                  }));
+                                  setCoupons(nextCoupons);
+                                  setCouponError("");
+                                })
+                                .catch((error: any) => {
+                                  const apiMessage = error?.response?.data?.message || error?.response?.data?.detail;
+                                  setCouponError(apiMessage ?? t('checkout.invalidCoupon'));
+                                })
+                                .finally(() => setCouponLoading(false));
+                            }}
+                            className="text-red-500 hover:text-red-600 transition"
+                          >
+                            {t('checkout.remove')}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 mb-6">

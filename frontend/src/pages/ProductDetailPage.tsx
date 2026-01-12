@@ -5,7 +5,7 @@ import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
 import { useWishlistStore } from '../store/wishlistStore';
-import { fetchProductById, fetchRelatedProducts } from '../services/productService';
+import { fetchProductById, fetchProducts, fetchRelatedProducts } from '../services/productService';
 import { fetchAuctionByProductId } from '../services/auctionService';
 import ProductCard from '../components/products/ProductCard';
 import { Product, Auction, ProductReview } from '../types';
@@ -30,6 +30,7 @@ export default function ProductDetailPage() {
   
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [brandProducts, setBrandProducts] = useState<Product[]>([]);
   const [activeAuction, setActiveAuction] = useState<Auction | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -55,6 +56,18 @@ export default function ProductDetailPage() {
         const related = await fetchRelatedProducts(parseInt(id), 4);
         setRelatedProducts(related);
 
+        if (productData.brand) {
+          const brandResult = await fetchProducts({
+            brand: productData.brand,
+            page_size: 6,
+            sort: 'newest',
+          });
+          const filtered = brandResult.products.filter((item) => item.id !== productData.id);
+          setBrandProducts(filtered.slice(0, 6));
+        } else {
+          setBrandProducts([]);
+        }
+
         try {
           const reviewData = await fetchProductReviews(parseInt(id));
           setReviews(reviewData.reviews);
@@ -76,6 +89,7 @@ export default function ProductDetailPage() {
       } catch (error) {
         console.error('Error loading product:', error);
         setProduct(null);
+        setBrandProducts([]);
       } finally {
         setLoading(false);
       }
@@ -180,8 +194,29 @@ export default function ProductDetailPage() {
     </div>
   );
 
+  const handleBuyNow = () => {
+    if (!isInStock || !product) return;
+    const primaryImage = images[0] || PLACEHOLDER_PERFUME;
+    addToCart(
+      {
+        id: String(product.id),
+        name,
+        price: product.base_price,
+        image: primaryImage,
+        brand: product.brand,
+      },
+      1
+    );
+    const target = '/checkout';
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=${encodeURIComponent(target)}`);
+      return;
+    }
+    navigate(target);
+  };
+
   return (
-    <div className="space-y-12">
+    <div className="space-y-12 pb-24 lg:pb-0">
       {/* Active Auction Banner */}
       {activeAuction && (
         <div className="bg-gradient-to-r from-gold to-gold-light rounded-luxury p-6 shadow-luxury">
@@ -303,26 +338,7 @@ export default function ProductDetailPage() {
             <div className="space-y-3">
               <button
                 disabled={!isInStock}
-                onClick={() => {
-                  if (!isInStock || !product) return;
-                  const primaryImage = images[0] || PLACEHOLDER_PERFUME;
-                  addToCart(
-                    {
-                      id: String(product.id),
-                      name,
-                      price: product.base_price,
-                      image: primaryImage,
-                      brand: product.brand,
-                    },
-                    1
-                  );
-                  const target = '/checkout';
-                  if (!isAuthenticated) {
-                    navigate(`/login?redirect=${encodeURIComponent(target)}`);
-                    return;
-                  }
-                  navigate(target);
-                }}
+                onClick={handleBuyNow}
                 className="w-full bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <span>{isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}</span>
@@ -335,6 +351,22 @@ export default function ProductDetailPage() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 px-4 py-3 shadow-[0_-12px_24px_rgba(0,0,0,0.08)] lg:hidden z-40">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-gold font-bold text-lg inline-flex items-center gap-1">
+            {formatPrice(product.base_price, language).replace(/\s?(SAR|﷼)$/i, '')}
+            <SARIcon size={16} className="text-gold" />
+          </div>
+          <button
+            disabled={!isInStock}
+            onClick={handleBuyNow}
+            className="bg-gold text-charcoal px-5 py-2.5 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}
+          </button>
         </div>
       </div>
 
@@ -402,6 +434,27 @@ export default function ProductDetailPage() {
           <div className="responsive-card-grid responsive-card-grid--roomy">
             {relatedProducts.map((relatedProduct) => (
               <ProductCard key={relatedProduct.id} product={relatedProduct} type="new" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {brandProducts.length > 0 && (
+        <div className="border-t border-gray-200 pt-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-h2 text-charcoal">
+              {t('productDetail.moreFromBrand', 'مزيد من منتجات نفس العلامة')}
+            </h2>
+            <Link
+              to={`/products?brand=${encodeURIComponent(product.brand)}&status=published`}
+              className="text-sm text-gold hover:text-charcoal transition"
+            >
+              {t('productDetail.viewBrand', 'عرض العلامة')}
+            </Link>
+          </div>
+          <div className="responsive-card-grid responsive-card-grid--roomy">
+            {brandProducts.map((brandProduct) => (
+              <ProductCard key={`brand-${brandProduct.id}`} product={brandProduct} type="new" />
             ))}
           </div>
         </div>

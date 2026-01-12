@@ -51,6 +51,7 @@ export default function Products() {
   const location = useLocation();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [fallbackProducts, setFallbackProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +85,31 @@ export default function Products() {
     };
   }, [location.search]);
 
+  useEffect(() => {
+    let active = true;
+    if (loading || error || products.length > 0) {
+      return;
+    }
+    (async () => {
+      try {
+        const res = await api.get("/products", {
+          params: { status: "published", sort: "stock", page_size: 6 },
+        });
+        if (!active) return;
+        const data = Array.isArray(res.data)
+          ? res.data
+          : res.data?.products || res.data?.data || [];
+        setFallbackProducts(data);
+      } catch (_error) {
+        if (!active) return;
+        setFallbackProducts([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [loading, error, products.length]);
+
   const resultsText = useMemo(() => {
     if (loading) return t("common.loading");
     const n = products.length;
@@ -113,8 +139,22 @@ export default function Products() {
         )}
 
         {!loading && !error && products.length === 0 && (
-          <div className="col-span-full bg-white rounded-xl p-6 text-center text-charcoal">
-            {t("common.noResults") || "لا توجد نتائج مطابقة للفلاتر الحالية."}
+          <div className="col-span-full space-y-6">
+            <div className="bg-white rounded-xl p-6 text-center text-charcoal">
+              {t("common.noResults") || "لا توجد نتائج مطابقة للفلاتر الحالية."}
+            </div>
+            {fallbackProducts.length > 0 && (
+              <div className="bg-white rounded-xl p-6">
+                <h2 className="text-lg font-semibold text-charcoal mb-4">
+                  {t('products.youMayLike', 'قد تعجبك هذه المنتجات')}
+                </h2>
+                <div className="responsive-card-grid responsive-card-grid--compact">
+                  {fallbackProducts.map((p) => (
+                    <ProductCard key={`fallback-${p.id}`} product={p} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

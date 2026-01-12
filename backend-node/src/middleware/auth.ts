@@ -5,17 +5,19 @@ import { prisma } from "../prisma/client";
 import { verifyAccessToken } from "../utils/jwt";
 import { AppError } from "../utils/errors";
 import { config } from "../config/env";
+import { parseCookies } from "../utils/cookies";
 
 export const authenticate =
   (options: { roles?: RoleName[] } = {}) =>
   async (req: Request, _res: Response, next: NextFunction) => {
     try {
       const authHeader = req.headers.authorization;
-      if (!authHeader) {
-        throw AppError.unauthorized();
-      }
+      const bearerToken =
+        typeof authHeader === "string" ? authHeader.split(" ")[1] : undefined;
+      const cookies = parseCookies(req.headers.cookie);
+      const cookieToken = cookies[config.auth.cookieName];
+      const token = bearerToken ?? cookieToken;
 
-      const [, token] = authHeader.split(" ");
       if (!token) {
         throw AppError.unauthorized();
       }

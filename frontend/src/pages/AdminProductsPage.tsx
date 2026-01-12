@@ -72,16 +72,33 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [active, setActive] = useState<AdminStatus>("all");
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.get<Product[]>("/admin/products");
-        setProducts(response.data);
+        const params: Record<string, string | number> = {
+          page,
+          page_size: 20,
+        };
+        if (active !== "all") {
+          params.status = adminStatusToApi(active);
+        }
+        if (q.trim()) {
+          params.search = q.trim();
+        }
+        const response = await api.get("/admin/products", { params });
+        const payload = response.data;
+        setProducts(payload.products ?? []);
+        setTotalPages(payload.total_pages ?? 1);
+        setStatusCounts(payload.status_counts ?? {});
       } catch (err: any) {
         console.error("Failed to load admin products", err);
         setError(err?.response?.data?.detail ?? t("common.errorLoading"));
@@ -91,36 +108,25 @@ export default function AdminProductsPage() {
     };
 
     fetchProducts();
-  }, [t]);
+  }, [t, active, q, page]);
 
   const counts = useMemo(() => {
-    const base = { all: products.length, pending: 0, approved: 0, rejected: 0, hidden: 0 };
-    products.forEach((product) => {
-      const status = productStatusToAdmin(product.status);
-      (base as any)[status] += 1;
-    });
-    return base;
-  }, [products]);
+    const base = { all: 0, pending: 0, approved: 0, rejected: 0, hidden: 0 };
+    const normalizedCounts = Object.entries(statusCounts).reduce<Record<string, number>>(
+      (acc, [status, count]) => {
+        const adminStatus = productStatusToAdmin(status.toLowerCase());
+        acc[adminStatus] = (acc[adminStatus] ?? 0) + count;
+        acc.all += count;
+        return acc;
+      },
+      { ...base }
+    );
+    return normalizedCounts;
+  }, [statusCounts]);
 
   const filtered = useMemo(() => {
-    let list = products;
-    if (active !== "all") {
-      const acceptedStatuses = STATUS_META[active].productValues;
-      list = list.filter((product) => acceptedStatuses.includes(product.status));
-    }
-    if (q.trim()) {
-      const term = q.trim().toLowerCase();
-      list = list.filter((product) => {
-        return (
-          product.name_en.toLowerCase().includes(term) ||
-          product.name_ar.includes(q.trim()) ||
-          product.brand.toLowerCase().includes(term) ||
-          String(product.id).includes(term)
-        );
-      });
-    }
-    return list;
-  }, [products, active, q]);
+    return products;
+  }, [products]);
 
   const handleStatusChange = async (product: Product, status: Exclude<AdminStatus, "all">) => {
     try {
@@ -130,9 +136,16 @@ export default function AdminProductsPage() {
           p.id === product.id ? { ...p, status: adminStatusToProductStatus(status) } : p
         )
       );
+      setNotice({
+        tone: "success",
+        message: t("admin.updateSuccess", "تم تحديث الحالة بنجاح"),
+      });
     } catch (err: any) {
       console.error("Failed to update product status", err);
-      alert(err?.response?.data?.detail ?? t("seller.updateFailed", "Failed to update product"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("seller.updateFailed", "Failed to update product"),
+      });
     }
   };
 
@@ -160,6 +173,17 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-3">
+      {notice && (
+        <div
+          className={`rounded-luxury border px-4 py-3 text-sm ${
+            notice.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-lg sm:text-xl font-extrabold text-charcoal">
           {t("admin.products")}
@@ -168,7 +192,10 @@ export default function AdminProductsPage() {
         <div className="relative w-full sm:w-72">
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
             placeholder={t("seller.searchProducts") || ""}
             className="w-full rounded-md border border-sand/60 bg-white px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-gold"
           />
@@ -186,7 +213,10 @@ export default function AdminProductsPage() {
         ] as { id: AdminStatus; label: string; count: number }[]).map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActive(tab.id)}
+            onClick={() => {
+              setActive(tab.id);
+              setPage(1);
+            }}
             className={`px-4 py-2 rounded-luxury text-xs sm:text-sm font-semibold transition ${
               active === tab.id ? "bg-gold text-charcoal shadow-sm" : "bg-sand text-charcoal-light hover:bg-sand/80"
             }`}
@@ -269,6 +299,28 @@ export default function AdminProductsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-charcoal-light">
+          {t("admin.pageIndicator", { page, total: totalPages })}
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            disabled={page <= 1}
+            className="px-4 py-2 rounded-luxury border border-sand text-charcoal disabled:opacity-50"
+          >
+            {t("common.previous", "Previous")}
+          </button>
+          <button
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={page >= totalPages}
+            className="px-4 py-2 rounded-luxury border border-sand text-charcoal disabled:opacity-50"
+          >
+            {t("common.next", "Next")}
+          </button>
+        </div>
       </div>
 
       <p className="text-[11px] sm:text-xs text-taupe/80">

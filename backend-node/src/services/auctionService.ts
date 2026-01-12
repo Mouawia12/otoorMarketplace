@@ -5,6 +5,7 @@ import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { toPlainObject } from "../utils/serializer";
 import { normalizeProduct } from "./productService";
+import { createNotificationForUser } from "./notificationService";
 
 const normalizeSeller = (seller?: { id: number; fullName: string; verifiedSeller: boolean }) =>
   seller
@@ -52,6 +53,7 @@ const normalizeAuction = (auction: any) => {
     total_bids: plain.total_bids ?? plain._count?.bids ?? 0,
     product: plain.product ? normalizeProduct(plain.product) : undefined,
     seller: normalizeSeller(plain.seller),
+    winner: plain.winner,
   };
 };
 
@@ -71,6 +73,17 @@ const normalizeBid = (bid: any) => {
         }
       : undefined,
   };
+};
+
+const resolveWinningBid = (bids: Array<{ amount: number; createdAt: Date }>) => {
+  if (!bids.length) return null;
+  return bids.reduce((top, current) => {
+    if (current.amount > top.amount) return current;
+    if (current.amount === top.amount && current.createdAt < top.createdAt) {
+      return current;
+    }
+    return top;
+  });
 };
 
 const hasWonAuction = (currentPrice: number, userMaxBid: number) =>
@@ -292,10 +305,41 @@ export const getAuctionById = async (id: number) => {
     });
   }
 
+  const isEnded = nextStatus === AuctionStatus.COMPLETED;
+  const winningBid = isEnded
+    ? resolveWinningBid(
+        auction.bids.map((bid) => ({
+          amount: Number(bid.amount),
+          createdAt: bid.createdAt,
+        }))
+      )
+    : null;
+  const winningRecord = winningBid
+    ? auction.bids.find(
+        (bid) =>
+          Number(bid.amount) === winningBid.amount &&
+          bid.createdAt.getTime() === winningBid.createdAt.getTime()
+      )
+    : null;
+
   const normalized = normalizeAuction({
     ...auction,
     status: nextStatus,
     total_bids: auction.bids.length,
+    winner: winningRecord
+      ? {
+          bid_id: winningRecord.id,
+          bidder_id: winningRecord.bidderId,
+          amount: Number(winningRecord.amount),
+          bidder: winningRecord.bidder
+            ? {
+                id: winningRecord.bidder.id,
+                full_name: winningRecord.bidder.fullName,
+                email: winningRecord.bidder.email,
+              }
+            : undefined,
+        }
+      : null,
   });
 
   return {
@@ -345,11 +389,124 @@ export const getAuctionByProductId = async (productId: number) => {
     });
   }
 
+  let winner: {
+    bid_id: number;
+    bidder_id: number;
+    amount: number;
+    bidder?: { id: number; full_name: string; email: string };
+  } | null = null;
+
+  if (nextStatus === AuctionStatus.COMPLETED) {
+    const topBid = await prisma.bid.findFirst({
+      where: { auctionId: auction.id },
+      orderBy: [{ amount: "desc" }, { createdAt: "asc" }],
+      include: {
+        bidder: {
+          select: { id: true, fullName: true, email: true },
+        },
+      },
+    });
+    if (topBid) {
+      winner = {
+        bid_id: topBid.id,
+        bidder_id: topBid.bidderId,
+        amount: Number(topBid.amount),
+        bidder: topBid.bidder
+          ? {
+              id: topBid.bidder.id,
+              full_name: topBid.bidder.fullName,
+              email: topBid.bidder.email,
+            }
+          : undefined,
+      };
+    }
+  }
+
   return normalizeAuction({
     ...auction,
     status: nextStatus,
     total_bids: auction._count.bids,
+    winner,
   });
+};
+
+export const closeExpiredAuctions = async () => {
+  const now = new Date();
+  const expired = await prisma.auction.findMany({
+    where: {
+      status: { in: [AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED] },
+      endTime: { lte: now },
+    },
+    select: {
+      id: true,
+      sellerId: true,
+      productId: true,
+      currentPrice: true,
+    },
+  });
+
+  if (expired.length === 0) {
+    return;
+  }
+
+  for (const auction of expired) {
+    const topBid = await prisma.bid.findFirst({
+      where: { auctionId: auction.id },
+      orderBy: [{ amount: "desc" }, { createdAt: "asc" }],
+      include: {
+        bidder: {
+          select: { id: true, fullName: true, email: true },
+        },
+      },
+    });
+
+    await prisma.auction.update({
+      where: { id: auction.id },
+      data: {
+        status: AuctionStatus.COMPLETED,
+        ...(topBid ? { currentPrice: new Prisma.Decimal(topBid.amount) } : {}),
+      },
+    });
+
+    if (topBid) {
+      await createNotificationForUser({
+        userId: topBid.bidderId,
+        title: "تهانينا! فزت بالمزاد",
+        message: `تم إغلاق المزاد #${auction.id} وأنت صاحب أعلى مزايدة.`,
+        data: { auctionId: auction.id, productId: auction.productId },
+      });
+    }
+
+    await createNotificationForUser({
+      userId: auction.sellerId,
+      title: "انتهى المزاد",
+      message: topBid
+        ? `انتهى المزاد #${auction.id} وتم تحديد الفائز.`
+        : `انتهى المزاد #${auction.id} بدون أي مزايدات.`,
+      data: { auctionId: auction.id, productId: auction.productId },
+    });
+  }
+};
+
+let auctionFinalizerTimer: NodeJS.Timeout | null = null;
+
+export const startAuctionFinalizer = () => {
+  if (auctionFinalizerTimer) return;
+  auctionFinalizerTimer = setInterval(() => {
+    closeExpiredAuctions().catch((error) => {
+      console.error("Failed to finalize auctions", error);
+    });
+  }, 60_000);
+  closeExpiredAuctions().catch((error) => {
+    console.error("Failed to finalize auctions", error);
+  });
+};
+
+export const stopAuctionFinalizer = () => {
+  if (auctionFinalizerTimer) {
+    clearInterval(auctionFinalizerTimer);
+    auctionFinalizerTimer = null;
+  }
 };
 
 const placeBidSchema = z.object({

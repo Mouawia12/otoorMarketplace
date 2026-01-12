@@ -24,6 +24,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           ws: true,
         },
+        '/uploads': {
+          target: proxyTarget || 'http://localhost:8080',
+          changeOrigin: true,
+        },
       },
     },
     build: {

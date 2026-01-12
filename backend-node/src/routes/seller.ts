@@ -52,10 +52,13 @@ router.post("/products", sellerOnly, async (req, res, next) => {
       throw AppError.unauthorized();
     }
 
-    const product = await createProduct({
-      ...req.body,
-      sellerId: req.user.id,
-    });
+    const product = await createProduct(
+      {
+        ...req.body,
+        sellerId: req.user.id,
+      },
+      { roles: req.user.roles as RoleName[] }
+    );
     res.status(201).json(product);
   } catch (error) {
     next(error);
@@ -72,7 +75,9 @@ router.patch("/products/:id", sellerOnly, async (req, res, next) => {
       throw AppError.badRequest("Invalid product id");
     }
 
-    const product = await updateProduct(productId, req.user.id, req.body);
+    const product = await updateProduct(productId, req.user.id, req.body, {
+      roles: req.user.roles as RoleName[],
+    });
     res.json(product);
   } catch (error) {
     next(error);

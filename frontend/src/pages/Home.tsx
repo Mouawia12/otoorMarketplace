@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import homeService, { HeroSlide, Brand } from '../services/homeService';
 import Hero from './home/HomeSections/Hero';
+import ShopCTA from './home/HomeSections/ShopCTA';
 import PromoTiles from './home/HomeSections/PromoTiles';
 import FeaturedGrid from './home/HomeSections/FeaturedGrid';
 import AuctionsStrip from './home/HomeSections/AuctionsStrip';
@@ -92,6 +93,7 @@ export default function Home() {
   return (
     <div className="space-y-0">
       <Hero slides={combinedHeroSlides} />
+      <ShopCTA />
       <PromoTiles />
       <AuctionsStrip auctions={liveAuctions} />
       <FeaturedGrid

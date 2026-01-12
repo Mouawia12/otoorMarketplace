@@ -21,6 +21,7 @@ export type PendingOrderPayload = {
     unitPrice?: number;
   }>;
   coupon_code?: string | null;
+  coupon_codes?: string[];
   discount_amount?: number;
   shipping_fee?: number;
 };

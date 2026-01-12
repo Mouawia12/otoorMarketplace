@@ -68,7 +68,7 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-sand">
       <div className="flex flex-col md:flex-row">
         {/* Sidebar (desktop only, mobile يستخدم درج الهيدر) */}
-        <aside className="hidden md:block w-72 md:w-64 bg-charcoal text-ivory overflow-y-auto">
+        <aside className="hidden md:block w-72 md:w-64 shrink-0 bg-charcoal text-ivory overflow-y-auto">
           <div className="p-4 sm:p-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gold mb-2">
               {t('admin.adminPanel')}
@@ -97,7 +97,7 @@ export default function AdminLayout() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8">
+        <main className="flex-1 min-w-0 p-4 sm:p-6 md:p-8">
           <div className="mb-6 flex justify-end">
             <NotificationBell />
           </div>

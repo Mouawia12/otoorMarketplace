@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import BrandLogo from '../brand/BrandLogo';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CartIconButton from '../cart/CartIconButton';
 import WishlistIconButton from '../wishlist/WishlistIconButton';
 import PromoStripBar from '../promotions/PromoStripBar';
+import { fetchProductSuggestions, type ProductSuggestion } from '../../services/productService';
 
 export default function Navbar() {
   const { t, i18n } = useTranslation();
@@ -24,6 +25,9 @@ export default function Navbar() {
       : 'Register as Seller';
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
@@ -40,11 +44,46 @@ export default function Navbar() {
     if (searchQuery.trim()) {
       window.location.href = `/products?search=${encodeURIComponent(searchQuery)}`;
     }
+    setSuggestions([]);
+    setShowSuggestions(false);
     setMobileSearchOpen(false);
   };
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
   const closeMobileSearch = () => setMobileSearchOpen(false);
+
+  const normalizedQuery = searchQuery.trim();
+  const shouldShowSuggestions = showSuggestions && normalizedQuery.length >= 2;
+
+  useEffect(() => {
+    if (normalizedQuery.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        setIsSuggesting(true);
+        const results = await fetchProductSuggestions(normalizedQuery, 6);
+        setSuggestions(results);
+      } catch (_error) {
+        setSuggestions([]);
+      } finally {
+        setIsSuggesting(false);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [normalizedQuery]);
+
+  const resolveSuggestionLabel = (suggestion: ProductSuggestion) =>
+    language === 'ar' ? suggestion.name_ar : suggestion.name_en;
+
+  const handleSuggestionSelect = (suggestion: ProductSuggestion) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    window.location.href = `/p/${suggestion.id}`;
+  };
 
   const accountMenuItems = [
     { path: '/account', label: t('account.overview'), icon: '👤' },
@@ -142,14 +181,46 @@ export default function Navbar() {
             </Link>
 
             <div className="flex items-center gap-4 lg:gap-6 flex-1 justify-end">
-              <form onSubmit={handleSearch} className="flex-1 max-w-md" style={{ marginInline: '1rem' }}>
+              <form onSubmit={handleSearch} className="flex-1 max-w-md relative" style={{ marginInline: '1rem' }}>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => window.setTimeout(() => setShowSuggestions(false), 150)}
                   placeholder={t('common.search')}
                   className="w-full px-4 py-2 rounded-luxury bg-charcoal-light text-ivory placeholder-taupe focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]"
                 />
+                {shouldShowSuggestions && (
+                  <div className="absolute top-full mt-2 w-full rounded-luxury border border-sand bg-white text-charcoal shadow-lg z-50 overflow-hidden">
+                    {isSuggesting && (
+                      <div className="px-4 py-3 text-sm text-taupe">{t('common.loading')}</div>
+                    )}
+                    {!isSuggesting && suggestions.length === 0 && (
+                      <div className="px-4 py-3 text-sm text-taupe">
+                        {t('products.noResults', 'لا توجد نتائج')}
+                      </div>
+                    )}
+                    {!isSuggesting && suggestions.length > 0 && (
+                      <ul className="max-h-72 overflow-auto">
+                        {suggestions.map((suggestion) => (
+                          <li key={suggestion.id}>
+                            <button
+                              type="button"
+                              onMouseDown={() => handleSuggestionSelect(suggestion)}
+                              className="w-full px-4 py-3 text-sm flex flex-col items-start gap-1 hover:bg-sand transition"
+                            >
+                              <span className="font-semibold text-charcoal">
+                                {resolveSuggestionLabel(suggestion)}
+                              </span>
+                              <span className="text-xs text-taupe">{suggestion.brand}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </form>
 
               <Link to="/" className="hover:text-gold transition whitespace-nowrap">{t('nav.home')}</Link>
@@ -213,6 +284,8 @@ export default function Navbar() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => window.setTimeout(() => setShowSuggestions(false), 150)}
                 placeholder={t('common.search')}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-charcoal-light text-ivory placeholder-taupe focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]"
                 autoFocus
@@ -229,6 +302,38 @@ export default function Navbar() {
               </button>
             </form>
           </div>
+          {shouldShowSuggestions && (
+            <div className="px-3 pt-3">
+              <div className="rounded-luxury border border-charcoal-light bg-charcoal text-ivory shadow-lg overflow-hidden">
+                {isSuggesting && (
+                  <div className="px-4 py-3 text-sm text-taupe">{t('common.loading')}</div>
+                )}
+                {!isSuggesting && suggestions.length === 0 && (
+                  <div className="px-4 py-3 text-sm text-taupe">
+                    {t('products.noResults', 'لا توجد نتائج')}
+                  </div>
+                )}
+                {!isSuggesting && suggestions.length > 0 && (
+                  <ul className="max-h-72 overflow-auto">
+                    {suggestions.map((suggestion) => (
+                      <li key={suggestion.id}>
+                        <button
+                          type="button"
+                          onMouseDown={() => handleSuggestionSelect(suggestion)}
+                          className="w-full px-4 py-3 text-sm flex flex-col items-start gap-1 hover:bg-charcoal-light transition"
+                        >
+                          <span className="font-semibold text-ivory">
+                            {resolveSuggestionLabel(suggestion)}
+                          </span>
+                          <span className="text-xs text-taupe">{suggestion.brand}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
