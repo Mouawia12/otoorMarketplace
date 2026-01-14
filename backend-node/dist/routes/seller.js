@@ -45,7 +45,7 @@ router.post("/products", sellerOnly, async (req, res, next) => {
         const product = await (0, productService_1.createProduct)({
             ...req.body,
             sellerId: req.user.id,
-        });
+        }, { roles: req.user.roles });
         res.status(201).json(product);
     }
     catch (error) {
@@ -61,7 +61,9 @@ router.patch("/products/:id", sellerOnly, async (req, res, next) => {
         if (Number.isNaN(productId)) {
             throw errors_1.AppError.badRequest("Invalid product id");
         }
-        const product = await (0, productService_1.updateProduct)(productId, req.user.id, req.body);
+        const product = await (0, productService_1.updateProduct)(productId, req.user.id, req.body, {
+            roles: req.user.roles,
+        });
         res.json(product);
     }
     catch (error) {
@@ -157,8 +159,8 @@ router.get("/auctions", sellerOnly, async (req, res, next) => {
 });
 router.get("/product-templates", sellerOnly, async (req, res, next) => {
     try {
-        const templates = await (0, productTemplateService_1.listProductTemplates)(req.query);
-        res.json(templates);
+        const result = await (0, productTemplateService_1.listProductTemplates)(req.query);
+        res.json(result);
     }
     catch (error) {
         next(error);

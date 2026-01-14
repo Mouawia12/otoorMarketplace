@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getOrderTracking = exports.getOrderLabel = exports.updateOrderStatus = exports.confirmOrderDelivery = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersByUser = exports.createOrder = void 0;
+exports.getOrderTracking = exports.getOrderLabel = exports.updateOrderStatus = exports.confirmOrderDelivery = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersWithPagination = exports.listOrdersByUser = exports.createOrder = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
@@ -8,35 +8,76 @@ const errors_1 = require("../utils/errors");
 const productService_1 = require("./productService");
 const env_1 = require("../config/env");
 const couponService_1 = require("./couponService");
-const redboxService_1 = require("./redboxService");
+const torodService_1 = require("./torodService");
 const orderItemSchema = zod_1.z.object({
     productId: zod_1.z.coerce.number().int().positive(),
     quantity: zod_1.z.coerce.number().int().positive(),
     unitPrice: zod_1.z.coerce.number().positive().optional(),
 });
+const listOrdersSchema = zod_1.z.object({
+    status: zod_1.z.string().optional(),
+    page: zod_1.z.coerce.number().int().min(1).default(1).optional(),
+    page_size: zod_1.z.coerce.number().int().min(1).max(200).default(25).optional(),
+    search: zod_1.z.string().optional(),
+    sellerId: zod_1.z.coerce.number().optional(),
+});
+const normalizeShippingType = (value) => {
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "redbox" || normalized === "omni") {
+        return "torod";
+    }
+    if (["standard", "express", "torod"].includes(normalized)) {
+        return normalized;
+    }
+    return undefined;
+};
 const shippingDetailsSchema = zod_1.z.preprocess((value) => {
     if (value && typeof value === "object") {
         const shipping = value;
+        const normalizedType = normalizeShippingType(shipping.type) ??
+            normalizeShippingType(shipping.shipping_method) ??
+            normalizeShippingType(shipping.shippingMethod);
         return {
             name: shipping.name,
             phone: shipping.phone,
             city: shipping.city,
-            region: shipping.region,
+            region: shipping.region ?? shipping.city,
             address: shipping.address,
-            type: shipping.type,
-            redboxPointId: shipping.redboxPointId ??
-                shipping.redbox_point_id ??
-                shipping.point_id,
-            customerCityCode: shipping.customerCityCode ?? shipping.customer_city_code ?? shipping.city,
+            type: normalizedType ?? shipping.type,
+            customerCityCode: shipping.customerCityCode ??
+                shipping.customer_city_code ??
+                shipping.city,
             customerCountry: shipping.customerCountry ?? shipping.customer_country ?? "SA",
             codAmount: shipping.codAmount ?? shipping.cod_amount,
             codCurrency: shipping.codCurrency ?? shipping.cod_currency,
-            redboxType: shipping.redboxType ??
-                shipping.redbox_type ??
-                (shipping.type === "omni" ? "omni" : undefined),
-            shipmentType: shipping.shipmentType ??
-                shipping.shipment_type ??
-                (shipping.type === "omni" ? "omni" : undefined),
+            torodShippingCompanyId: shipping.torodShippingCompanyId ??
+                shipping.torod_shipping_company_id ??
+                shipping.shippingCompanyId ??
+                shipping.shipping_company_id,
+            torodWarehouseId: shipping.torodWarehouseId ??
+                shipping.torod_warehouse_id ??
+                shipping.warehouseId ??
+                shipping.warehouse_id,
+            torodCountryId: shipping.torodCountryId ??
+                shipping.torod_country_id ??
+                shipping.countryId ??
+                shipping.country_id,
+            torodRegionId: shipping.torodRegionId ??
+                shipping.torod_region_id ??
+                shipping.regionId ??
+                shipping.region_id,
+            torodCityId: shipping.torodCityId ??
+                shipping.torod_city_id ??
+                shipping.cityId ??
+                shipping.city_id,
+            torodDistrictId: shipping.torodDistrictId ??
+                shipping.torod_district_id ??
+                shipping.districtId ??
+                shipping.district_id,
+            torodMetadata: shipping.torodMetadata ?? shipping.torod_metadata ?? shipping.metadata,
         };
     }
     return value;
@@ -46,14 +87,18 @@ const shippingDetailsSchema = zod_1.z.preprocess((value) => {
     city: zod_1.z.string().min(2),
     region: zod_1.z.string().min(2),
     address: zod_1.z.string().min(3),
-    type: zod_1.z.enum(["standard", "express", "redbox", "omni"]).default("standard"),
-    redboxPointId: zod_1.z.string().min(1, "RedBox point_id is required").optional(),
+    type: zod_1.z.enum(["standard", "express", "torod"]).default("standard"),
     customerCityCode: zod_1.z.string().optional(),
     customerCountry: zod_1.z.string().default("SA"),
     codAmount: zod_1.z.coerce.number().nonnegative().optional(),
     codCurrency: zod_1.z.string().default("SAR"),
-    redboxType: zod_1.z.enum(["redbox", "omni"]).default("redbox"),
-    shipmentType: zod_1.z.enum(["direct", "agency", "omni"]).default("direct"),
+    torodShippingCompanyId: zod_1.z.string().optional(),
+    torodWarehouseId: zod_1.z.string().optional(),
+    torodCountryId: zod_1.z.string().optional(),
+    torodRegionId: zod_1.z.string().optional(),
+    torodCityId: zod_1.z.string().optional(),
+    torodDistrictId: zod_1.z.string().optional(),
+    torodMetadata: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional(),
 }));
 const createOrderSchema = zod_1.z.object({
     buyerId: zod_1.z.number().int().positive(),
@@ -61,26 +106,55 @@ const createOrderSchema = zod_1.z.object({
     shipping: shippingDetailsSchema.optional(),
     items: zod_1.z.array(orderItemSchema).min(1),
     couponCode: zod_1.z.string().min(3).optional(),
+    couponCodes: zod_1.z.array(zod_1.z.string().min(3)).max(5).optional(),
 });
 const createOrder = async (input) => {
     const data = createOrderSchema.parse(input);
     if (!data.shipping) {
         throw errors_1.AppError.badRequest("Shipping details are required");
     }
-    const shipping = data.shipping;
-    const redboxPointId = shipping.redboxPointId;
-    if (!redboxPointId) {
-        throw errors_1.AppError.badRequest("RedBox point selection is required");
+    const itemMap = new Map();
+    for (const item of data.items) {
+        const existing = itemMap.get(item.productId);
+        if (existing) {
+            existing.quantity += item.quantity;
+        }
+        else {
+            itemMap.set(item.productId, {
+                productId: item.productId,
+                quantity: item.quantity,
+            });
+        }
     }
-    const shippingMethod = shipping.type ?? "standard";
+    const aggregatedItems = Array.from(itemMap.values());
+    if (aggregatedItems.length === 0) {
+        throw errors_1.AppError.badRequest("Order items are required");
+    }
+    const shipping = data.shipping;
+    const shippingMethod = normalizeShippingType(shipping.type) ?? "standard";
+    const requiresTorodShipment = shippingMethod === "torod";
     const shippingOption = shippingMethod === "express" ? "express" : "standard";
+    if (requiresTorodShipment) {
+        if (!shipping.torodCountryId) {
+            throw errors_1.AppError.badRequest("Torod country is required");
+        }
+        if (!shipping.torodRegionId) {
+            throw errors_1.AppError.badRequest("Torod region is required");
+        }
+        if (!shipping.torodCityId) {
+            throw errors_1.AppError.badRequest("Torod city is required");
+        }
+        if (!shipping.torodDistrictId) {
+            throw errors_1.AppError.badRequest("Torod district is required");
+        }
+    }
     const shippingFeeValue = shippingOption === "express"
         ? env_1.config.shipping.express
         : env_1.config.shipping.standard;
     // validate products and stock
     const products = await client_2.prisma.product.findMany({
         where: {
-            id: { in: data.items.map((item) => item.productId) },
+            id: { in: aggregatedItems.map((item) => item.productId) },
         },
         select: {
             id: true,
@@ -91,10 +165,10 @@ const createOrder = async (input) => {
         },
     });
     const productMap = new Map(products.map((product) => [product.id, product]));
-    if (productMap.size !== data.items.length) {
+    if (productMap.size !== aggregatedItems.length) {
         throw errors_1.AppError.badRequest("One or more products are unavailable");
     }
-    const subtotal = data.items.reduce((total, item) => {
+    const subtotal = aggregatedItems.reduce((total, item) => {
         const product = productMap.get(item.productId);
         if (!product) {
             throw errors_1.AppError.badRequest(`Product ${item.productId} not found`);
@@ -104,7 +178,7 @@ const createOrder = async (input) => {
     if (subtotal <= 0) {
         throw errors_1.AppError.badRequest("Order subtotal must be greater than zero");
     }
-    for (const item of data.items) {
+    for (const item of aggregatedItems) {
         const product = productMap.get(item.productId);
         if (!product) {
             throw errors_1.AppError.badRequest(`Product ${item.productId} not found`);
@@ -116,7 +190,7 @@ const createOrder = async (input) => {
             throw errors_1.AppError.badRequest(`Insufficient stock for product ${item.productId}`);
         }
     }
-    const normalizedItems = data.items.map((item) => {
+    const normalizedItems = aggregatedItems.map((item) => {
         const product = productMap.get(item.productId);
         const basePriceNumber = product.basePrice.toNumber();
         const unitPrice = new client_1.Prisma.Decimal(basePriceNumber);
@@ -127,7 +201,7 @@ const createOrder = async (input) => {
             totalPrice: unitPrice.mul(item.quantity),
         };
     });
-    const couponLines = data.items.map((item) => {
+    const couponLines = aggregatedItems.map((item) => {
         const product = productMap.get(item.productId);
         return {
             productId: item.productId,
@@ -137,10 +211,24 @@ const createOrder = async (input) => {
         };
     });
     let appliedCoupon = null;
-    if (data.couponCode) {
-        appliedCoupon = await client_2.prisma.$transaction((tx) => (0, couponService_1.prepareCouponForOrder)(tx, data.couponCode, couponLines));
+    let appliedCoupons = [];
+    let appliedCouponCodes = [];
+    if (data.couponCodes && data.couponCodes.length > 0) {
+        const prepared = await client_2.prisma.$transaction((tx) => (0, couponService_1.prepareCouponsForOrder)(tx, data.couponCodes, couponLines));
+        appliedCoupons = prepared.coupons.map((entry) => ({
+            coupon: entry.coupon,
+            discountAmount: entry.discountAmount,
+        }));
+        appliedCouponCodes = appliedCoupons.map((entry) => entry.coupon.code);
     }
-    const discountAmount = appliedCoupon?.discountAmount ?? 0;
+    else if (data.couponCode) {
+        appliedCoupon = await client_2.prisma.$transaction((tx) => (0, couponService_1.prepareCouponForOrder)(tx, data.couponCode, couponLines));
+        if (appliedCoupon) {
+            appliedCoupons = [appliedCoupon];
+            appliedCouponCodes = [appliedCoupon.coupon.code];
+        }
+    }
+    const discountAmount = appliedCoupons.reduce((total, entry) => total + entry.discountAmount, 0);
     const totalBeforeShipping = Math.max(0, subtotal - discountAmount);
     const totalAmount = totalBeforeShipping + shippingFeeValue;
     const platformFee = totalAmount * env_1.config.platformCommissionRate;
@@ -154,9 +242,13 @@ const createOrder = async (input) => {
     const codCurrency = shipping.codCurrency ?? "SAR";
     const customerCityCode = shipping.customerCityCode ?? shipping.city;
     const customerCountry = shipping.customerCountry ?? "SA";
-    const redboxShipmentType = shipping.shipmentType ?? "direct";
-    const redboxType = shipping.redboxType ??
-        (shippingMethod === "omni" ? "omni" : "redbox");
+    const torodShippingCompanyId = shipping.torodShippingCompanyId;
+    const torodWarehouseId = shipping.torodWarehouseId;
+    const torodCountryId = shipping.torodCountryId;
+    const torodRegionId = shipping.torodRegionId;
+    const torodCityId = shipping.torodCityId;
+    const torodDistrictId = shipping.torodDistrictId;
+    const torodMetadata = shipping.torodMetadata;
     const order = await client_2.prisma.$transaction(async (tx) => {
         const created = await tx.order.create({
             data: {
@@ -176,14 +268,16 @@ const createOrder = async (input) => {
                 shippingFee: new client_1.Prisma.Decimal(shippingFeeValue),
                 totalAmount: new client_1.Prisma.Decimal(totalAmount),
                 platformFee: new client_1.Prisma.Decimal(platformFee),
-                couponId: appliedCoupon?.coupon.id ?? null,
-                couponCode: appliedCoupon?.coupon.code ?? null,
+                couponId: appliedCoupon && appliedCoupons.length === 1
+                    ? appliedCoupon.coupon.id
+                    : null,
+                couponCode: appliedCouponCodes.length > 0 ? appliedCouponCodes.join(",") : null,
                 codAmount: codAmount !== undefined
                     ? new client_1.Prisma.Decimal(codAmount)
                     : null,
                 codCurrency: codAmount !== undefined ? codCurrency : null,
-                redboxPointId,
-                redboxStatus: "pending",
+                redboxPointId: null,
+                redboxStatus: requiresTorodShipment ? "pending" : null,
                 items: {
                     create: normalizedItems,
                 },
@@ -193,90 +287,114 @@ const createOrder = async (input) => {
             },
         });
         for (const item of normalizedItems) {
-            await tx.product.update({
-                where: { id: item.productId },
+            const updateResult = await tx.product.updateMany({
+                where: {
+                    id: item.productId,
+                    stockQuantity: { gte: item.quantity },
+                    status: "PUBLISHED",
+                },
                 data: {
                     stockQuantity: {
                         decrement: item.quantity,
                     },
                 },
             });
+            if (updateResult.count === 0) {
+                throw errors_1.AppError.badRequest(`Insufficient stock for product ${item.productId}`);
+            }
         }
         return created;
     });
     let shipment;
-    try {
-        const shipmentPayload = {
-            pointId: redboxPointId,
-            reference: `order-${order.id}`,
-            type: redboxType,
-            customerCityCode,
-            customerCountry,
-            codAmount: codAmount ?? 0,
-            codCurrency,
-            metadata: {
+    let torodOrder;
+    if (requiresTorodShipment) {
+        try {
+            const baseMetadata = {
                 orderId: order.id,
                 buyerId: data.buyerId,
-            },
-            receiver: {
-                name: shipping.name,
-                phone: shipping.phone,
-                cityCode: customerCityCode,
-                country: customerCountry,
-                address: shipping.address,
-            },
-            items: normalizedItems.map((item) => ({
-                name: `Item-${item.productId}`,
-                quantity: item.quantity,
-                price: Number(item.unitPrice),
-            })),
-        };
-        if (redboxShipmentType === "agency") {
-            shipment = await (0, redboxService_1.createShipmentAgency)(shipmentPayload);
-        }
-        else if (redboxShipmentType === "omni" || redboxType === "omni") {
-            shipment = await (0, redboxService_1.createOmniOrder)(shipmentPayload);
-        }
-        else {
-            shipment = await (0, redboxService_1.createShipmentDirect)(shipmentPayload);
-        }
-    }
-    catch (error) {
-        await client_2.prisma.$transaction(async (tx) => {
-            await tx.order.update({
-                where: { id: order.id },
-                data: { status: client_1.OrderStatus.CANCELLED, redboxStatus: "failed" },
-            });
-            for (const item of normalizedItems) {
-                await tx.product.update({
-                    where: { id: item.productId },
-                    data: {
-                        stockQuantity: {
-                            increment: item.quantity,
-                        },
-                    },
-                });
+            };
+            const metadata = torodMetadata && typeof torodMetadata === "object"
+                ? { ...baseMetadata, ...torodMetadata }
+                : baseMetadata;
+            const torodOrderPayload = {
+                reference: `order-${order.id}`,
+                customer_name: shipping.name,
+                customer_phone: shipping.phone,
+                customer_address: shipping.address,
+                customer_city: shipping.city,
+                customer_region: shipping.region,
+                customer_country: customerCountry,
+                country_id: torodCountryId,
+                region_id: torodRegionId,
+                city_id: torodCityId,
+                district_id: torodDistrictId,
+                payment_method: data.paymentMethod,
+                cod_amount: codAmount ?? 0,
+                cod_currency: codCurrency,
+                metadata,
+                items: normalizedItems.map((item) => ({
+                    name: `Item-${item.productId}`,
+                    quantity: item.quantity,
+                    price: Number(item.unitPrice),
+                    sku: String(item.productId),
+                })),
+            };
+            torodOrder = await (0, torodService_1.createOrder)(torodOrderPayload);
+            const shipmentPayload = {};
+            if (torodShippingCompanyId) {
+                shipmentPayload.shipping_company_id = torodShippingCompanyId;
             }
-        });
-        const friendlyMessage = "تعذر إنشاء الشحنة مع شركة التوصيل، حاول مرة أخرى أو اختر طريقة شحن أخرى.";
-        if (error instanceof errors_1.AppError) {
-            throw new errors_1.AppError(friendlyMessage, error.statusCode, error.details ?? error);
+            if (torodWarehouseId) {
+                shipmentPayload.warehouse_id = torodWarehouseId;
+            }
+            shipment = await (0, torodService_1.shipOrder)(torodOrder.id, Object.keys(shipmentPayload).length > 0 ? shipmentPayload : undefined);
         }
-        throw errors_1.AppError.internal(friendlyMessage, error);
+        catch (error) {
+            await client_2.prisma.$transaction(async (tx) => {
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: { status: client_1.OrderStatus.CANCELLED, redboxStatus: "failed" },
+                });
+                for (const item of normalizedItems) {
+                    await tx.product.update({
+                        where: { id: item.productId },
+                        data: {
+                            stockQuantity: {
+                                increment: item.quantity,
+                            },
+                        },
+                    });
+                }
+            });
+            const friendlyMessage = "تعذر إنشاء الشحنة مع شركة التوصيل، حاول مرة أخرى أو اختر طريقة شحن أخرى.";
+            if (error instanceof errors_1.AppError) {
+                throw new errors_1.AppError(friendlyMessage, error.statusCode, error.details ?? error);
+            }
+            throw errors_1.AppError.internal(friendlyMessage, error);
+        }
     }
-    if (appliedCoupon) {
-        await client_2.prisma.$transaction((tx) => (0, couponService_1.finalizeCouponUsage)(tx, appliedCoupon.coupon));
+    if (appliedCoupons.length > 0) {
+        await client_2.prisma.$transaction((tx) => (0, couponService_1.finalizeCouponsUsage)(tx, appliedCoupons.map((entry) => entry.coupon)));
     }
-    const updatedOrder = await client_2.prisma.order.update({
-        where: { id: order.id },
-        data: {
-            redboxShipmentId: shipment.id,
-            redboxTrackingNumber: shipment.trackingNumber ?? order.redboxTrackingNumber,
-            redboxLabelUrl: shipment.labelUrl ?? order.redboxLabelUrl,
-            redboxStatus: shipment.status ?? "created",
-        },
-        include: orderInclude,
-    });
+    const shipmentId = shipment?.id ?? torodOrder?.id;
+    const trackingNumber = shipment?.trackingNumber ?? torodOrder?.trackingNumber ?? order.redboxTrackingNumber;
+    const labelUrl = shipment?.labelUrl ?? order.redboxLabelUrl;
+    const shipmentStatus = shipment?.status ?? torodOrder?.status ?? "created";
+    const updatedOrder = shipment || torodOrder
+        ? await client_2.prisma.order.update({
+            where: { id: order.id },
+            data: {
+                redboxShipmentId: shipmentId ?? order.redboxShipmentId,
+                redboxTrackingNumber: trackingNumber ?? order.redboxTrackingNumber,
+                redboxLabelUrl: labelUrl ?? order.redboxLabelUrl,
+                redboxStatus: shipmentStatus ?? "created",
+            },
+            include: orderInclude,
+        })
+        : await client_2.prisma.order.findUniqueOrThrow({
+            where: { id: order.id },
+            include: orderInclude,
+        });
     return mapOrderToDto(updatedOrder);
 };
 exports.createOrder = createOrder;
@@ -376,11 +494,10 @@ const mapOrderToDto = (order) => {
         cod_currency: order.codCurrency ?? null,
         customer_city_code: order.customerCityCode ?? null,
         customer_country: order.customerCountry ?? null,
-        redbox_point_id: order.redboxPointId ?? null,
-        redbox_shipment_id: order.redboxShipmentId ?? null,
-        redbox_tracking_number: order.redboxTrackingNumber ?? null,
-        redbox_label_url: order.redboxLabelUrl ?? null,
-        redbox_status: order.redboxStatus ?? null,
+        torod_shipment_id: order.redboxShipmentId ?? null,
+        torod_tracking_number: order.redboxTrackingNumber ?? null,
+        torod_label_url: order.redboxLabelUrl ?? null,
+        torod_status: order.redboxStatus ?? null,
         product: summaryItem?.product,
         items,
     };
@@ -394,6 +511,120 @@ const listOrdersByUser = async (userId) => {
     return orders.map(mapOrderToDto);
 };
 exports.listOrdersByUser = listOrdersByUser;
+const buildOrdersSearchWhere = (search) => {
+    if (!search) {
+        return undefined;
+    }
+    const term = search.trim();
+    if (!term) {
+        return undefined;
+    }
+    const maybeId = Number(term);
+    const numericFilters = Number.isNaN(maybeId)
+        ? []
+        : [
+            { id: maybeId },
+            { buyerId: maybeId },
+        ];
+    return {
+        OR: [
+            { shippingName: { contains: term } },
+            { shippingPhone: { contains: term } },
+            { couponCode: { contains: term } },
+            {
+                items: {
+                    some: {
+                        product: {
+                            OR: [
+                                { nameEn: { contains: term } },
+                                { nameAr: { contains: term } },
+                                { brand: { contains: term } },
+                            ],
+                        },
+                    },
+                },
+            },
+            ...numericFilters,
+        ],
+    };
+};
+const mapOrdersForSeller = (orders, sellerId) => orders.map((order) => {
+    const dto = mapOrderToDto(order);
+    const sellerItems = dto.items?.filter((item) => item.product?.seller_id === sellerId);
+    if (!sellerItems || sellerItems.length === 0) {
+        return dto;
+    }
+    const [primary] = sellerItems;
+    return {
+        ...dto,
+        product: primary?.product ?? dto.product,
+        product_id: primary?.product_id ?? dto.product_id,
+        quantity: sellerItems.reduce((total, item) => total + item.quantity, 0),
+        unit_price: primary?.unit_price ?? dto.unit_price,
+        items: sellerItems,
+    };
+});
+const listOrdersWithPagination = async (options = {}) => {
+    const { status, page = 1, page_size = 25, search, sellerId } = listOrdersSchema.parse(options ?? {});
+    const where = {};
+    if (status) {
+        where.status = friendlyToStatus(status);
+    }
+    if (sellerId) {
+        where.items = {
+            some: {
+                product: { sellerId },
+            },
+        };
+    }
+    const searchWhere = buildOrdersSearchWhere(search);
+    if (searchWhere) {
+        Object.assign(where, searchWhere);
+    }
+    const countsWhere = {
+        ...(sellerId
+            ? {
+                items: {
+                    some: {
+                        product: { sellerId },
+                    },
+                },
+            }
+            : {}),
+        ...(searchWhere ?? {}),
+    };
+    const [total, orders, statusCounts] = await client_2.prisma.$transaction([
+        client_2.prisma.order.count({ where }),
+        client_2.prisma.order.findMany({
+            where,
+            include: orderInclude,
+            orderBy: { createdAt: "desc" },
+            skip: (page - 1) * page_size,
+            take: page_size,
+        }),
+        client_2.prisma.order.groupBy({
+            by: ["status"],
+            where: countsWhere,
+            _count: { status: true },
+            orderBy: { status: "asc" },
+        }),
+    ]);
+    const mapped = sellerId ? mapOrdersForSeller(orders, sellerId) : orders.map(mapOrderToDto);
+    const status_counts = statusCounts.reduce((acc, row) => {
+        const count = typeof row._count === "object" && row._count ? row._count.status ?? 0 : 0;
+        acc[statusToFriendly(row.status)] = count;
+        return acc;
+    }, {});
+    return {
+        orders: mapped,
+        total,
+        page,
+        page_size,
+        total_pages: Math.ceil(total / page_size),
+        status_counts,
+    };
+};
+exports.listOrdersWithPagination = listOrdersWithPagination;
 const listAllOrders = async (status) => {
     const where = {};
     if (status) {
@@ -425,22 +656,7 @@ const listOrdersForSeller = async (sellerId, status) => {
         include: orderInclude,
         orderBy: { createdAt: "desc" },
     });
-    return orders.map((order) => {
-        const dto = mapOrderToDto(order);
-        const sellerItems = dto.items?.filter((item) => item.product?.seller_id === sellerId);
-        if (!sellerItems || sellerItems.length === 0) {
-            return dto;
-        }
-        const [primary] = sellerItems;
-        return {
-            ...dto,
-            product: primary?.product ?? dto.product,
-            product_id: primary?.product_id ?? dto.product_id,
-            quantity: sellerItems.reduce((total, item) => total + item.quantity, 0),
-            unit_price: primary?.unit_price ?? dto.unit_price,
-            items: sellerItems,
-        };
-    });
+    return mapOrdersForSeller(orders, sellerId);
 };
 exports.listOrdersForSeller = listOrdersForSeller;
 const confirmOrderDelivery = async (orderId, buyerId) => {
@@ -506,20 +722,16 @@ const getOrderLabel = async (orderId, actorId, actorRoles) => {
         throw errors_1.AppError.notFound("Order not found");
     }
     assertOrderAccess(order, actorId, actorRoles);
-    if (!order.redboxShipmentId) {
-        throw errors_1.AppError.badRequest("No RedBox shipment for this order");
+    if (!order.redboxTrackingNumber || order.shippingMethod?.toLowerCase() !== "torod") {
+        throw errors_1.AppError.badRequest("لا توجد شحنة طُرُد مرتبطة بهذا الطلب");
     }
-    const label = await (0, redboxService_1.getLabel)(order.redboxShipmentId);
-    const labelUrl = label.url ||
-        label.labelUrl ||
-        label.label_url ||
-        label.link ||
-        order.redboxLabelUrl ||
-        "";
+    const shipment = await (0, torodService_1.trackShipment)(order.redboxTrackingNumber);
+    const labelUrl = shipment.labelUrl || order.redboxLabelUrl || "";
     const updated = await client_2.prisma.order.update({
         where: { id: order.id },
         data: {
             redboxLabelUrl: labelUrl || order.redboxLabelUrl,
+            redboxTrackingNumber: shipment.trackingNumber ?? order.redboxTrackingNumber,
         },
         include: orderInclude,
     });
@@ -539,23 +751,17 @@ const getOrderTracking = async (orderId, actorId, actorRoles) => {
         throw errors_1.AppError.notFound("Order not found");
     }
     assertOrderAccess(order, actorId, actorRoles);
-    if (!order.redboxShipmentId) {
-        throw errors_1.AppError.badRequest("No RedBox shipment for this order");
+    if (!order.redboxTrackingNumber) {
+        throw errors_1.AppError.badRequest("No Torod tracking number for this order");
     }
-    const shipmentStatus = await (0, redboxService_1.getStatus)(order.redboxShipmentId);
-    let activities = [];
-    try {
-        const activityResponse = await (0, redboxService_1.getActivities)(order.redboxShipmentId);
-        activities = Array.isArray(activityResponse)
-            ? activityResponse
-            : activityResponse?.activities ?? [];
-    }
-    catch (error) {
-        activities = [];
-    }
+    const shipmentStatus = await (0, torodService_1.trackShipment)(order.redboxTrackingNumber);
+    const raw = shipmentStatus.raw;
+    const activities = (Array.isArray(raw?.activities) && raw?.activities) ||
+        (Array.isArray(raw?.events) && raw?.events) ||
+        (Array.isArray(raw?.history) && raw?.history) ||
+        [];
     const statusValue = shipmentStatus.status ?? order.redboxStatus ?? statusToFriendly(order.status);
     const trackingNumber = shipmentStatus.trackingNumber ??
-        shipmentStatus.raw?.tracking_number ??
         order.redboxTrackingNumber;
     const updated = await client_2.prisma.order.update({
         where: { id: order.id },

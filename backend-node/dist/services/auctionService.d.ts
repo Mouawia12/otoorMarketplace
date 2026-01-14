@@ -27,6 +27,7 @@ export declare const listAuctions: (query: unknown) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -46,6 +47,16 @@ export declare const listAuctions: (query: unknown) => Promise<{
         full_name: string;
         verified_seller: boolean;
     } | undefined;
+    winner: any;
+}[]>;
+export declare const listUserBids: (bidderId: number) => Promise<{
+    auctionId: number;
+    auctionName: string;
+    auctionNameAr: string;
+    yourMaxBid: number;
+    currentPrice: number;
+    endTime: Date;
+    status: "winning" | "outbid" | "ended_won" | "ended_lost";
 }[]>;
 export declare const getAuctionById: (id: number) => Promise<{
     bids: {
@@ -87,6 +98,7 @@ export declare const getAuctionById: (id: number) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -106,6 +118,7 @@ export declare const getAuctionById: (id: number) => Promise<{
         full_name: string;
         verified_seller: boolean;
     } | undefined;
+    winner: any;
 }>;
 export declare const getAuctionByProductId: (productId: number) => Promise<{
     id: any;
@@ -135,6 +148,7 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -154,7 +168,11 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
         full_name: string;
         verified_seller: boolean;
     } | undefined;
+    winner: any;
 } | null>;
+export declare const closeExpiredAuctions: () => Promise<void>;
+export declare const startAuctionFinalizer: () => void;
+export declare const stopAuctionFinalizer: () => void;
 declare const placeBidSchema: z.ZodObject<{
     auctionId: z.ZodNumber;
     bidderId: z.ZodNumber;
@@ -232,6 +250,7 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -251,6 +270,7 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
         full_name: string;
         verified_seller: boolean;
     } | undefined;
+    winner: any;
 }>;
 export declare const updateAuction: (auctionId: number, payload: unknown) => Promise<{
     id: any;
@@ -280,6 +300,7 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -299,6 +320,7 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
         full_name: string;
         verified_seller: boolean;
     } | undefined;
+    winner: any;
 }>;
 export {};
 //# sourceMappingURL=auctionService.d.ts.map

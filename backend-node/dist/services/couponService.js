@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.finalizeCouponUsage = exports.prepareCouponForOrder = exports.deleteCoupon = exports.updateCoupon = exports.createCoupon = exports.listCoupons = exports.redeemCoupon = exports.validateCoupon = void 0;
+exports.finalizeCouponsUsage = exports.finalizeCouponUsage = exports.prepareCouponsForOrder = exports.prepareCouponForOrder = exports.deleteCoupon = exports.updateCoupon = exports.createCoupon = exports.listCoupons = exports.redeemCoupon = exports.validateCoupon = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
@@ -9,9 +9,15 @@ const couponLineSchema = zod_1.z.object({
     product_id: zod_1.z.coerce.number().int().positive(),
     quantity: zod_1.z.coerce.number().int().positive(),
 });
-const validateRequestSchema = zod_1.z.object({
-    code: zod_1.z.string().min(3).max(64),
+const validateRequestSchema = zod_1.z
+    .object({
+    code: zod_1.z.string().min(3).max(64).optional(),
+    codes: zod_1.z.array(zod_1.z.string().min(3).max(64)).min(1).max(5).optional(),
     items: zod_1.z.array(couponLineSchema).min(1),
+})
+    .refine((data) => data.code || (data.codes && data.codes.length > 0), {
+    message: "Coupon code is required",
+    path: ["code"],
 });
 const redeemRequestSchema = zod_1.z.object({
     code: zod_1.z.string().min(3).max(64),
@@ -34,6 +40,7 @@ const updateCouponSchema = couponPayloadSchema
     .partial()
     .extend({ code: zod_1.z.string().min(3).max(64).optional() });
 const normalizeCode = (code) => code.trim().toUpperCase();
+const normalizeCodes = (codes) => Array.from(new Set(codes.map((code) => normalizeCode(code)))).filter(Boolean);
 const parseDateInput = (value) => {
     if (value === null || value === undefined || value === "") {
         return null;
@@ -123,7 +130,10 @@ const normalizeLinesFromProducts = (items, products) => {
 };
 const validateCoupon = async (input) => {
     const data = validateRequestSchema.parse(input);
-    const coupon = await findCouponOrThrow(data.code, client_2.prisma);
+    const codes = normalizeCodes(data.codes ?? (data.code ? [data.code] : []));
+    if (codes.length === 0) {
+        throw errors_1.AppError.badRequest("Coupon code is required");
+    }
     const productIds = Array.from(new Set(data.items.map((item) => item.product_id)));
     const products = await client_2.prisma.product.findMany({
         where: { id: { in: productIds } },
@@ -133,14 +143,13 @@ const validateCoupon = async (input) => {
         throw errors_1.AppError.badRequest("لا يمكن إيجاد المنتجات المحددة");
     }
     const lines = normalizeLinesFromProducts(data.items, products);
-    const eligibleSubtotal = computeEligibleSubtotal(coupon, lines);
-    if (eligibleSubtotal <= 0) {
-        throw errors_1.AppError.badRequest("لا يمكن تطبيق هذا الكوبون على المنتجات المحددة");
-    }
-    const discountAmount = calculateDiscountAmount(coupon, eligibleSubtotal);
+    const prepared = await (0, exports.prepareCouponsForOrder)(client_2.prisma, codes, lines);
     return {
-        coupon: serializeCoupon(coupon),
-        discount_amount: discountAmount,
+        coupons: prepared.coupons.map((entry) => ({
+            coupon: serializeCoupon(entry.coupon),
+            discount_amount: entry.discountAmount,
+        })),
+        total_discount: prepared.totalDiscount,
     };
 };
 exports.validateCoupon = validateCoupon;
@@ -283,8 +292,69 @@ const prepareCouponForOrder = async (tx, code, items) => {
     return { coupon, discountAmount };
 };
 exports.prepareCouponForOrder = prepareCouponForOrder;
+const prepareCouponsForOrder = async (tx, codes, items) => {
+    const normalized = normalizeCodes(codes);
+    if (normalized.length === 0) {
+        throw errors_1.AppError.badRequest("Coupon code is required");
+    }
+    const coupons = [];
+    let globalCoupon = null;
+    const sellerCoupons = new Map();
+    for (const code of normalized) {
+        const coupon = await findCouponOrThrow(code, tx);
+        if (coupon.sellerId) {
+            if (sellerCoupons.has(coupon.sellerId)) {
+                throw errors_1.AppError.badRequest("لا يمكن استخدام أكثر من كوبون للبائع نفسه");
+            }
+            sellerCoupons.set(coupon.sellerId, coupon);
+        }
+        else {
+            if (globalCoupon) {
+                throw errors_1.AppError.badRequest("يمكن استخدام كوبون عام واحد فقط");
+            }
+            globalCoupon = coupon;
+        }
+        coupons.push(coupon);
+    }
+    const sellerCoveredSubtotal = Array.from(sellerCoupons.values()).reduce((total, coupon) => total + computeEligibleSubtotal(coupon, items), 0);
+    const totalSubtotal = items.reduce((total, line) => total + line.unitPrice * line.quantity, 0);
+    const prepared = Array.from(sellerCoupons.values()).map((coupon) => {
+        const eligibleSubtotal = computeEligibleSubtotal(coupon, items);
+        if (eligibleSubtotal <= 0) {
+            throw errors_1.AppError.badRequest("لا يمكن تطبيق هذا الكوبون على الطلب الحالي");
+        }
+        return {
+            coupon,
+            eligibleSubtotal,
+            discountAmount: calculateDiscountAmount(coupon, eligibleSubtotal),
+        };
+    });
+    if (globalCoupon) {
+        const remainingSubtotal = Math.max(0, totalSubtotal - sellerCoveredSubtotal);
+        if (remainingSubtotal <= 0) {
+            throw errors_1.AppError.badRequest("لا يمكن تطبيق الكوبون العام على الطلب الحالي");
+        }
+        prepared.push({
+            coupon: globalCoupon,
+            eligibleSubtotal: remainingSubtotal,
+            discountAmount: calculateDiscountAmount(globalCoupon, remainingSubtotal),
+        });
+    }
+    const totalDiscount = prepared.reduce((total, entry) => total + entry.discountAmount, 0);
+    return {
+        coupons: prepared,
+        totalDiscount,
+    };
+};
+exports.prepareCouponsForOrder = prepareCouponsForOrder;
 const finalizeCouponUsage = async (tx, coupon) => {
     await incrementUsageCount(tx, coupon);
 };
 exports.finalizeCouponUsage = finalizeCouponUsage;
+const finalizeCouponsUsage = async (tx, coupons) => {
+    for (const coupon of coupons) {
+        await incrementUsageCount(tx, coupon);
+    }
+};
+exports.finalizeCouponsUsage = finalizeCouponsUsage;
 //# sourceMappingURL=couponService.js.map

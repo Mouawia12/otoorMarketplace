@@ -7,17 +7,23 @@ export declare const getAdminDashboardStats: () => Promise<{
     pending_orders: number;
     running_auctions: number;
 }>;
-export declare const listUsersForAdmin: () => Promise<{
-    id: number;
-    email: string;
-    full_name: string;
-    status: import(".prisma/client").$Enums.UserStatus;
-    roles: string[];
-    created_at: string;
-    seller_status: string;
-    seller_profile_status: string | undefined;
-    verified_seller: boolean;
-}[]>;
+export declare const listUsersForAdmin: (query?: unknown) => Promise<{
+    users: {
+        id: number;
+        email: string;
+        full_name: string;
+        status: import(".prisma/client").$Enums.UserStatus;
+        roles: string[];
+        created_at: string;
+        seller_status: string;
+        seller_profile_status: string | undefined;
+        verified_seller: boolean;
+    }[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+}>;
 type AdminUserUpdatePayload = {
     status?: string;
     seller_status?: string;
@@ -54,6 +60,7 @@ export declare const listPendingProducts: () => Promise<{
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;
@@ -68,35 +75,43 @@ export declare const listPendingProducts: () => Promise<{
     is_auction_product: boolean;
     has_active_auction: any;
 }[]>;
-export declare const listProductsForAdmin: (status?: string) => Promise<{
-    id: any;
-    seller_id: any;
-    name_ar: any;
-    name_en: any;
-    description_ar: any;
-    description_en: any;
-    product_type: any;
-    brand: any;
-    category: any;
-    base_price: any;
-    size_ml: any;
-    concentration: any;
-    condition: any;
-    stock_quantity: any;
-    image_urls: string[];
-    status: string;
-    created_at: any;
-    updated_at: any;
-    rating_avg: number;
-    rating_count: any;
-    seller: {
+export declare const listProductsForAdmin: (query?: unknown) => Promise<{
+    products: {
         id: any;
-        full_name: any;
-        verified_seller: any;
-    } | undefined;
-    is_auction_product: boolean;
-    has_active_auction: any;
-}[]>;
+        seller_id: any;
+        name_ar: any;
+        name_en: any;
+        description_ar: any;
+        description_en: any;
+        product_type: any;
+        brand: any;
+        category: any;
+        base_price: any;
+        size_ml: any;
+        concentration: any;
+        condition: any;
+        stock_quantity: any;
+        is_tester: boolean;
+        image_urls: string[];
+        status: string;
+        created_at: any;
+        updated_at: any;
+        rating_avg: number;
+        rating_count: any;
+        seller: {
+            id: any;
+            full_name: any;
+            verified_seller: any;
+        } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
+    }[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+    status_counts: Record<string, number>;
+}>;
 export declare const updateProductStatusAsAdmin: (productId: number, status: string) => Promise<{
     id: any;
     seller_id: any;
@@ -112,6 +127,7 @@ export declare const updateProductStatusAsAdmin: (productId: number, status: str
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;

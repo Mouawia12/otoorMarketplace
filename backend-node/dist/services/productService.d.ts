@@ -1,3 +1,4 @@
+import { RoleName } from "@prisma/client";
 import { z } from "zod";
 export declare const normalizeProduct: (product: any) => {
     id: any;
@@ -14,6 +15,7 @@ export declare const normalizeProduct: (product: any) => {
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;
@@ -44,6 +46,7 @@ export declare const listProducts: (query: unknown) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -63,6 +66,14 @@ export declare const listProducts: (query: unknown) => Promise<{
     page_size: number;
     total_pages: number;
 }>;
+export declare const listProductSuggestions: (query: unknown) => Promise<{
+    id: any;
+    name_ar: any;
+    name_en: any;
+    brand: any;
+    image_url: string | null;
+    base_price: any;
+}[]>;
 export declare const getProductById: (id: number) => Promise<{
     id: any;
     seller_id: any;
@@ -78,6 +89,7 @@ export declare const getProductById: (id: number) => Promise<{
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;
@@ -107,6 +119,7 @@ export declare const getRelatedProducts: (productId: number, limit?: number) => 
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;
@@ -145,6 +158,7 @@ declare const productInputSchema: z.ZodObject<{
         USED: "USED";
     }>;
     stockQuantity: z.ZodCoercedNumber<unknown>;
+    isTester: z.ZodOptional<z.ZodBoolean>;
     status: z.ZodDefault<z.ZodEnum<{
         DRAFT: "DRAFT";
         PENDING_REVIEW: "PENDING_REVIEW";
@@ -154,7 +168,9 @@ declare const productInputSchema: z.ZodObject<{
     }>>;
     imageUrls: z.ZodDefault<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;
-export declare const createProduct: (input: z.infer<typeof productInputSchema>) => Promise<{
+export declare const createProduct: (input: z.infer<typeof productInputSchema>, options?: {
+    roles?: RoleName[];
+}) => Promise<{
     id: any;
     seller_id: any;
     name_ar: any;
@@ -169,6 +185,7 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>) 
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;
@@ -183,7 +200,9 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>) 
     is_auction_product: boolean;
     has_active_auction: any;
 }>;
-export declare const updateProduct: (productId: number, sellerId: number, payload: unknown) => Promise<{
+export declare const updateProduct: (productId: number, sellerId: number, payload: unknown, options?: {
+    roles?: RoleName[];
+}) => Promise<{
     id: any;
     seller_id: any;
     name_ar: any;
@@ -198,6 +217,7 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;
@@ -228,6 +248,7 @@ export declare const moderateProduct: (productId: number, action: "approve" | "r
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;

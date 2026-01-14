@@ -120,7 +120,7 @@ const shippingDetailsSchema = z.preprocess((value) => {
   torodRegionId: z.string().optional(),
   torodCityId: z.string().optional(),
   torodDistrictId: z.string().optional(),
-  torodMetadata: z.record(z.unknown()).optional(),
+  torodMetadata: z.record(z.string(), z.unknown()).optional(),
 }));
 
 const createOrderSchema = z.object({
@@ -730,12 +730,15 @@ export const listOrdersWithPagination = async (options: ListOrdersOptions = {}) 
       by: ["status"],
       where: countsWhere,
       _count: { status: true },
+      orderBy: { status: "asc" },
     }),
   ]);
 
   const mapped = sellerId ? mapOrdersForSeller(orders, sellerId) : orders.map(mapOrderToDto);
   const status_counts = statusCounts.reduce<Record<string, number>>((acc, row) => {
-    acc[statusToFriendly(row.status)] = row._count.status ?? 0;
+    const count =
+      typeof row._count === "object" && row._count ? row._count.status ?? 0 : 0;
+    acc[statusToFriendly(row.status)] = count;
     return acc;
   }, {});
 

@@ -24,6 +24,15 @@ router.get("/meta", async (_req, res, next) => {
         next(error);
     }
 });
+router.get("/suggestions", async (req, res, next) => {
+    try {
+        const suggestions = await (0, productService_1.listProductSuggestions)(req.query);
+        res.json({ suggestions });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.get("/:id", async (req, res, next) => {
     try {
         const id = Number(req.params.id);
@@ -97,7 +106,7 @@ router.post("/", (0, auth_1.authenticate)({ roles: ["SELLER", "ADMIN", "SUPER_AD
         const product = await (0, productService_1.createProduct)({
             ...req.body,
             sellerId: req.user.id,
-        });
+        }, { roles: req.user.roles });
         res.status(201).json(product);
     }
     catch (error) {

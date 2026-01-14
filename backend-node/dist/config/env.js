@@ -38,25 +38,24 @@ const envSchema = zod_1.z.object({
         .string()
         .url()
         .default("http://localhost:5173/reset-password"),
+    AUTH_COOKIE_NAME: zod_1.z.string().default("otoor_session"),
     ADMIN_PROTECTED_EMAIL: zod_1.z
         .string()
         .email()
         .default("fragreworld@gmail.com"),
-    REDBOX_API_TOKEN: zod_1.z.string().min(1, "REDBOX_API_TOKEN is required"),
-    REDBOX_BUSINESS_ID: zod_1.z.string().optional(),
-    REDBOX_ENV: zod_1.z.enum(["production", "sandbox"]).default("production"),
-    REDBOX_API_BASE_URL: zod_1.z
+    TOROD_API_URL: zod_1.z
         .string()
         .url()
-        .default("https://api.redboxsa.com"),
-    REDBOX_DEFAULT_COUNTRY: zod_1.z.string().default("SA"),
+        .default("https://demo.stage.torod.co/en/api/"),
+    TOROD_CLIENT_ID: zod_1.z.string().min(1, "TOROD_CLIENT_ID is required"),
+    TOROD_CLIENT_SECRET: zod_1.z.string().min(1, "TOROD_CLIENT_SECRET is required"),
 });
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
     console.error("❌ Invalid environment variables:", parsed.error.flatten());
     throw new Error("Invalid environment configuration");
 }
-const { NODE_ENV, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, ALLOWED_ORIGINS, PLATFORM_COMMISSION_RATE, STANDARD_SHIPPING_FEE, EXPRESS_SHIPPING_FEE, UPLOAD_DIR, MAX_UPLOAD_SIZE_MB, ASSET_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SUPPORT_EMAIL, MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_ENCRYPTION, MAIL_FROM_ADDRESS, MAIL_FROM_NAME, PASSWORD_RESET_URL, ADMIN_PROTECTED_EMAIL, REDBOX_API_TOKEN, REDBOX_BUSINESS_ID, REDBOX_ENV, REDBOX_API_BASE_URL, REDBOX_DEFAULT_COUNTRY, } = parsed.data;
+const { NODE_ENV, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, ALLOWED_ORIGINS, PLATFORM_COMMISSION_RATE, STANDARD_SHIPPING_FEE, EXPRESS_SHIPPING_FEE, UPLOAD_DIR, MAX_UPLOAD_SIZE_MB, ASSET_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SUPPORT_EMAIL, MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_ENCRYPTION, MAIL_FROM_ADDRESS, MAIL_FROM_NAME, PASSWORD_RESET_URL, AUTH_COOKIE_NAME, ADMIN_PROTECTED_EMAIL, TOROD_API_URL, TOROD_CLIENT_ID, TOROD_CLIENT_SECRET, } = parsed.data;
 const allowedOrigins = ALLOWED_ORIGINS === "*"
     ? ["*"]
     : ALLOWED_ORIGINS.split(",")
@@ -99,16 +98,19 @@ exports.config = {
     },
     auth: {
         passwordResetUrl: PASSWORD_RESET_URL.replace(/\/+$/, ""),
+        cookieName: AUTH_COOKIE_NAME,
+        cookieMaxAgeSeconds: (() => {
+            const numericExpires = Number(JWT_EXPIRES_IN);
+            return Number.isNaN(numericExpires) ? 86400 : numericExpires;
+        })(),
     },
     accounts: {
         protectedAdminEmail: ADMIN_PROTECTED_EMAIL.toLowerCase(),
     },
-    redbox: {
-        token: REDBOX_API_TOKEN,
-        businessId: REDBOX_BUSINESS_ID,
-        env: REDBOX_ENV,
-        baseUrl: `${REDBOX_API_BASE_URL.replace(/\/+$/, "")}/v3`,
-        defaultCountry: REDBOX_DEFAULT_COUNTRY,
+    torod: {
+        baseUrl: TOROD_API_URL.replace(/\/+$/, ""),
+        clientId: TOROD_CLIENT_ID,
+        clientSecret: TOROD_CLIENT_SECRET,
     },
 };
 //# sourceMappingURL=env.js.map

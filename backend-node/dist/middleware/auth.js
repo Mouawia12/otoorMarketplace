@@ -5,13 +5,14 @@ const client_1 = require("../prisma/client");
 const jwt_1 = require("../utils/jwt");
 const errors_1 = require("../utils/errors");
 const env_1 = require("../config/env");
+const cookies_1 = require("../utils/cookies");
 const authenticate = (options = {}) => async (req, _res, next) => {
     try {
         const authHeader = req.headers.authorization;
-        if (!authHeader) {
-            throw errors_1.AppError.unauthorized();
-        }
-        const [, token] = authHeader.split(" ");
+        const bearerToken = typeof authHeader === "string" ? authHeader.split(" ")[1] : undefined;
+        const cookies = (0, cookies_1.parseCookies)(req.headers.cookie);
+        const cookieToken = cookies[env_1.config.auth.cookieName];
+        const token = bearerToken ?? cookieToken;
         if (!token) {
             throw errors_1.AppError.unauthorized();
         }

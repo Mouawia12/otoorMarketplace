@@ -23,6 +23,7 @@ export declare const listSellerProductsWithFilters: (sellerId: number, filters?:
     concentration: any;
     condition: any;
     stock_quantity: any;
+    is_tester: boolean;
     image_urls: string[];
     status: string;
     created_at: any;
@@ -61,11 +62,10 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
-    redbox_point_id: string | null;
-    redbox_shipment_id: string | null;
-    redbox_tracking_number: string | null;
-    redbox_label_url: string | null;
-    redbox_status: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -81,6 +81,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -116,6 +117,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;

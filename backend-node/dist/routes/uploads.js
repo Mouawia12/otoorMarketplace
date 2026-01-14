@@ -49,18 +49,23 @@ const upload = (0, multer_1.default)({
 });
 const sellerRoles = [client_1.RoleName.SELLER, client_1.RoleName.ADMIN, client_1.RoleName.SUPER_ADMIN];
 const sellerOnly = (0, auth_1.authenticate)({ roles: sellerRoles });
-router.post("/image", sellerOnly, upload.single("image"), (req, res, next) => {
-    if (!req.file) {
+router.post("/image", sellerOnly, upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "upload", maxCount: 1 },
+]), (req, res, next) => {
+    const files = (req.files ?? {});
+    const file = files.image?.[0] ?? files.upload?.[0];
+    if (!file) {
         return next(errors_1.AppError.badRequest("No image file received"));
     }
-    const publicPath = (0, uploads_1.buildPublicUploadPath)(req.file.filename);
+    const publicPath = (0, uploads_1.buildPublicUploadPath)(file.filename);
     const absoluteUrl = `${req.protocol}://${req.get("host")}${publicPath}`;
     res.json({
         url: absoluteUrl,
         path: publicPath,
-        filename: req.file.filename,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
+        filename: file.filename,
+        size: file.size,
+        mimetype: file.mimetype,
     });
 });
 exports.default = router;

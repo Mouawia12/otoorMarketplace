@@ -28,6 +28,7 @@ const listTemplatesSchema = zod_1.z.object({
     brand: zod_1.z.string().optional(),
     category: zod_1.z.string().optional(),
     limit: zod_1.z.coerce.number().int().positive().max(100).default(50),
+    skip: zod_1.z.coerce.number().int().min(0).default(0),
 });
 const normalizeTemplate = (template) => {
     const images = Array.isArray(template.images)
@@ -173,7 +174,7 @@ const getProductTemplateById = async (templateId) => {
 };
 exports.getProductTemplateById = getProductTemplateById;
 const listProductTemplates = async (query) => {
-    const { search, brand, category, limit } = listTemplatesSchema.parse(query ?? {});
+    const { search, brand, category, limit, skip } = listTemplatesSchema.parse(query ?? {});
     const where = {};
     if (brand)
         where.brand = brand;
@@ -187,16 +188,25 @@ const listProductTemplates = async (query) => {
             { category: { contains: search } },
         ];
     }
-    const templates = await client_2.prisma.productTemplate.findMany({
-        where,
-        include: {
-            images: { orderBy: { sortOrder: "asc" } },
-            createdBy: { select: { id: true, fullName: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-        take: limit,
-    });
-    return templates.map((template) => normalizeTemplate(template));
+    const [templates, total, totalAll] = await client_2.prisma.$transaction([
+        client_2.prisma.productTemplate.findMany({
+            where,
+            include: {
+                images: { orderBy: { sortOrder: "asc" } },
+                createdBy: { select: { id: true, fullName: true } },
+            },
+            orderBy: { updatedAt: "desc" },
+            take: limit,
+            skip,
+        }),
+        client_2.prisma.productTemplate.count({ where }),
+        client_2.prisma.productTemplate.count(),
+    ]);
+    return {
+        items: templates.map((template) => normalizeTemplate(template)),
+        total,
+        total_all: totalAll,
+    };
 };
 exports.listProductTemplates = listProductTemplates;
 //# sourceMappingURL=productTemplateService.js.map

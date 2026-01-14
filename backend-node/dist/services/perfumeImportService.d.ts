@@ -1,0 +1,51 @@
+import { Prisma, PerfumeImportMode } from "@prisma/client";
+export declare const enqueuePerfumeImport: (jobId: number) => Promise<void>;
+export declare const resumePendingPerfumeImports: () => Promise<void>;
+export declare const createPerfumeImportJob: (params: {
+    storedFilename: string;
+    filePath: string;
+    originalFilename: string;
+    mode: PerfumeImportMode;
+    downloadImages: boolean;
+    createdById?: number | null;
+}) => Promise<{
+    id: number;
+    createdAt: Date;
+    updatedAt: Date;
+    status: import(".prisma/client").$Enums.PerfumeImportStatus;
+    createdById: number | null;
+    mode: import(".prisma/client").$Enums.PerfumeImportMode;
+    originalFilename: string;
+    storedFilename: string;
+    filePath: string;
+    totalRows: number;
+    processedRows: number;
+    insertedRows: number;
+    updatedRows: number;
+    skippedRows: number;
+    failedRows: number;
+    errorCount: number;
+    errorFilePath: string | null;
+    errorSamples: Prisma.JsonValue | null;
+    downloadImages: boolean;
+    startedAt: Date | null;
+    finishedAt: Date | null;
+}>;
+export declare const getPerfumeImportStatus: (jobId: number) => Promise<{
+    jobId: number;
+    status: string;
+    mode: string;
+    total_rows: number;
+    processed_rows: number;
+    inserted_rows: number;
+    updated_rows: number;
+    skipped_rows: number;
+    failed_rows: number;
+    error_count: number;
+    error_samples: string | number | boolean | Prisma.JsonObject | Prisma.JsonArray;
+    started_at: Date | null;
+    finished_at: Date | null;
+    errors_ready: boolean;
+}>;
+export declare const getPerfumeImportErrorsPath: (jobId: number) => Promise<string>;
+//# sourceMappingURL=perfumeImportService.d.ts.map

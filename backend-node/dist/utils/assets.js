@@ -8,6 +8,24 @@ const stripLeadingSlash = (value) => value.replace(/^\/+/, "/");
 const normalizedBase = stripTrailingSlash(assetBaseUrl);
 const isAbsoluteUrl = (value) => /^https?:\/\//i.test(value);
 const isLocalhostUrl = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(value);
+const assetHost = (() => {
+    try {
+        return new URL(normalizedBase).hostname.toLowerCase();
+    }
+    catch {
+        return "";
+    }
+})();
+const isAssetHostUrl = (value) => {
+    if (!assetHost)
+        return false;
+    try {
+        return new URL(value).hostname.toLowerCase() === assetHost;
+    }
+    catch {
+        return false;
+    }
+};
 const toPublicAssetUrl = (input) => {
     if (!input)
         return input ?? "";
@@ -39,7 +57,10 @@ const normalizeImagePathForStorage = (input) => {
     if (isAbsoluteUrl(trimmed)) {
         try {
             const parsed = new URL(trimmed);
-            return parsed.pathname || "/";
+            if (isLocalhostUrl(trimmed) || isAssetHostUrl(trimmed)) {
+                return parsed.pathname || "/";
+            }
+            return trimmed;
         }
         catch {
             return trimmed;

@@ -1,8 +1,15 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const multer_1 = __importDefault(require("multer"));
 const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
+const rateLimit_1 = require("../middleware/rateLimit");
 const adminService_1 = require("../services/adminService");
 const productService_1 = require("../services/productService");
 const auctionService_1 = require("../services/auctionService");
@@ -11,8 +18,46 @@ const productTemplateService_1 = require("../services/productTemplateService");
 const blogService_1 = require("../services/blogService");
 const auditLogService_1 = require("../services/auditLogService");
 const settingService_1 = require("../services/settingService");
+const perfumeImportService_1 = require("../services/perfumeImportService");
+const uploads_1 = require("../utils/uploads");
 const router = (0, express_1.Router)();
 const adminOnly = (0, auth_1.authenticate)({ roles: [client_1.RoleName.ADMIN, client_1.RoleName.SUPER_ADMIN] });
+const perfumeImportDir = path_1.default.join((0, uploads_1.getUploadRoot)(), "perfume-imports");
+if (!fs_1.default.existsSync(perfumeImportDir)) {
+    fs_1.default.mkdirSync(perfumeImportDir, { recursive: true });
+}
+const importStorage = multer_1.default.diskStorage({
+    destination: (_req, _file, cb) => cb(null, perfumeImportDir),
+    filename: (_req, file, cb) => {
+        const ext = path_1.default.extname(file.originalname) || ".csv";
+        const baseName = path_1.default
+            .basename(file.originalname, ext)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/gi, "-")
+            .replace(/^-+|-+$/g, "");
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        cb(null, `${baseName || "perfumes"}-${uniqueSuffix}${ext}`);
+    },
+});
+const allowedImportTypes = new Set([
+    "text/csv",
+    "text/plain",
+    "application/csv",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+const importUpload = (0, multer_1.default)({
+    storage: importStorage,
+    limits: { fileSize: 50 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        const ext = path_1.default.extname(file.originalname).toLowerCase();
+        if (allowedImportTypes.has(file.mimetype) || ext === ".csv" || ext === ".xlsx") {
+            cb(null, true);
+            return;
+        }
+        cb(errors_1.AppError.badRequest("Only CSV or XLSX files are allowed"));
+    },
+});
 const logAdminAction = async (req, details) => {
     if (!req.user) {
         return;
@@ -135,9 +180,9 @@ router.put("/settings/social-links", adminOnly, async (req, res, next) => {
         next(error);
     }
 });
-router.get("/users", adminOnly, async (_req, res, next) => {
+router.get("/users", adminOnly, async (req, res, next) => {
     try {
-        const users = await (0, adminService_1.listUsersForAdmin)();
+        const users = await (0, adminService_1.listUsersForAdmin)(req.query);
         res.json(users);
     }
     catch (error) {
@@ -244,8 +289,7 @@ router.patch("/products/:id/moderate", adminOnly, async (req, res, next) => {
 });
 router.get("/products", adminOnly, async (req, res, next) => {
     try {
-        const status = typeof req.query.status === "string" ? req.query.status : undefined;
-        const products = await (0, adminService_1.listProductsForAdmin)(status);
+        const products = await (0, adminService_1.listProductsForAdmin)(req.query);
         res.json(products);
     }
     catch (error) {
@@ -316,8 +360,8 @@ router.patch("/auctions/:id", adminOnly, async (req, res, next) => {
 });
 router.get("/product-templates", adminOnly, async (req, res, next) => {
     try {
-        const templates = await (0, productTemplateService_1.listProductTemplates)(req.query);
-        res.json(templates);
+        const result = await (0, productTemplateService_1.listProductTemplates)(req.query);
+        res.json(result);
     }
     catch (error) {
         next(error);
@@ -504,6 +548,67 @@ router.delete("/blog/:id", adminOnly, async (req, res, next) => {
             description: `Deleted blog post ${id}`,
         });
         res.json(result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/perfumes/import", adminOnly, (0, rateLimit_1.rateLimit)({ windowMs: 10 * 60 * 1000, max: 5, keyGenerator: (req) => `${req.ip}-${req.user?.id ?? "admin"}` }), importUpload.single("file"), async (req, res, next) => {
+    try {
+        if (!req.file) {
+            throw errors_1.AppError.badRequest("No import file received");
+        }
+        const modeParam = typeof req.body?.mode === "string" ? req.body.mode.toLowerCase() : "insert_only";
+        const mode = modeParam === "replace"
+            ? client_1.PerfumeImportMode.REPLACE
+            : modeParam === "upsert"
+                ? client_1.PerfumeImportMode.UPSERT
+                : client_1.PerfumeImportMode.INSERT_ONLY;
+        const downloadImages = typeof req.body?.downloadImages === "string"
+            ? req.body.downloadImages.toLowerCase() === "true"
+            : Boolean(req.body?.downloadImages);
+        const job = await (0, perfumeImportService_1.createPerfumeImportJob)({
+            storedFilename: req.file.filename,
+            filePath: req.file.path,
+            originalFilename: req.file.originalname,
+            mode,
+            downloadImages,
+            createdById: req.user?.id ?? null,
+        });
+        await logAdminAction(req, {
+            action: "perfume.import",
+            targetType: "perfume_import",
+            targetId: job.id,
+            description: `Started perfume import ${job.id}`,
+            metadata: { mode: mode.toLowerCase(), filename: req.file.originalname },
+        });
+        res.status(202).json({ jobId: job.id });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/perfumes/import/:jobId/status", adminOnly, async (req, res, next) => {
+    try {
+        const jobId = Number(req.params.jobId);
+        if (Number.isNaN(jobId)) {
+            throw errors_1.AppError.badRequest("Invalid job id");
+        }
+        const status = await (0, perfumeImportService_1.getPerfumeImportStatus)(jobId);
+        res.json(status);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/perfumes/import/:jobId/errors.csv", adminOnly, async (req, res, next) => {
+    try {
+        const jobId = Number(req.params.jobId);
+        if (Number.isNaN(jobId)) {
+            throw errors_1.AppError.badRequest("Invalid job id");
+        }
+        const filePath = await (0, perfumeImportService_1.getPerfumeImportErrorsPath)(jobId);
+        res.download(filePath, `perfume-import-${jobId}-errors.csv`);
     }
     catch (error) {
         next(error);

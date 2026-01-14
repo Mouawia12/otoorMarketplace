@@ -9,25 +9,21 @@ declare const createOrderSchema: z.ZodObject<{
         region: z.ZodString;
         address: z.ZodString;
         type: z.ZodDefault<z.ZodEnum<{
-            omni: "omni";
-            redbox: "redbox";
             standard: "standard";
             express: "express";
+            torod: "torod";
         }>>;
-        redboxPointId: z.ZodOptional<z.ZodString>;
         customerCityCode: z.ZodOptional<z.ZodString>;
         customerCountry: z.ZodDefault<z.ZodString>;
         codAmount: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
         codCurrency: z.ZodDefault<z.ZodString>;
-        redboxType: z.ZodDefault<z.ZodEnum<{
-            omni: "omni";
-            redbox: "redbox";
-        }>>;
-        shipmentType: z.ZodDefault<z.ZodEnum<{
-            direct: "direct";
-            agency: "agency";
-            omni: "omni";
-        }>>;
+        torodShippingCompanyId: z.ZodOptional<z.ZodString>;
+        torodWarehouseId: z.ZodOptional<z.ZodString>;
+        torodCountryId: z.ZodOptional<z.ZodString>;
+        torodRegionId: z.ZodOptional<z.ZodString>;
+        torodCityId: z.ZodOptional<z.ZodString>;
+        torodDistrictId: z.ZodOptional<z.ZodString>;
+        torodMetadata: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>>>;
     items: z.ZodArray<z.ZodObject<{
         productId: z.ZodCoercedNumber<unknown>;
@@ -35,6 +31,7 @@ declare const createOrderSchema: z.ZodObject<{
         unitPrice: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
     }, z.core.$strip>>;
     couponCode: z.ZodOptional<z.ZodString>;
+    couponCodes: z.ZodOptional<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;
 export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => Promise<{
     id: number;
@@ -60,11 +57,10 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
-    redbox_point_id: string | null;
-    redbox_shipment_id: string | null;
-    redbox_tracking_number: string | null;
-    redbox_label_url: string | null;
-    redbox_status: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -80,6 +76,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -115,6 +112,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -155,11 +153,10 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
-    redbox_point_id: string | null;
-    redbox_shipment_id: string | null;
-    redbox_tracking_number: string | null;
-    redbox_label_url: string | null;
-    redbox_status: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -175,6 +172,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -210,6 +208,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -226,6 +225,116 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
         } | undefined;
     }[];
 }[]>;
+type ListOrdersOptions = {
+    status?: string;
+    page?: number;
+    page_size?: number;
+    search?: string;
+    sellerId?: number;
+};
+export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => Promise<{
+    orders: {
+        id: number;
+        buyer_id: number;
+        product_id: number | null;
+        quantity: number;
+        unit_price: number;
+        total_amount: number;
+        payment_method: string;
+        shipping_address: string;
+        shipping_name: string;
+        shipping_phone: string;
+        shipping_city: string;
+        shipping_region: string;
+        shipping_method: string;
+        shipping_fee: number;
+        discount_amount: number;
+        coupon_code: string | null;
+        status: string;
+        created_at: string;
+        platform_fee: number;
+        cod_amount: number | null;
+        cod_currency: string | null;
+        customer_city_code: string | null;
+        customer_country: string | null;
+        torod_shipment_id: string | null;
+        torod_tracking_number: string | null;
+        torod_label_url: string | null;
+        torod_status: string | null;
+        product: {
+            id: any;
+            seller_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            is_tester: boolean;
+            image_urls: string[];
+            status: string;
+            created_at: any;
+            updated_at: any;
+            rating_avg: number;
+            rating_count: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
+        } | undefined;
+        items: {
+            id: number;
+            product_id: number;
+            quantity: number;
+            unit_price: number;
+            total_price: number;
+            product: {
+                id: any;
+                seller_id: any;
+                name_ar: any;
+                name_en: any;
+                description_ar: any;
+                description_en: any;
+                product_type: any;
+                brand: any;
+                category: any;
+                base_price: any;
+                size_ml: any;
+                concentration: any;
+                condition: any;
+                stock_quantity: any;
+                is_tester: boolean;
+                image_urls: string[];
+                status: string;
+                created_at: any;
+                updated_at: any;
+                rating_avg: number;
+                rating_count: any;
+                seller: {
+                    id: any;
+                    full_name: any;
+                    verified_seller: any;
+                } | undefined;
+                is_auction_product: boolean;
+                has_active_auction: any;
+            } | undefined;
+        }[];
+    }[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+    status_counts: Record<string, number>;
+}>;
 export declare const listAllOrders: (status?: string) => Promise<{
     id: number;
     buyer_id: number;
@@ -250,11 +359,10 @@ export declare const listAllOrders: (status?: string) => Promise<{
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
-    redbox_point_id: string | null;
-    redbox_shipment_id: string | null;
-    redbox_tracking_number: string | null;
-    redbox_label_url: string | null;
-    redbox_status: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -270,6 +378,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -305,6 +414,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -345,11 +455,10 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
-    redbox_point_id: string | null;
-    redbox_shipment_id: string | null;
-    redbox_tracking_number: string | null;
-    redbox_label_url: string | null;
-    redbox_status: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -365,6 +474,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -400,6 +510,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -440,11 +551,10 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
-    redbox_point_id: string | null;
-    redbox_shipment_id: string | null;
-    redbox_tracking_number: string | null;
-    redbox_label_url: string | null;
-    redbox_status: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -460,6 +570,7 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -495,6 +606,7 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -535,11 +647,10 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
-    redbox_point_id: string | null;
-    redbox_shipment_id: string | null;
-    redbox_tracking_number: string | null;
-    redbox_label_url: string | null;
-    redbox_status: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -555,6 +666,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
         concentration: any;
         condition: any;
         stock_quantity: any;
+        is_tester: boolean;
         image_urls: string[];
         status: string;
         created_at: any;
@@ -590,6 +702,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -633,11 +746,10 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
         cod_currency: string | null;
         customer_city_code: string | null;
         customer_country: string | null;
-        redbox_point_id: string | null;
-        redbox_shipment_id: string | null;
-        redbox_tracking_number: string | null;
-        redbox_label_url: string | null;
-        redbox_status: string | null;
+        torod_shipment_id: string | null;
+        torod_tracking_number: string | null;
+        torod_label_url: string | null;
+        torod_status: string | null;
         product: {
             id: any;
             seller_id: any;
@@ -653,6 +765,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -688,6 +801,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
                 concentration: any;
                 condition: any;
                 stock_quantity: any;
+                is_tester: boolean;
                 image_urls: string[];
                 status: string;
                 created_at: any;
@@ -708,7 +822,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
 export declare const getOrderTracking: (orderId: number, actorId: number, actorRoles: string[]) => Promise<{
     order_id: number;
     shipment_id: string | null;
-    tracking_number: string | null;
+    tracking_number: string;
     status: string;
     activities: unknown[];
     order: {
@@ -735,11 +849,10 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
         cod_currency: string | null;
         customer_city_code: string | null;
         customer_country: string | null;
-        redbox_point_id: string | null;
-        redbox_shipment_id: string | null;
-        redbox_tracking_number: string | null;
-        redbox_label_url: string | null;
-        redbox_status: string | null;
+        torod_shipment_id: string | null;
+        torod_tracking_number: string | null;
+        torod_label_url: string | null;
+        torod_status: string | null;
         product: {
             id: any;
             seller_id: any;
@@ -755,6 +868,7 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
             concentration: any;
             condition: any;
             stock_quantity: any;
+            is_tester: boolean;
             image_urls: string[];
             status: string;
             created_at: any;
@@ -790,6 +904,7 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
                 concentration: any;
                 condition: any;
                 stock_quantity: any;
+                is_tester: boolean;
                 image_urls: string[];
                 status: string;
                 created_at: any;

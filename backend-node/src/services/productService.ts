@@ -422,9 +422,10 @@ export const createProduct = async (
   options?: { roles?: RoleName[] }
 ) => {
   const data = productInputSchema.parse(input);
-  const isAdmin = options?.roles?.some((role) =>
-    [RoleName.ADMIN, RoleName.SUPER_ADMIN].includes(role)
-  ) ?? false;
+  const isAdmin =
+    options?.roles?.some(
+      (role) => role === RoleName.ADMIN || role === RoleName.SUPER_ADMIN
+    ) ?? false;
   const requestedStatus = data.status ?? ProductStatus.PUBLISHED;
   const initialStatus =
     !isAdmin && requestedStatus === ProductStatus.PUBLISHED
@@ -576,9 +577,10 @@ export const updateProduct = async (
   if (data.stockQuantity !== undefined) updateData.stockQuantity = data.stockQuantity;
   if (data.isTester !== undefined) updateData.isTester = data.isTester;
   if (data.status !== undefined) {
-    const isAdmin = options?.roles?.some((role) =>
-      [RoleName.ADMIN, RoleName.SUPER_ADMIN].includes(role)
-    ) ?? false;
+    const isAdmin =
+      options?.roles?.some(
+        (role) => role === RoleName.ADMIN || role === RoleName.SUPER_ADMIN
+      ) ?? false;
     if (typeof data.status === "string") {
       const normalized = data.status.toLowerCase();
       if (normalized === "pending" || normalized === "published") {

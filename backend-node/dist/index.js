@@ -14,6 +14,8 @@ const routes_1 = __importDefault(require("./routes"));
 const errorHandler_1 = require("./middleware/errorHandler");
 const uploads_1 = require("./utils/uploads");
 const auctionRealtime_1 = require("./realtime/auctionRealtime");
+const auctionService_1 = require("./services/auctionService");
+const perfumeImportService_1 = require("./services/perfumeImportService");
 const app = (0, express_1.default)();
 const httpServer = http_1.default.createServer(app);
 const corsOptions = env_1.config.allowedOrigins.length === 1 && env_1.config.allowedOrigins[0] === "*"
@@ -51,11 +53,16 @@ app.use(errorHandler_1.errorHandler);
 (0, auctionRealtime_1.initAuctionRealtime)(httpServer, corsOptions);
 const server = httpServer.listen(env_1.config.port, () => {
     console.log(`🚀 API server running on http://localhost:${env_1.config.port}`);
+    (0, perfumeImportService_1.resumePendingPerfumeImports)().catch((error) => {
+        console.error("Failed to resume perfume imports", error);
+    });
+    (0, auctionService_1.startAuctionFinalizer)();
 });
 const gracefulShutdown = async (signal) => {
     console.log(`\nReceived ${signal}. Shutting down gracefully...`);
     server.close(async () => {
         (0, auctionRealtime_1.shutdownAuctionRealtime)();
+        (0, auctionService_1.stopAuctionFinalizer)();
         await client_1.prisma.$disconnect();
         process.exit(0);
     });

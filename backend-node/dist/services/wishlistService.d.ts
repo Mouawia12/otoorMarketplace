@@ -31,6 +31,7 @@ export declare const addToWishlist: (input: z.infer<typeof wishlistInputSchema>)
         concentration: string;
         condition: import(".prisma/client").$Enums.ProductCondition;
         stockQuantity: number;
+        isTester: boolean;
         sellerId: number;
     };
     id: number;
@@ -67,6 +68,7 @@ export declare const listWishlist: (userId: number) => Promise<{
         concentration: string;
         condition: import(".prisma/client").$Enums.ProductCondition;
         stockQuantity: number;
+        isTester: boolean;
         sellerId: number;
     };
     id: number;

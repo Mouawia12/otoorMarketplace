@@ -507,13 +507,16 @@ export const listProductsForAdmin = async (query?: unknown) => {
     }),
     prisma.product.groupBy({
       by: ["status"],
-      where: seller_id ? { sellerId: seller_id } : undefined,
       _count: { status: true },
+      orderBy: { status: "asc" },
+      ...(seller_id ? { where: { sellerId: seller_id } } : {}),
     }),
   ]);
 
   const counts = statusCounts.reduce<Record<string, number>>((acc, row) => {
-    acc[row.status] = row._count.status ?? 0;
+    const count =
+      typeof row._count === "object" && row._count ? row._count.status ?? 0 : 0;
+    acc[row.status] = count;
     return acc;
   }, {});
 

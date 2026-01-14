@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { RoleName } from "@prisma/client";
 
 import {
   listProducts,

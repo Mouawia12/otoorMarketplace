@@ -45,21 +45,25 @@ router.get(
       }
 
       const roles = req.user.roles.map((r) => r.toUpperCase());
-      const page = typeof req.query.page === "string" ? Number(req.query.page) : undefined;
-      const pageSize =
+      const pageRaw = typeof req.query.page === "string" ? Number(req.query.page) : undefined;
+      const page =
+        typeof pageRaw === "number" && Number.isFinite(pageRaw) ? pageRaw : undefined;
+      const pageSizeRaw =
         typeof req.query.page_size === "string" ? Number(req.query.page_size) : undefined;
+      const pageSize =
+        typeof pageSizeRaw === "number" && Number.isFinite(pageSizeRaw) ? pageSizeRaw : undefined;
       const search = typeof req.query.search === "string" ? req.query.search : undefined;
       const wantsPagination =
-        Number.isFinite(page) || Number.isFinite(pageSize) || typeof search === "string";
+        typeof page === "number" || typeof pageSize === "number" || typeof search === "string";
 
       if (roles.includes(RoleName.ADMIN) || roles.includes(RoleName.SUPER_ADMIN)) {
         if (wantsPagination) {
-          const result = await listOrdersWithPagination({
-            status: statusQuery,
-            page: Number.isFinite(page) ? page : undefined,
-            page_size: Number.isFinite(pageSize) ? pageSize : undefined,
-            search,
-          });
+          const options: Parameters<typeof listOrdersWithPagination>[0] = {};
+          if (statusQuery) options.status = statusQuery;
+          if (typeof page === "number") options.page = page;
+          if (typeof pageSize === "number") options.page_size = pageSize;
+          if (typeof search === "string") options.search = search;
+          const result = await listOrdersWithPagination(options);
           res.json(result);
           return;
         }
@@ -69,13 +73,14 @@ router.get(
       }
 
       if (wantsPagination) {
-        const result = await listOrdersWithPagination({
-          status: statusQuery,
-          page: Number.isFinite(page) ? page : undefined,
-          page_size: Number.isFinite(pageSize) ? pageSize : undefined,
-          search,
+        const options: Parameters<typeof listOrdersWithPagination>[0] = {
           sellerId: req.user.id,
-        });
+        };
+        if (statusQuery) options.status = statusQuery;
+        if (typeof page === "number") options.page = page;
+        if (typeof pageSize === "number") options.page_size = pageSize;
+        if (typeof search === "string") options.search = search;
+        const result = await listOrdersWithPagination(options);
         res.json(result);
         return;
       }
@@ -167,7 +172,7 @@ router.post("/", authenticate(), async (req, res, next) => {
       items,
       couponCode: typeof body.coupon_code === "string" ? body.coupon_code : undefined,
       couponCodes: Array.isArray(body.coupon_codes)
-        ? body.coupon_codes.filter((code) => typeof code === "string")
+        ? body.coupon_codes.filter((code: unknown): code is string => typeof code === "string")
         : undefined,
     });
 

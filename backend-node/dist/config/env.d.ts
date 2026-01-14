@@ -36,16 +36,16 @@ export declare const config: {
     };
     auth: {
         passwordResetUrl: string;
+        cookieName: string;
+        cookieMaxAgeSeconds: number;
     };
     accounts: {
         protectedAdminEmail: string;
     };
-    redbox: {
-        token: string;
-        businessId: string | undefined;
-        env: "production" | "sandbox";
+    torod: {
         baseUrl: string;
-        defaultCountry: string;
+        clientId: string;
+        clientSecret: string;
     };
 };
 //# sourceMappingURL=env.d.ts.map

@@ -407,18 +407,24 @@ export const getAuctionByProductId = async (productId: number) => {
       },
     });
     if (topBid) {
-      winner = {
+      const winnerPayload: {
+        bid_id: number;
+        bidder_id: number;
+        amount: number;
+        bidder?: { id: number; full_name: string; email: string };
+      } = {
         bid_id: topBid.id,
         bidder_id: topBid.bidderId,
         amount: Number(topBid.amount),
-        bidder: topBid.bidder
-          ? {
-              id: topBid.bidder.id,
-              full_name: topBid.bidder.fullName,
-              email: topBid.bidder.email,
-            }
-          : undefined,
       };
+      if (topBid.bidder) {
+        winnerPayload.bidder = {
+          id: topBid.bidder.id,
+          full_name: topBid.bidder.fullName,
+          email: topBid.bidder.email,
+        };
+      }
+      winner = winnerPayload;
     }
   }
 

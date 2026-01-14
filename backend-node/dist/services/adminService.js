@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAdminModerationQueue = exports.updateProductStatusAsAdmin = exports.listProductsForAdmin = exports.listPendingProducts = exports.deleteUserByAdmin = exports.updateUserStatus = exports.listUsersForAdmin = exports.getAdminDashboardStats = void 0;
 const client_1 = require("@prisma/client");
+const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
 const errors_1 = require("../utils/errors");
 const productService_1 = require("./productService");
@@ -41,19 +42,68 @@ const getAdminDashboardStats = async () => {
     };
 };
 exports.getAdminDashboardStats = getAdminDashboardStats;
-const listUsersForAdmin = async () => {
-    const users = (await client_2.prisma.user.findMany({
-        include: {
-            roles: {
-                include: { role: true },
+const listUsersSchema = zod_1.z.object({
+    page: zod_1.z.coerce.number().int().min(1).default(1).optional(),
+    page_size: zod_1.z.coerce.number().int().min(1).max(200).default(25).optional(),
+    search: zod_1.z.string().optional(),
+    status: zod_1.z.string().optional(),
+    role: zod_1.z.string().optional(),
+    seller_status: zod_1.z.string().optional(),
+});
+const listUsersForAdmin = async (query) => {
+    const { page = 1, page_size = 25, search, status, role, seller_status } = listUsersSchema.parse(query ?? {});
+    const where = {};
+    if (status) {
+        const normalized = status.toUpperCase();
+        if (Object.values(client_1.UserStatus).includes(normalized)) {
+            where.status = normalized;
+        }
+    }
+    if (seller_status) {
+        const normalized = seller_status.toUpperCase();
+        if (Object.values(client_1.SellerStatus).includes(normalized)) {
+            where.sellerStatus = normalized;
+        }
+    }
+    if (role) {
+        const normalized = role.toUpperCase();
+        if (Object.values(client_1.RoleName).includes(normalized)) {
+            where.roles = {
+                some: {
+                    role: { name: normalized },
+                },
+            };
+        }
+    }
+    if (search) {
+        const term = search.trim();
+        if (term) {
+            const maybeId = Number(term);
+            where.OR = [
+                { email: { contains: term } },
+                { fullName: { contains: term } },
+                ...(Number.isNaN(maybeId) ? [] : [{ id: maybeId }]),
+            ];
+        }
+    }
+    const [total, users] = await client_2.prisma.$transaction([
+        client_2.prisma.user.count({ where }),
+        client_2.prisma.user.findMany({
+            where,
+            include: {
+                roles: {
+                    include: { role: true },
+                },
+                sellerProfile: {
+                    select: { status: true },
+                },
             },
-            sellerProfile: {
-                select: { status: true },
-            },
-        },
-        orderBy: { createdAt: "desc" },
-    }));
-    return users.map((user) => ({
+            orderBy: { createdAt: "desc" },
+            skip: (page - 1) * page_size,
+            take: page_size,
+        }),
+    ]);
+    const items = users.map((user) => ({
         id: user.id,
         email: user.email,
         full_name: user.fullName,
@@ -64,6 +114,13 @@ const listUsersForAdmin = async () => {
         seller_profile_status: user.sellerProfile?.status?.toLowerCase?.(),
         verified_seller: user.verifiedSeller,
     }));
+    return {
+        users: items,
+        total,
+        page,
+        page_size,
+        total_pages: Math.ceil(total / page_size),
+    };
 };
 exports.listUsersForAdmin = listUsersForAdmin;
 const updateUserStatus = async (userId, updates, allowedRoles, auditContext) => {
@@ -282,7 +339,15 @@ const friendlyToProductStatus = (status) => {
             throw errors_1.AppError.badRequest("Unsupported product status value");
     }
 };
-const listProductsForAdmin = async (status) => {
+const listProductsSchema = zod_1.z.object({
+    status: zod_1.z.string().optional(),
+    search: zod_1.z.string().optional(),
+    seller_id: zod_1.z.coerce.number().optional(),
+    page: zod_1.z.coerce.number().int().min(1).default(1).optional(),
+    page_size: zod_1.z.coerce.number().int().min(1).max(200).default(25).optional(),
+});
+const listProductsForAdmin = async (query) => {
+    const { status, search, seller_id, page = 1, page_size = 25 } = listProductsSchema.parse(query ?? {});
     const where = {};
     if (status) {
         where.status = friendlyToProductStatus(status);
@@ -290,21 +355,60 @@ const listProductsForAdmin = async (status) => {
     else {
         where.status = { not: client_1.ProductStatus.DRAFT };
     }
-    const products = await client_2.prisma.product.findMany({
-        where,
-        include: {
-            images: { orderBy: { sortOrder: "asc" } },
-            seller: {
-                select: {
-                    id: true,
-                    fullName: true,
-                    verifiedSeller: true,
+    if (seller_id) {
+        where.sellerId = seller_id;
+    }
+    if (search) {
+        const term = search.trim();
+        if (term) {
+            const maybeId = Number(term);
+            where.OR = [
+                { nameEn: { contains: term } },
+                { nameAr: { contains: term } },
+                { brand: { contains: term } },
+                { slug: { contains: term } },
+                ...(Number.isNaN(maybeId) ? [] : [{ id: maybeId }]),
+            ];
+        }
+    }
+    const [total, products, statusCounts] = await client_2.prisma.$transaction([
+        client_2.prisma.product.count({ where }),
+        client_2.prisma.product.findMany({
+            where,
+            include: {
+                images: { orderBy: { sortOrder: "asc" } },
+                seller: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        verifiedSeller: true,
+                    },
                 },
             },
-        },
-        orderBy: { createdAt: "desc" },
-    });
-    return products.map((product) => (0, productService_1.normalizeProduct)(product));
+            orderBy: { createdAt: "desc" },
+            skip: (page - 1) * page_size,
+            take: page_size,
+        }),
+        client_2.prisma.product.groupBy({
+            by: ["status"],
+            _count: { status: true },
+            orderBy: { status: "asc" },
+            ...(seller_id ? { where: { sellerId: seller_id } } : {}),
+        }),
+    ]);
+    const counts = statusCounts.reduce((acc, row) => {
+        const count = typeof row._count === "object" && row._count ? row._count.status ?? 0 : 0;
+        acc[row.status] = count;
+        return acc;
+    }, {});
+    return {
+        products: products.map((product) => (0, productService_1.normalizeProduct)(product)),
+        total,
+        page,
+        page_size,
+        total_pages: Math.ceil(total / page_size),
+        status_counts: counts,
+    };
 };
 exports.listProductsForAdmin = listProductsForAdmin;
 const updateProductStatusAsAdmin = async (productId, status) => {

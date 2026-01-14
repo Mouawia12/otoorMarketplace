@@ -18,6 +18,18 @@ router.get("/", async (req, res, next) => {
         next(error);
     }
 });
+router.get("/my-bids", (0, auth_1.authenticate)({ roles: ["BUYER", "SELLER", "ADMIN", "SUPER_ADMIN"] }), async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const bids = await (0, auctionService_1.listUserBids)(req.user.id);
+        res.json({ bids });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.get("/product/:productId", async (req, res, next) => {
     try {
         const productId = Number(req.params.productId);

@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.broadcastUserNotification = exports.broadcastBidUpdate = exports.shutdownAuctionRealtime = exports.initAuctionRealtime = void 0;
 const socket_io_1 = require("socket.io");
 const jwt_1 = require("../utils/jwt");
+const cookies_1 = require("../utils/cookies");
+const env_1 = require("../config/env");
 let io = null;
 const AUCTION_ROOM_PREFIX = "auction:";
 const USER_ROOM_PREFIX = "user:";
@@ -34,13 +36,16 @@ const initAuctionRealtime = (server, corsOptions) => {
             auth: socket.handshake.auth,
             cookie: socket.handshake.headers.cookie,
         });
+        const cookies = (0, cookies_1.parseCookies)(socket.handshake.headers.cookie);
+        const cookieToken = cookies[env_1.config.auth.cookieName];
         const tokenRaw = (typeof socket.handshake.auth?.token === "string" && socket.handshake.auth.token.trim().length > 0
             ? socket.handshake.auth.token
             : undefined) ||
             (typeof socket.handshake.query?.token === "string" ? socket.handshake.query.token : undefined) ||
             (typeof socket.handshake.headers?.authorization === "string"
                 ? socket.handshake.headers.authorization.replace(/^Bearer\s+/i, "")
-                : undefined);
+                : undefined) ||
+            cookieToken;
         if (tokenRaw) {
             try {
                 const payload = (0, jwt_1.verifyAccessToken)(tokenRaw);

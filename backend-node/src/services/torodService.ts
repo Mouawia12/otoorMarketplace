@@ -115,12 +115,16 @@ const mapOrder = (data: unknown): TorodOrder => {
     throw AppError.internal("Unable to parse Torod order response", payload);
   }
 
-  return {
-    id,
-    trackingNumber: extractTrackingNumber(payload),
-    status: extractStatus(payload),
-    raw: data,
-  };
+  const trackingNumber = extractTrackingNumber(payload);
+  const status = extractStatus(payload);
+  const order: TorodOrder = { id, raw: data };
+  if (trackingNumber) {
+    order.trackingNumber = trackingNumber;
+  }
+  if (status) {
+    order.status = status;
+  }
+  return order;
 };
 
 const mapShipment = (data: unknown): TorodShipment => {
@@ -141,13 +145,19 @@ const mapShipment = (data: unknown): TorodShipment => {
     throw AppError.internal("Unable to parse Torod shipment response", payload);
   }
 
-  return {
-    id,
-    trackingNumber,
-    labelUrl: extractLabelUrl(payload),
-    status: extractStatus(payload),
-    raw: data,
-  };
+  const labelUrl = extractLabelUrl(payload);
+  const status = extractStatus(payload);
+  const shipment: TorodShipment = { id, raw: data };
+  if (trackingNumber) {
+    shipment.trackingNumber = trackingNumber;
+  }
+  if (labelUrl) {
+    shipment.labelUrl = labelUrl;
+  }
+  if (status) {
+    shipment.status = status;
+  }
+  return shipment;
 };
 
 const requestWithFallback = async <T>(
