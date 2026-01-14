@@ -31,6 +31,7 @@ export default function Orders({ view }: OrdersProps = {}) {
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted?: boolean }>>({});
   const [submittingReviewKey, setSubmittingReviewKey] = useState<string | null>(null);
   const [printingLabel, setPrintingLabel] = useState(false);
+  const [trackingLoading, setTrackingLoading] = useState(false);
 
   const userIsSeller = useMemo(() => user?.roles?.includes('seller'), [user]);
   const userIsAdmin = useMemo(() => user?.roles?.some((r) => ['admin', 'super_admin'].includes(r)), [user]);
@@ -45,6 +46,34 @@ export default function Orders({ view }: OrdersProps = {}) {
     }
     fetchOrders();
   }, [filter, isAuthenticated]);
+
+  useEffect(() => {
+    if (!activeOrder?.id || !activeOrder.torod_tracking_number) return;
+    let active = true;
+
+    const refreshTracking = async () => {
+      try {
+        setTrackingLoading(true);
+        const response = await api.get(`/orders/${activeOrder.id}/tracking`);
+        const payload = response.data ?? {};
+        const updatedOrder = payload.order;
+        if (!active || !updatedOrder) return;
+        setActiveOrder(updatedOrder);
+        setOrders((prev) =>
+          prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
+        );
+      } catch (error) {
+        if (!active) return;
+      } finally {
+        if (active) setTrackingLoading(false);
+      }
+    };
+
+    refreshTracking();
+    return () => {
+      active = false;
+    };
+  }, [activeOrder?.id, activeOrder?.torod_tracking_number]);
 
   const fetchOrders = async () => {
     try {
@@ -457,26 +486,31 @@ export default function Orders({ view }: OrdersProps = {}) {
                 </div>
               </div>
 
-              {(activeOrder.redbox_tracking_number ||
-                activeOrder.redbox_label_url ||
-                activeOrder.redbox_status) && (
+              {(activeOrder.torod_tracking_number ||
+                activeOrder.torod_label_url ||
+                activeOrder.torod_status) && (
                 <div className="border border-sand/70 rounded-xl p-4">
                   <h4 className="font-semibold text-charcoal mb-2">
                     {t('orders.trackingInfo', 'معلومات الشحنة')}
                   </h4>
+                  {trackingLoading && (
+                    <p className="text-xs text-taupe mb-2">
+                      {t('common.loading')}
+                    </p>
+                  )}
                   <div className="space-y-2 text-sm text-charcoal">
-                    {activeOrder.redbox_tracking_number && (
+                    {activeOrder.torod_tracking_number && (
                       <p className="break-all">
                         {t('orders.trackingNumber', 'رقم التتبع')}:{" "}
                         <span className="font-semibold text-gold">
-                          {activeOrder.redbox_tracking_number}
+                          {activeOrder.torod_tracking_number}
                         </span>
                       </p>
                     )}
-                    {activeOrder.redbox_status && (
+                    {activeOrder.torod_status && (
                       <p>
                         {t('orders.shipmentStatus', 'حالة الشحنة')}:{" "}
-                        <span className="font-semibold">{activeOrder.redbox_status}</span>
+                        <span className="font-semibold">{activeOrder.torod_status}</span>
                       </p>
                     )}
                     {(sellerMode || userIsAdmin) && (
@@ -492,9 +526,9 @@ export default function Orders({ view }: OrdersProps = {}) {
                         <span aria-hidden>↗</span>
                       </button>
                     )}
-                    {activeOrder.redbox_label_url && (
+                    {activeOrder.torod_label_url && (
                       <a
-                        href={activeOrder.redbox_label_url}
+                        href={activeOrder.torod_label_url}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition"

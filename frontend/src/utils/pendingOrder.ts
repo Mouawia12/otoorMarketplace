@@ -8,12 +8,17 @@ export type PendingOrderPayload = {
     address: string;
     type?: string;
     shipping_method?: string;
-    redbox_point_id?: string;
-    redbox_city_code?: string;
     customer_city_code?: string;
     customer_country?: string;
     cod_amount?: number;
     cod_currency?: string;
+    torod_shipping_company_id?: string;
+    torod_warehouse_id?: string;
+    torod_country_id?: string;
+    torod_region_id?: string;
+    torod_city_id?: string;
+    torod_district_id?: string;
+    torod_metadata?: Record<string, unknown>;
   };
   items: Array<{
     productId: number;

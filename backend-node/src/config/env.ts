@@ -41,11 +41,12 @@ const envSchema = z.object({
     .string()
     .email()
     .default("fragreworld@gmail.com"),
-  REDBOX_API_TOKEN: z.string().min(1, "REDBOX_API_TOKEN is required"),
-  REDBOX_BUSINESS_ID: z.string().optional(),
-  REDBOX_ENV: z.enum(["production", "sandbox"]).default("production"),
-  REDBOX_API_BASE_URL: z.string().url().optional(),
-  REDBOX_DEFAULT_COUNTRY: z.string().default("SA"),
+  TOROD_API_URL: z
+    .string()
+    .url()
+    .default("https://demo.stage.torod.co/en/api/"),
+  TOROD_CLIENT_ID: z.string().min(1, "TOROD_CLIENT_ID is required"),
+  TOROD_CLIENT_SECRET: z.string().min(1, "TOROD_CLIENT_SECRET is required"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -81,11 +82,9 @@ const {
   PASSWORD_RESET_URL,
   AUTH_COOKIE_NAME,
   ADMIN_PROTECTED_EMAIL,
-  REDBOX_API_TOKEN,
-  REDBOX_BUSINESS_ID,
-  REDBOX_ENV,
-  REDBOX_API_BASE_URL,
-  REDBOX_DEFAULT_COUNTRY,
+  TOROD_API_URL,
+  TOROD_CLIENT_ID,
+  TOROD_CLIENT_SECRET,
 } = parsed.data;
 
 const allowedOrigins =
@@ -141,16 +140,9 @@ export const config = {
   accounts: {
     protectedAdminEmail: ADMIN_PROTECTED_EMAIL.toLowerCase(),
   },
-  redbox: {
-    token: REDBOX_API_TOKEN,
-    businessId: REDBOX_BUSINESS_ID,
-    env: REDBOX_ENV,
-    baseUrl: `${(
-      REDBOX_API_BASE_URL ||
-      (REDBOX_ENV === "sandbox"
-        ? "https://stage.api.redboxsa.com"
-        : "https://api.redboxsa.com")
-    ).replace(/\/+$/, "")}/v3`,
-    defaultCountry: REDBOX_DEFAULT_COUNTRY,
+  torod: {
+    baseUrl: TOROD_API_URL.replace(/\/+$/, ""),
+    clientId: TOROD_CLIENT_ID,
+    clientSecret: TOROD_CLIENT_SECRET,
   },
 };

@@ -146,13 +146,17 @@ router.post("/", authenticate(), async (req, res, next) => {
             region: body.shipping_region,
             address: body.shipping_address,
             type: body.shipping_method,
-            redbox_point_id: body.redbox_point_id,
             customer_city_code: body.customer_city_code,
             customer_country: body.customer_country,
             cod_amount: body.cod_amount,
             cod_currency: body.cod_currency,
-            redbox_type: body.redbox_type,
-            shipment_type: body.shipment_type,
+            torod_shipping_company_id: body.torod_shipping_company_id,
+            torod_warehouse_id: body.torod_warehouse_id,
+            torod_country_id: body.torod_country_id,
+            torod_region_id: body.torod_region_id,
+            torod_city_id: body.torod_city_id,
+            torod_district_id: body.torod_district_id,
+            torod_metadata: body.torod_metadata,
           }
         : undefined);
 

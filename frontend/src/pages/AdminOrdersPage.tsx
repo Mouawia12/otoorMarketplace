@@ -239,9 +239,9 @@ export default function AdminOrdersPage() {
                   id: order.buyer_id,
                   defaultValue: `Buyer #${order.buyer_id}`,
                 });
-                const isRedbox =
+                const isTorod =
                   typeof order.shipping_method === "string" &&
-                  order.shipping_method.toLowerCase().includes("redbox");
+                  order.shipping_method.toLowerCase().includes("torod");
                 return (
                   <tr key={order.id} className="border-b border-gray-100 hover:bg-sand">
                     <td className="px-4 py-4 text-charcoal-light">#{order.id}</td>
@@ -271,7 +271,7 @@ export default function AdminOrdersPage() {
                             </option>
                           ))}
                         </select>
-                        {isRedbox && (
+                        {isTorod && (
                           <button
                             type="button"
                             onClick={() => handlePrintLabel(order.id)}

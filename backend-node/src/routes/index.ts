@@ -16,7 +16,7 @@ import promotionsRouter from "./promotions";
 import footerPagesRouter from "./footerPages";
 import notificationsRouter from "./notifications";
 import settingsRouter from "./settings";
-import shippingRouter from "./shipping";
+import torodRouter from "./torod";
 
 const router = Router();
 
@@ -36,6 +36,6 @@ router.use("/promotions", promotionsRouter);
 router.use("/footer-pages", footerPagesRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/settings", settingsRouter);
-router.use("/shipping", shippingRouter);
+router.use("/torod", torodRouter);
 
 export default router;

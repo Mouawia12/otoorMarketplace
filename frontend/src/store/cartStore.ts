@@ -12,7 +12,7 @@ export type CartItem = {
   variantLabel?: string;
 };
 
-type ShippingMethod = "standard" | "express" | "redbox";
+type ShippingMethod = "standard" | "express" | "torod";
 
 type CouponMeta = {
   discount_type: "percentage" | "fixed";
@@ -46,7 +46,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       coupons: [],
-      shipping: "redbox",
+      shipping: "torod",
       add: (p, qty = 1) => {
         const items = [...get().items];
         const idx = items.findIndex((i) => i.id === p.id && i.variantId === p.variantId);

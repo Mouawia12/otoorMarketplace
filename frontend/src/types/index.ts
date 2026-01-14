@@ -130,10 +130,10 @@ export interface Order {
   status: string;
   created_at: string;
   product?: Product;
-  redbox_shipment_id?: string | null;
-  redbox_tracking_number?: string | null;
-  redbox_label_url?: string | null;
-  redbox_status?: string | null;
+  torod_shipment_id?: string | null;
+  torod_tracking_number?: string | null;
+  torod_label_url?: string | null;
+  torod_status?: string | null;
   items?: Array<{
     id: number;
     product_id: number;

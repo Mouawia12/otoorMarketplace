@@ -1,8 +1,12 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import api from "../lib/api";
+import { useAuthStore } from "../store/authStore";
 
 export default function OrderSuccessPage() {
   const { t } = useTranslation();
+  const { isAuthenticated } = useAuthStore();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get("orderId") || "N/A";
@@ -12,12 +16,45 @@ export default function OrderSuccessPage() {
   const state = (location.state || {}) as {
     trackingNumber?: string;
     labelUrl?: string;
-    redboxStatus?: string;
+    torodStatus?: string;
   };
 
   const trackingNumber = state.trackingNumber || trackingFromQuery || "";
   const labelUrl = state.labelUrl || "";
-  const redboxStatus = state.redboxStatus || statusFromQuery || "";
+  const torodStatus = state.torodStatus || statusFromQuery || "";
+  const [liveTracking, setLiveTracking] = useState<{
+    trackingNumber?: string;
+    status?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const numericOrderId = Number(orderId);
+    if (!Number.isFinite(numericOrderId)) return;
+
+    let active = true;
+    const refreshTracking = async () => {
+      try {
+        const response = await api.get(`/orders/${numericOrderId}/tracking`);
+        const payload = response.data ?? {};
+        if (!active) return;
+        setLiveTracking({
+          trackingNumber: payload.tracking_number,
+          status: payload.status,
+        });
+      } catch (error) {
+        if (!active) return;
+      }
+    };
+
+    refreshTracking();
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, orderId]);
+
+  const resolvedTrackingNumber = liveTracking?.trackingNumber || trackingNumber;
+  const resolvedStatus = liveTracking?.status || torodStatus;
 
   return (
     <div className="min-h-screen bg-sand py-16">
@@ -36,23 +73,23 @@ export default function OrderSuccessPage() {
             </p>
           </div>
 
-          {(trackingNumber || labelUrl || redboxStatus) && (
+          {(resolvedTrackingNumber || labelUrl || resolvedStatus) && (
             <div className="bg-white rounded-luxury p-6 shadow-sm border border-gold/50 mb-8 text-left">
               <h3 className="text-xl font-bold text-charcoal mb-3 flex items-center gap-2">
                 <span aria-hidden>🚚</span>
                 {t("orderSuccess.trackingTitle", "تفاصيل الشحن")}
               </h3>
               <div className="space-y-2 text-charcoal">
-                {trackingNumber && (
+                {resolvedTrackingNumber && (
                   <p className="text-sm">
                     {t("orderSuccess.trackingNumber", "رقم التتبع")}:{" "}
-                    <span className="font-semibold text-gold break-all">{trackingNumber}</span>
+                    <span className="font-semibold text-gold break-all">{resolvedTrackingNumber}</span>
                   </p>
                 )}
-                {redboxStatus && (
+                {resolvedStatus && (
                   <p className="text-sm">
                     {t("orderSuccess.shipmentStatus", "حالة الشحنة")}:{" "}
-                    <span className="font-semibold">{redboxStatus}</span>
+                    <span className="font-semibold">{resolvedStatus}</span>
                   </p>
                 )}
                 {labelUrl && (

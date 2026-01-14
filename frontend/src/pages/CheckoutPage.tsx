@@ -25,32 +25,84 @@ const dialCodeOptions = [
 
 const normalizeDigits = (value: string) => value.replace(/[^\d]/g, "");
 
-const formatPointAddress = (point: any, lang: "ar" | "en") => {
-  const raw =
-    (lang === "ar" ? point.address_ar : point.address) ??
-    (lang === "ar" ? point.address : point.address_ar) ??
-    point.address ??
-    point.point_address ??
-    point.full_address ??
-    "";
-
-  if (!raw) return "";
-
-  if (typeof raw === "string") {
-    return raw;
-  }
-
-  if (typeof raw === "object") {
-    const address = raw as Record<string, unknown>;
-    const parts = [address.street, address.district, address.city]
-      .filter((value) => typeof value === "string" && value.trim().length > 0)
-      .map((value) => String(value).trim());
-    const separator = lang === "ar" ? "، " : ", ";
-    return parts.length > 0 ? parts.join(separator) : "";
-  }
-
-  return String(raw);
+type LocationOption = {
+  id: string;
+  name: string;
+  raw: any;
 };
+
+const extractList = (payload: any): any[] => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.result)) return payload.result;
+  if (Array.isArray(payload?.data?.data)) return payload.data.data;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+};
+
+const resolveOption = (item: any, lang: "ar" | "en"): LocationOption | null => {
+  const id =
+    item?.id ??
+    item?.country_id ??
+    item?.region_id ??
+    item?.city_id ??
+    item?.cities_id ??
+    item?.district_id ??
+    item?.courier_id ??
+    item?.partner_id ??
+    item?.shipping_company_id ??
+    item?.company_id ??
+    item?.code;
+
+  const nameAr =
+    item?.name_ar ??
+    item?.nameAr ??
+    item?.title_ar ??
+    item?.titleAr ??
+    item?.ar ??
+    item?.district_name_ar ??
+    item?.city_name_ar ??
+    item?.region_name_ar ??
+    item?.country_name_ar ??
+    item?.company_name_ar ??
+    item?.partner_name_ar;
+
+  const nameEn =
+    item?.name_en ??
+    item?.nameEn ??
+    item?.title_en ??
+    item?.titleEn ??
+    item?.en ??
+    item?.district_name_en ??
+    item?.city_name_en ??
+    item?.region_name_en ??
+    item?.country_name_en ??
+    item?.company_name_en ??
+    item?.partner_name_en;
+
+  const fallback =
+    item?.name ??
+    item?.title ??
+    item?.label ??
+    item?.company_name ??
+    item?.partner_name ??
+    item?.district_name ??
+    item?.city_name ??
+    item?.region_name ??
+    item?.country_name ??
+    id;
+
+  const name = (lang === "ar" ? nameAr : nameEn) ?? fallback;
+
+  if (!id || !name) return null;
+  return { id: String(id), name: String(name), raw: item };
+};
+
+const toOptions = (list: any[], lang: "ar" | "en") =>
+  list
+    .map((item) => resolveOption(item, lang))
+    .filter(Boolean) as LocationOption[];
 
 export default function CheckoutPage() {
   const { t, i18n } = useTranslation();
@@ -65,14 +117,24 @@ export default function CheckoutPage() {
   const [couponSuccess, setCouponSuccess] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [bankSettings, setBankSettings] = useState<BankTransferSettings | null>(null);
-  const [redboxCities, setRedboxCities] = useState<Array<{ code: string; name: string }>>([]);
-  const [redboxPoints, setRedboxPoints] = useState<
-    Array<{ id: string; name: string; address?: string }>
-  >([]);
+  const [countries, setCountries] = useState<any[]>([]);
+  const [regions, setRegions] = useState<any[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [courierPartners, setCourierPartners] = useState<any[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [selectedRegion, setSelectedRegion] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
-  const [selectedPoint, setSelectedPoint] = useState("");
-  const [redboxLoading, setRedboxLoading] = useState(false);
-  const [redboxError, setRedboxError] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedCourier, setSelectedCourier] = useState("");
+  const [locationsLoading, setLocationsLoading] = useState({
+    countries: false,
+    regions: false,
+    cities: false,
+    districts: false,
+    partners: false,
+  });
+  const [locationsError, setLocationsError] = useState<string | null>(null);
 
   useEffect(() => {
     setCoupons([]);
@@ -82,7 +144,7 @@ export default function CheckoutPage() {
   }, [setCoupons]);
 
   useEffect(() => {
-    setShipping("redbox");
+    setShipping("torod");
   }, [setShipping]);
 
   useEffect(() => {
@@ -97,142 +159,23 @@ export default function CheckoutPage() {
     loadBankSettings();
   }, []);
 
-  useEffect(() => {
-    const loadCities = async () => {
-      try {
-        setRedboxLoading(true);
-        const response = await api.get("/shipping/redbox/cities");
-        const raw = response.data;
-        const list = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.data)
-          ? raw.data
-          : Array.isArray(raw?.cities)
-          ? raw.cities
-          : [];
+  const countryOptions = toOptions(countries, lang);
+  const regionOptions = toOptions(regions, lang);
+  const cityOptions = toOptions(cities, lang);
+  const districtOptions = toOptions(districts, lang);
+  const courierOptions = toOptions(courierPartners, lang);
 
-        const normalized = list
-          .map((city: any) => {
-            const code = city.code || city.city_code || city.cityCode || city.id || city.Code;
-            const localizedName =
-              (lang === "ar"
-                ? city.ar || city.name_ar || city.city_name_ar
-                : city.en || city.name_en || city.city_name_en) ??
-              (city.name ||
-                city.city_name ||
-                city.cityName ||
-                city.title ||
-                code);
-            if (!code || !localizedName) return null;
-            return { code: String(code), name: String(localizedName) };
-          })
-          .filter(Boolean) as Array<{ code: string; name: string }>;
+  const setLoading = (
+    key: "countries" | "regions" | "cities" | "districts" | "partners",
+    value: boolean
+  ) =>
+    setLocationsLoading((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
 
-        setRedboxCities(normalized);
-        if (normalized.length > 0 && !selectedCity) {
-          setSelectedCity(normalized[0].code);
-        }
-      } catch (error) {
-        console.error("Failed to load RedBox cities", error);
-        const msg = (error as any)?.response?.data?.message || (error as any)?.message;
-        setRedboxError(msg ?? t("checkout.redboxLoadFailed", "تعذّر تحميل مدن RedBox"));
-      } finally {
-        setRedboxLoading(false);
-      }
-    };
-
-    loadCities();
-  }, [t, lang]);
-
-  useEffect(() => {
-    if (selectedPoint) {
-      const point = redboxPoints.find((p) => p.id === selectedPoint);
-      if (point) {
-        setFormData((prev) => ({
-          ...prev,
-          address: point.address || point.name,
-        }));
-      }
-    }
-  }, [selectedPoint, redboxPoints]);
-
-  useEffect(() => {
-    const loadPoints = async () => {
-      if (!selectedCity) return;
-      try {
-        setRedboxLoading(true);
-        setRedboxError(null);
-        const response = await api.get("/shipping/redbox/points", {
-          params: { city_code: selectedCity },
-        });
-        const raw = response.data;
-        const list = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.data)
-          ? raw.data
-          : Array.isArray(raw?.points)
-          ? raw.points
-          : [];
-        const normalized = list
-          .map((point: any) => {
-            const id =
-              point.point_id ||
-              point.pointId ||
-              point.id ||
-              point.code ||
-              point.point_code ||
-              point.pointCode;
-            const localizedName =
-              (lang === "ar"
-                ? point.host_name_ar ||
-                  point.name_ar ||
-                  point.point_name_ar ||
-                  point.ar
-                : point.host_name_en ||
-                  point.name_en ||
-                  point.point_name_en ||
-                  point.en) ??
-              (point.host_name ||
-                point.point_name ||
-                point.name ||
-                point.pointName ||
-                point.label ||
-                id);
-            const address =
-              formatPointAddress(point, lang) ||
-              (typeof point.location === "string" ? point.location : "") ||
-              "";
-            if (!id || !localizedName) return null;
-            return {
-              id: String(id),
-              name: String(localizedName),
-              address: address ? String(address) : undefined,
-            };
-          })
-          .filter(Boolean) as Array<{ id: string; name: string; address?: string }>;
-
-        setRedboxPoints(normalized);
-        if (normalized.length > 0) {
-          setSelectedPoint(normalized[0].id);
-          setFormData((prev) => ({
-            ...prev,
-            address: normalized[0].address ?? normalized[0].name,
-          }));
-        } else {
-          setSelectedPoint("");
-        }
-      } catch (error) {
-        console.error("Failed to load RedBox points", error);
-        const msg = (error as any)?.response?.data?.message || (error as any)?.message;
-        setRedboxError(msg ?? t("checkout.redboxPointsFailed", "تعذّر تحميل نقاط RedBox"));
-      } finally {
-        setRedboxLoading(false);
-      }
-    };
-
-    loadPoints();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCity, lang]);
+  const findOptionName = (options: LocationOption[], id: string) =>
+    options.find((option) => option.id === id)?.name ?? "";
 
   const [formData, setFormData] = useState({
     name: "",
@@ -242,6 +185,173 @@ export default function CheckoutPage() {
     city: "",
     paymentMethod: "bank" as "card" | "applepay" | "mada" | "cod" | "bank",
   });
+
+  useEffect(() => {
+    let active = true;
+    const loadCountries = async () => {
+      try {
+        setLoading("countries", true);
+        setLocationsError(null);
+        const response = await api.get("/torod/countries", { params: { page: 1 } });
+        const list = extractList(response.data);
+        if (!active) return;
+        setCountries(list);
+        if (!selectedCountry && list.length > 0) {
+          const first = toOptions(list, lang)[0];
+          if (first) setSelectedCountry(first.id);
+        }
+      } catch (error: any) {
+        if (!active) return;
+        const msg = error?.response?.data?.message || error?.message;
+        setLocationsError(msg ?? t("checkout.locationsLoadFailed", "تعذّر تحميل بيانات العنوان"));
+      } finally {
+        if (active) setLoading("countries", false);
+      }
+    };
+
+    loadCountries();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setSelectedRegion("");
+    setSelectedCity("");
+    setSelectedDistrict("");
+    setSelectedCourier("");
+    setRegions([]);
+    setCities([]);
+    setDistricts([]);
+    setCourierPartners([]);
+
+    if (!selectedCountry) return undefined;
+
+    const loadRegions = async () => {
+      try {
+        setLoading("regions", true);
+        setLocationsError(null);
+        const response = await api.get("/torod/regions", {
+          params: { country_id: selectedCountry, page: 1 },
+        });
+        const list = extractList(response.data);
+        if (!active) return;
+        setRegions(list);
+        const first = toOptions(list, lang)[0];
+        if (first) setSelectedRegion(first.id);
+      } catch (error: any) {
+        if (!active) return;
+        const msg = error?.response?.data?.message || error?.message;
+        setLocationsError(msg ?? t("checkout.locationsLoadFailed", "تعذّر تحميل بيانات العنوان"));
+      } finally {
+        if (active) setLoading("regions", false);
+      }
+    };
+
+    loadRegions();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCountry]);
+
+  useEffect(() => {
+    let active = true;
+    setSelectedCity("");
+    setSelectedDistrict("");
+    setSelectedCourier("");
+    setCities([]);
+    setDistricts([]);
+    setCourierPartners([]);
+
+    if (!selectedRegion) return undefined;
+
+    const loadCities = async () => {
+      try {
+        setLoading("cities", true);
+        setLocationsError(null);
+        const response = await api.get("/torod/cities", {
+          params: { region_id: selectedRegion, page: 1 },
+        });
+        const list = extractList(response.data);
+        if (!active) return;
+        setCities(list);
+        const first = toOptions(list, lang)[0];
+        if (first) setSelectedCity(first.id);
+      } catch (error: any) {
+        if (!active) return;
+        const msg = error?.response?.data?.message || error?.message;
+        setLocationsError(msg ?? t("checkout.locationsLoadFailed", "تعذّر تحميل بيانات العنوان"));
+      } finally {
+        if (active) setLoading("cities", false);
+      }
+    };
+
+    loadCities();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRegion]);
+
+  useEffect(() => {
+    let active = true;
+    setSelectedDistrict("");
+    setSelectedCourier("");
+    setDistricts([]);
+    setCourierPartners([]);
+
+    if (!selectedCity) return undefined;
+
+    const loadDistrictsAndPartners = async () => {
+      try {
+        setLoading("districts", true);
+        setLoading("partners", true);
+        setLocationsError(null);
+        const [districtsResponse, partnersResponse] = await Promise.all([
+          api.get("/torod/districts", {
+            params: { cities_id: selectedCity, page: 1 },
+          }),
+          api.get("/torod/courier-partners", {
+            params: { city_id: selectedCity },
+          }),
+        ]);
+        if (!active) return;
+        const districtList = extractList(districtsResponse.data);
+        const partnerList = extractList(partnersResponse.data);
+        setDistricts(districtList);
+        setCourierPartners(partnerList);
+        const firstDistrict = toOptions(districtList, lang)[0];
+        const firstPartner = toOptions(partnerList, lang)[0];
+        if (firstDistrict) setSelectedDistrict(firstDistrict.id);
+        if (firstPartner) setSelectedCourier(firstPartner.id);
+      } catch (error: any) {
+        if (!active) return;
+        const msg = error?.response?.data?.message || error?.message;
+        setLocationsError(msg ?? t("checkout.locationsLoadFailed", "تعذّر تحميل بيانات العنوان"));
+      } finally {
+        if (active) {
+          setLoading("districts", false);
+          setLoading("partners", false);
+        }
+      }
+    };
+
+    loadDistrictsAndPartners();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCity]);
+
+  useEffect(() => {
+    const cityName = findOptionName(cityOptions, selectedCity);
+    if (cityName && formData.city !== cityName) {
+      setFormData((prev) => ({ ...prev, city: cityName }));
+    }
+  }, [cityOptions, formData.city, selectedCity]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -323,9 +433,14 @@ export default function CheckoutPage() {
     } else if (formData.phone.trim().length < 8) {
       newErrors.phone = t('checkout.phoneInvalid', 'أدخل رقم هاتف صالح');
     }
+    if (!selectedCountry) newErrors.country = t('checkout.countryRequired', 'اختر الدولة');
+    if (!selectedRegion) newErrors.region = t('checkout.regionRequired', 'اختر المنطقة');
+    if (!selectedCity) newErrors.city = t('checkout.cityRequired');
+    if (!selectedDistrict) newErrors.district = t('checkout.districtRequired', 'اختر الحي');
+    if (courierOptions.length > 0 && !selectedCourier) {
+      newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
+    }
     if (!formData.address.trim()) newErrors.address = t('checkout.addressRequired');
-    if (!selectedCity) newErrors.redboxCity = t("checkout.redboxCityRequired", "اختر مدينة RedBox");
-    if (!selectedPoint) newErrors.redboxPoint = t("checkout.redboxPointRequired", "اختر نقطة استلام RedBox");
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -336,24 +451,37 @@ export default function CheckoutPage() {
       return null;
     }
 
-    const cityName =
-      redboxCities.find((city) => city.code === selectedCity)?.name ||
-      selectedCity;
+    const countryName = findOptionName(countryOptions, selectedCountry);
+    const regionName = findOptionName(regionOptions, selectedRegion);
+    const cityName = findOptionName(cityOptions, selectedCity);
+    const districtName = findOptionName(districtOptions, selectedDistrict);
+
+    const metadata = {
+      country_name: countryName || undefined,
+      region_name: regionName || undefined,
+      city_name: cityName || undefined,
+      district_name: districtName || undefined,
+    };
+    const hasMetadata = Object.values(metadata).some(Boolean);
 
     return {
       payment_method: formData.paymentMethod.toUpperCase(),
       shipping: {
         name: formData.name,
         phone: `${formData.phoneCode} ${formData.phone}`.trim(),
-        city: cityName,
-        region: cityName,
-        address: formData.address || selectedPoint,
-        type: "redbox",
-        shipping_method: "REDBOX",
-        redbox_point_id: selectedPoint,
+        city: cityName || formData.city,
+        region: regionName || cityName || formData.city,
+        address: formData.address,
+        type: "torod",
+        shipping_method: "TOROD",
         customer_city_code: selectedCity,
-        redbox_city_code: selectedCity,
-        customer_country: "SA",
+        customer_country: countryName || "SA",
+        torod_country_id: selectedCountry,
+        torod_region_id: selectedRegion,
+        torod_city_id: selectedCity,
+        torod_district_id: selectedDistrict,
+        torod_shipping_company_id: selectedCourier || undefined,
+        torod_metadata: hasMetadata ? metadata : undefined,
         cod_amount: formData.paymentMethod === "cod" ? total : 0,
         cod_currency: "SAR",
       },
@@ -372,19 +500,19 @@ export default function CheckoutPage() {
       setSubmitError(null);
       const response = await api.post("/orders", payload);
       const order = response.data ?? {};
-      const trackingNumber = order.redbox_tracking_number;
-      const labelUrl = order.redbox_label_url;
-      const redboxStatus = order.redbox_status;
+      const trackingNumber = order.torod_tracking_number;
+      const labelUrl = order.torod_label_url;
+      const torodStatus = order.torod_status;
       const params = new URLSearchParams({ orderId: String(order.id ?? "") });
       if (trackingNumber) params.set("tracking", trackingNumber);
-      if (redboxStatus) params.set("status", redboxStatus);
+      if (torodStatus) params.set("status", torodStatus);
       clearPendingOrder();
       clear();
       navigate(`/order/success?${params.toString()}`, {
         state: {
           trackingNumber,
           labelUrl,
-          redboxStatus,
+          torodStatus,
         },
       });
     } catch (error: any) {
@@ -489,102 +617,131 @@ export default function CheckoutPage() {
                   {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
                 </div>
 
-                <div className="sm:col-span-2 border border-gold/40 bg-white rounded-xl p-4 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div>
-                      <p className="text-charcoal font-semibold">
-                        {t("checkout.redboxPickup", "استلام من نقطة RedBox (إلزامي)")}
-                      </p>
-                      <p className="text-sm text-taupe">
-                        {t("checkout.redboxHint", "اختر المدينة ثم نقطة الاستلام الأقرب لك.")}
-                      </p>
-                    </div>
-                    {redboxLoading && (
-                      <span className="text-sm text-gold">{t("common.loading")}</span>
+                <div className="sm:col-span-1">
+                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.country')}</label>
+                  <select
+                    value={selectedCountry}
+                    onChange={(e) => setSelectedCountry(e.target.value)}
+                    disabled={locationsLoading.countries}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.country ? 'border-red-500' : 'border-charcoal-light'
+                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                  >
+                    {!selectedCountry && (
+                      <option value="">{t('checkout.countryPlaceholder')}</option>
                     )}
-                  </div>
+                    {countryOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.country && <p className="text-red-500 text-sm mt-1">{errors.country}</p>}
+                </div>
 
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-charcoal font-semibold mb-2">
-                        {t("checkout.redboxCity", "مدينة الاستلام")}
-                      </label>
-                      <select
-                        value={selectedCity}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setSelectedCity(value);
-                          setSelectedPoint("");
-                          setFormData((prev) => ({ ...prev, address: "" }));
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border ${
-                          errors.redboxCity ? "border-red-500" : "border-charcoal-light"
-                        } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
-                      >
-                        {!selectedCity && <option value="">{t("checkout.selectCity", "اختر المدينة")}</option>}
-                        {redboxCities.map((city) => (
-                          <option key={city.code} value={city.code}>
-                            {city.name}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.redboxCity && (
-                        <p className="text-red-500 text-sm mt-1">{errors.redboxCity}</p>
-                      )}
-                    </div>
+                <div className="sm:col-span-1">
+                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.region')}</label>
+                  <select
+                    value={selectedRegion}
+                    onChange={(e) => setSelectedRegion(e.target.value)}
+                    disabled={!selectedCountry || locationsLoading.regions}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.region ? 'border-red-500' : 'border-charcoal-light'
+                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                  >
+                    {!selectedRegion && (
+                      <option value="">{t('checkout.regionPlaceholder')}</option>
+                    )}
+                    {regionOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.region && <p className="text-red-500 text-sm mt-1">{errors.region}</p>}
+                </div>
 
-                    <div>
-                      <label className="block text-charcoal font-semibold mb-2">
-                        {t("checkout.redboxPoint", "نقطة الاستلام")}
-                      </label>
-                      <select
-                        value={selectedPoint}
-                        disabled={!selectedCity || redboxLoading}
-                        onChange={(e) => {
-                          const pointId = e.target.value;
-                          setSelectedPoint(pointId);
-                          const point = redboxPoints.find((p) => p.id === pointId);
-                          if (point) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              address: point.address || point.name,
-                              city: prev.city || point.name,
-                            }));
-                          }
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border ${
-                          errors.redboxPoint ? "border-red-500" : "border-charcoal-light"
-                        } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
-                      >
-                        {!selectedPoint && <option value="">{t("checkout.selectPoint", "اختر نقطة الاستلام")}</option>}
-                        {redboxPoints.map((point) => (
-                          <option key={point.id} value={point.id}>
-                            {point.name}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.redboxPoint && (
-                        <p className="text-red-500 text-sm mt-1">{errors.redboxPoint}</p>
-                      )}
-                      {redboxError && (
-                        <p className="text-red-500 text-sm mt-1">{redboxError}</p>
-                      )}
-                    </div>
-                  </div>
+                <div className="sm:col-span-1">
+                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.city')}</label>
+                  <select
+                    value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    disabled={!selectedRegion || locationsLoading.cities}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.city ? 'border-red-500' : 'border-charcoal-light'
+                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                  >
+                    {!selectedCity && (
+                      <option value="">{t('checkout.cityPlaceholder')}</option>
+                    )}
+                    {cityOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+                </div>
 
-                  <div>
-                    <label className="block text-charcoal font-semibold mb-2">{t('checkout.address')}</label>
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className={`w-full px-4 py-3 rounded-lg border ${
-                        errors.address ? 'border-red-500' : 'border-charcoal-light'
-                      } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
-                      placeholder={t('checkout.addressPlaceholder')}
-                    />
-                    {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
-                  </div>
+                <div className="sm:col-span-1">
+                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.district')}</label>
+                  <select
+                    value={selectedDistrict}
+                    onChange={(e) => setSelectedDistrict(e.target.value)}
+                    disabled={!selectedCity || locationsLoading.districts}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.district ? 'border-red-500' : 'border-charcoal-light'
+                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                  >
+                    {!selectedDistrict && (
+                      <option value="">{t('checkout.districtPlaceholder')}</option>
+                    )}
+                    {districtOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.courierPartner')}</label>
+                  <select
+                    value={selectedCourier}
+                    onChange={(e) => setSelectedCourier(e.target.value)}
+                    disabled={!selectedCity || locationsLoading.partners}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.courier ? 'border-red-500' : 'border-charcoal-light'
+                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                  >
+                    {!selectedCourier && (
+                      <option value="">{t('checkout.courierPartnerPlaceholder')}</option>
+                    )}
+                    {courierOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.courier && <p className="text-red-500 text-sm mt-1">{errors.courier}</p>}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.address')}</label>
+                  <input
+                    type="text"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.address ? 'border-red-500' : 'border-charcoal-light'
+                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px]`}
+                    placeholder={t('checkout.addressPlaceholder')}
+                  />
+                  {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
+                  {locationsError && (
+                    <p className="text-red-500 text-sm mt-2">{locationsError}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -597,16 +754,16 @@ export default function CheckoutPage() {
                   <input
                     type="radio"
                     name="shipping"
-                    checked={shipping === "redbox"}
-                    onChange={() => setShipping("redbox")}
+                    checked={shipping === "torod"}
+                    onChange={() => setShipping("torod")}
                     className="w-5 h-5 text-gold"
                   />
                   <div className="flex-1">
                     <p className="font-semibold text-charcoal">
-                      {t("checkout.redboxShipping", "استلام من نقطة RedBox")}
+                      {t("checkout.torodShipping", "شحن عبر طُرُد")}
                     </p>
                     <p className="text-sm text-taupe">
-                      {t("checkout.redboxShippingDesc", "مطلوب اختيار نقطة RedBox قبل إتمام الطلب.")}
+                      {t("checkout.torodShippingDesc", "يتم شحن طلبك عبر شركة طُرُد مع تتبع تلقائي.")}
                     </p>
                   </div>
                   <p className="font-bold text-gold">{t('checkout.free')}</p>

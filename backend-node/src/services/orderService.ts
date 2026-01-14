@@ -12,14 +12,11 @@ import {
   finalizeCouponsUsage,
 } from "./couponService";
 import {
-  createShipmentAgency,
-  createShipmentDirect,
-  createOmniOrder,
-  getActivities as getRedboxActivities,
-  getShipmentLabel as getRedboxLabel,
-  getStatus as getRedboxStatus,
-  type RedboxShipmentPayload,
-} from "./redboxService";
+  createOrder as createTorodOrder,
+  shipOrder as shipTorodOrder,
+  trackShipment as trackTorodShipment,
+  type TorodOrderPayload,
+} from "./torodService";
 
 const orderItemSchema = z.object({
   productId: z.coerce.number().int().positive(),
@@ -40,8 +37,11 @@ const normalizeShippingType = (value?: unknown) => {
     return undefined;
   }
   const normalized = value.trim().toLowerCase();
-  if (["standard", "express", "redbox", "omni"].includes(normalized)) {
-    return normalized as "standard" | "express" | "redbox" | "omni";
+  if (normalized === "redbox" || normalized === "omni") {
+    return "torod";
+  }
+  if (["standard", "express", "torod"].includes(normalized)) {
+    return normalized as "standard" | "express" | "torod";
   }
   return undefined;
 };
@@ -57,36 +57,49 @@ const shippingDetailsSchema = z.preprocess((value) => {
       name: shipping.name,
       phone: shipping.phone,
       city: shipping.city,
-      region: shipping.region,
+      region: shipping.region ?? shipping.city,
       address: shipping.address,
       type: normalizedType ?? shipping.type,
-      redboxPointId:
-        shipping.redboxPointId ??
-        shipping.redbox_point_id ??
-        shipping.point_id,
-      redboxCityCode:
-        shipping.redboxCityCode ??
-        shipping.redbox_city_code ??
-        shipping.customer_city_code ??
-        shipping.customerCityCode ??
-        shipping.city,
       customerCityCode:
         shipping.customerCityCode ??
         shipping.customer_city_code ??
-        shipping.redbox_city_code ??
         shipping.city,
       customerCountry:
         shipping.customerCountry ?? shipping.customer_country ?? "SA",
       codAmount: shipping.codAmount ?? shipping.cod_amount,
       codCurrency: shipping.codCurrency ?? shipping.cod_currency,
-      redboxType:
-        shipping.redboxType ??
-        shipping.redbox_type ??
-        (shipping.type === "omni" ? "omni" : undefined),
-      shipmentType:
-        shipping.shipmentType ??
-        shipping.shipment_type ??
-        (shipping.type === "omni" ? "omni" : undefined),
+      torodShippingCompanyId:
+        shipping.torodShippingCompanyId ??
+        shipping.torod_shipping_company_id ??
+        shipping.shippingCompanyId ??
+        shipping.shipping_company_id,
+      torodWarehouseId:
+        shipping.torodWarehouseId ??
+        shipping.torod_warehouse_id ??
+        shipping.warehouseId ??
+        shipping.warehouse_id,
+      torodCountryId:
+        shipping.torodCountryId ??
+        shipping.torod_country_id ??
+        shipping.countryId ??
+        shipping.country_id,
+      torodRegionId:
+        shipping.torodRegionId ??
+        shipping.torod_region_id ??
+        shipping.regionId ??
+        shipping.region_id,
+      torodCityId:
+        shipping.torodCityId ??
+        shipping.torod_city_id ??
+        shipping.cityId ??
+        shipping.city_id,
+      torodDistrictId:
+        shipping.torodDistrictId ??
+        shipping.torod_district_id ??
+        shipping.districtId ??
+        shipping.district_id,
+      torodMetadata:
+        shipping.torodMetadata ?? shipping.torod_metadata ?? shipping.metadata,
     };
   }
   return value;
@@ -96,15 +109,18 @@ const shippingDetailsSchema = z.preprocess((value) => {
   city: z.string().min(2),
   region: z.string().min(2),
   address: z.string().min(3),
-  type: z.enum(["standard", "express", "redbox", "omni"]).default("standard"),
-  redboxCityCode: z.string().optional(),
-  redboxPointId: z.string().min(1, "RedBox point_id is required").optional(),
+  type: z.enum(["standard", "express", "torod"]).default("standard"),
   customerCityCode: z.string().optional(),
   customerCountry: z.string().default("SA"),
   codAmount: z.coerce.number().nonnegative().optional(),
   codCurrency: z.string().default("SAR"),
-  redboxType: z.enum(["redbox", "omni"]).default("redbox"),
-  shipmentType: z.enum(["direct", "agency", "omni"]).default("direct"),
+  torodShippingCompanyId: z.string().optional(),
+  torodWarehouseId: z.string().optional(),
+  torodCountryId: z.string().optional(),
+  torodRegionId: z.string().optional(),
+  torodCityId: z.string().optional(),
+  torodDistrictId: z.string().optional(),
+  torodMetadata: z.record(z.unknown()).optional(),
 }));
 
 const createOrderSchema = z.object({
@@ -141,29 +157,24 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   }
 
   const shipping = data.shipping;
-  const shippingMethod = shipping.type ?? "standard";
-  const normalizedShippingMethod = shippingMethod.toLowerCase();
-  const requiresRedboxShipment =
-    normalizedShippingMethod === "redbox" || normalizedShippingMethod === "omni";
-  const redboxCityCode = shipping.redboxCityCode ?? shipping.customerCityCode;
+  const shippingMethod = normalizeShippingType(shipping.type) ?? "standard";
+  const requiresTorodShipment = shippingMethod === "torod";
+  const shippingOption = shippingMethod === "express" ? "express" : "standard";
 
-  if (normalizedShippingMethod === "redbox") {
-    if (!redboxCityCode) {
-      throw AppError.badRequest("RedBox city is required");
+  if (requiresTorodShipment) {
+    if (!shipping.torodCountryId) {
+      throw AppError.badRequest("Torod country is required");
     }
-    if (!shipping.redboxPointId) {
-      throw AppError.badRequest("RedBox point is required");
+    if (!shipping.torodRegionId) {
+      throw AppError.badRequest("Torod region is required");
     }
-    if (shipping.codAmount === undefined || Number.isNaN(shipping.codAmount)) {
-      throw AppError.badRequest("Invalid COD data");
+    if (!shipping.torodCityId) {
+      throw AppError.badRequest("Torod city is required");
     }
-    if (!shipping.codCurrency) {
-      throw AppError.badRequest("Invalid COD data");
+    if (!shipping.torodDistrictId) {
+      throw AppError.badRequest("Torod district is required");
     }
   }
-
-  const redboxPointId = shipping.redboxPointId;
-  const shippingOption = shippingMethod === "express" ? "express" : "standard";
   const shippingFeeValue =
     shippingOption === "express"
       ? config.shipping.express
@@ -279,13 +290,15 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
       ? totalAmount
       : undefined;
   const codCurrency = shipping.codCurrency ?? "SAR";
-  const customerCityCode =
-    shipping.customerCityCode ?? shipping.redboxCityCode ?? shipping.city;
+  const customerCityCode = shipping.customerCityCode ?? shipping.city;
   const customerCountry = shipping.customerCountry ?? "SA";
-  const redboxShipmentType = shipping.shipmentType ?? "direct";
-  const redboxType =
-    shipping.redboxType ??
-    (shippingMethod === "omni" ? "omni" : "redbox");
+  const torodShippingCompanyId = shipping.torodShippingCompanyId;
+  const torodWarehouseId = shipping.torodWarehouseId;
+  const torodCountryId = shipping.torodCountryId;
+  const torodRegionId = shipping.torodRegionId;
+  const torodCityId = shipping.torodCityId;
+  const torodDistrictId = shipping.torodDistrictId;
+  const torodMetadata = shipping.torodMetadata;
 
   const order = await prisma.$transaction(async (tx) => {
     const created = await tx.order.create({
@@ -317,8 +330,8 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
             ? new Prisma.Decimal(codAmount)
             : null,
         codCurrency: codAmount !== undefined ? codCurrency : null,
-        redboxPointId: redboxPointId ?? null,
-        redboxStatus: requiresRedboxShipment ? "pending" : null,
+        redboxPointId: null,
+        redboxStatus: requiresTorodShipment ? "pending" : null,
         items: {
           create: normalizedItems,
         },
@@ -350,45 +363,56 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   });
 
   let shipment;
-  if (requiresRedboxShipment) {
+  let torodOrder;
+  if (requiresTorodShipment) {
     try {
-      const shipmentPayload: RedboxShipmentPayload = {
-        ...(redboxPointId ? { pointId: redboxPointId } : {}),
+      const baseMetadata = {
+        orderId: order.id,
+        buyerId: data.buyerId,
+      };
+      const metadata =
+        torodMetadata && typeof torodMetadata === "object"
+          ? { ...baseMetadata, ...(torodMetadata as Record<string, unknown>) }
+          : baseMetadata;
+
+      const torodOrderPayload: TorodOrderPayload = {
         reference: `order-${order.id}`,
-        type: redboxType,
-        customerName: shipping.name,
-        customerPhone: shipping.phone,
-        customerAddress: shipping.address,
-        customerCity: shipping.city,
-        customerCityCode,
-        customerCountry,
-        codAmount: codAmount ?? 0,
-        codCurrency,
-        metadata: {
-          orderId: order.id,
-          buyerId: data.buyerId,
-        },
-        receiver: {
-          name: shipping.name,
-          phone: shipping.phone,
-          cityCode: customerCityCode,
-          country: customerCountry,
-          address: shipping.address,
-        },
+        customer_name: shipping.name,
+        customer_phone: shipping.phone,
+        customer_address: shipping.address,
+        customer_city: shipping.city,
+        customer_region: shipping.region,
+        customer_country: customerCountry,
+        country_id: torodCountryId,
+        region_id: torodRegionId,
+        city_id: torodCityId,
+        district_id: torodDistrictId,
+        payment_method: data.paymentMethod,
+        cod_amount: codAmount ?? 0,
+        cod_currency: codCurrency,
+        metadata,
         items: normalizedItems.map((item) => ({
           name: `Item-${item.productId}`,
           quantity: item.quantity,
           price: Number(item.unitPrice),
+          sku: String(item.productId),
         })),
       };
 
-      if (redboxShipmentType === "agency") {
-        shipment = await createShipmentAgency(shipmentPayload);
-      } else if (redboxShipmentType === "omni" || redboxType === "omni") {
-        shipment = await createOmniOrder(shipmentPayload);
-      } else {
-        shipment = await createShipmentDirect(shipmentPayload);
+      torodOrder = await createTorodOrder(torodOrderPayload);
+
+      const shipmentPayload: Record<string, unknown> = {};
+      if (torodShippingCompanyId) {
+        shipmentPayload.shipping_company_id = torodShippingCompanyId;
       }
+      if (torodWarehouseId) {
+        shipmentPayload.warehouse_id = torodWarehouseId;
+      }
+
+      shipment = await shipTorodOrder(
+        torodOrder.id,
+        Object.keys(shipmentPayload).length > 0 ? shipmentPayload : undefined
+      );
     } catch (error) {
       await prisma.$transaction(async (tx) => {
         await tx.order.update({
@@ -428,15 +452,20 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     );
   }
 
-  const updatedOrder = shipment
+  const shipmentId = shipment?.id ?? torodOrder?.id;
+  const trackingNumber =
+    shipment?.trackingNumber ?? torodOrder?.trackingNumber ?? order.redboxTrackingNumber;
+  const labelUrl = shipment?.labelUrl ?? order.redboxLabelUrl;
+  const shipmentStatus = shipment?.status ?? torodOrder?.status ?? "created";
+
+  const updatedOrder = shipment || torodOrder
     ? await prisma.order.update({
         where: { id: order.id },
         data: {
-          redboxShipmentId: shipment.id,
-          redboxTrackingNumber:
-            shipment.trackingNumber ?? order.redboxTrackingNumber,
-          redboxLabelUrl: shipment.labelUrl ?? order.redboxLabelUrl,
-          redboxStatus: shipment.status ?? "created",
+          redboxShipmentId: shipmentId ?? order.redboxShipmentId,
+          redboxTrackingNumber: trackingNumber ?? order.redboxTrackingNumber,
+          redboxLabelUrl: labelUrl ?? order.redboxLabelUrl,
+          redboxStatus: shipmentStatus ?? "created",
         },
         include: orderInclude,
       })
@@ -563,11 +592,10 @@ const mapOrderToDto = (
     cod_currency: order.codCurrency ?? null,
     customer_city_code: order.customerCityCode ?? null,
     customer_country: order.customerCountry ?? null,
-    redbox_point_id: order.redboxPointId ?? null,
-    redbox_shipment_id: order.redboxShipmentId ?? null,
-    redbox_tracking_number: order.redboxTrackingNumber ?? null,
-    redbox_label_url: order.redboxLabelUrl ?? null,
-    redbox_status: order.redboxStatus ?? null,
+    torod_shipment_id: order.redboxShipmentId ?? null,
+    torod_tracking_number: order.redboxTrackingNumber ?? null,
+    torod_label_url: order.redboxLabelUrl ?? null,
+    torod_status: order.redboxStatus ?? null,
     product: summaryItem?.product,
     items,
   };
@@ -852,23 +880,19 @@ export const getOrderLabel = async (
 
   assertOrderAccess(order, actorId, actorRoles);
 
-  if (!order.redboxShipmentId || order.shippingMethod?.toLowerCase() !== "redbox") {
-    throw AppError.badRequest("لا توجد شحنة RedBox مرتبطة بهذا الطلب");
+  if (!order.redboxTrackingNumber || order.shippingMethod?.toLowerCase() !== "torod") {
+    throw AppError.badRequest("لا توجد شحنة طُرُد مرتبطة بهذا الطلب");
   }
 
-  const label = await getRedboxLabel(order.redboxShipmentId);
-  const labelUrl =
-    label.url ||
-    label.labelUrl ||
-    label.label_url ||
-    label.link ||
-    order.redboxLabelUrl ||
-    "";
+  const shipment = await trackTorodShipment(order.redboxTrackingNumber);
+  const labelUrl = shipment.labelUrl || order.redboxLabelUrl || "";
 
   const updated = await prisma.order.update({
     where: { id: order.id },
     data: {
       redboxLabelUrl: labelUrl || order.redboxLabelUrl,
+      redboxTrackingNumber:
+        shipment.trackingNumber ?? order.redboxTrackingNumber,
     },
     include: orderInclude,
   });
@@ -896,31 +920,23 @@ export const getOrderTracking = async (
 
   assertOrderAccess(order, actorId, actorRoles);
 
-  if (!order.redboxShipmentId) {
-    throw AppError.badRequest("No RedBox shipment for this order");
+  if (!order.redboxTrackingNumber) {
+    throw AppError.badRequest("No Torod tracking number for this order");
   }
 
-  const shipmentStatus = await getRedboxStatus(order.redboxShipmentId);
+  const shipmentStatus = await trackTorodShipment(order.redboxTrackingNumber);
 
-  let activities: unknown[] = [];
-  try {
-    const activityResponse = await getRedboxActivities(order.redboxShipmentId);
-    activities = Array.isArray(activityResponse)
-      ? activityResponse
-      : (
-          activityResponse as {
-            activities?: unknown[];
-          }
-        )?.activities ?? [];
-  } catch (error) {
-    activities = [];
-  }
+  const raw = shipmentStatus.raw as { activities?: unknown[]; events?: unknown[]; history?: unknown[] } | undefined;
+  const activities =
+    (Array.isArray(raw?.activities) && raw?.activities) ||
+    (Array.isArray(raw?.events) && raw?.events) ||
+    (Array.isArray(raw?.history) && raw?.history) ||
+    [];
 
   const statusValue =
     shipmentStatus.status ?? order.redboxStatus ?? statusToFriendly(order.status);
   const trackingNumber =
     shipmentStatus.trackingNumber ??
-    (shipmentStatus.raw as { tracking_number?: string })?.tracking_number ??
     order.redboxTrackingNumber;
 
   const updated = await prisma.order.update({
