@@ -49,13 +49,21 @@ const envSchema = zod_1.z.object({
         .default("https://demo.stage.torod.co/en/api/"),
     TOROD_CLIENT_ID: zod_1.z.string().min(1, "TOROD_CLIENT_ID is required"),
     TOROD_CLIENT_SECRET: zod_1.z.string().min(1, "TOROD_CLIENT_SECRET is required"),
+    MYFATOORAH_API_TOKEN: zod_1.z.string().min(1, "MYFATOORAH_API_TOKEN is required"),
+    MYFATOORAH_BASE_URL: zod_1.z
+        .string()
+        .url()
+        .default("https://api-sa.myfatoorah.com"),
+    MYFATOORAH_CALLBACK_URL: zod_1.z.string().url("MYFATOORAH_CALLBACK_URL is required"),
+    MYFATOORAH_ERROR_URL: zod_1.z.string().url("MYFATOORAH_ERROR_URL is required"),
+    MYFATOORAH_CURRENCY: zod_1.z.string().default("SAR"),
 });
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
     console.error("❌ Invalid environment variables:", parsed.error.flatten());
     throw new Error("Invalid environment configuration");
 }
-const { NODE_ENV, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, ALLOWED_ORIGINS, PLATFORM_COMMISSION_RATE, STANDARD_SHIPPING_FEE, EXPRESS_SHIPPING_FEE, UPLOAD_DIR, MAX_UPLOAD_SIZE_MB, ASSET_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SUPPORT_EMAIL, MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_ENCRYPTION, MAIL_FROM_ADDRESS, MAIL_FROM_NAME, PASSWORD_RESET_URL, AUTH_COOKIE_NAME, ADMIN_PROTECTED_EMAIL, TOROD_API_URL, TOROD_CLIENT_ID, TOROD_CLIENT_SECRET, } = parsed.data;
+const { NODE_ENV, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, ALLOWED_ORIGINS, PLATFORM_COMMISSION_RATE, STANDARD_SHIPPING_FEE, EXPRESS_SHIPPING_FEE, UPLOAD_DIR, MAX_UPLOAD_SIZE_MB, ASSET_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SUPPORT_EMAIL, MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_ENCRYPTION, MAIL_FROM_ADDRESS, MAIL_FROM_NAME, PASSWORD_RESET_URL, AUTH_COOKIE_NAME, ADMIN_PROTECTED_EMAIL, TOROD_API_URL, TOROD_CLIENT_ID, TOROD_CLIENT_SECRET, MYFATOORAH_API_TOKEN, MYFATOORAH_BASE_URL, MYFATOORAH_CALLBACK_URL, MYFATOORAH_ERROR_URL, MYFATOORAH_CURRENCY, } = parsed.data;
 const allowedOrigins = ALLOWED_ORIGINS === "*"
     ? ["*"]
     : ALLOWED_ORIGINS.split(",")
@@ -111,6 +119,13 @@ exports.config = {
         baseUrl: TOROD_API_URL.replace(/\/+$/, ""),
         clientId: TOROD_CLIENT_ID,
         clientSecret: TOROD_CLIENT_SECRET,
+    },
+    myfatoorah: {
+        apiToken: MYFATOORAH_API_TOKEN,
+        baseUrl: MYFATOORAH_BASE_URL.replace(/\/+$/, ""),
+        callbackUrl: MYFATOORAH_CALLBACK_URL,
+        errorUrl: MYFATOORAH_ERROR_URL,
+        currency: MYFATOORAH_CURRENCY,
     },
 };
 //# sourceMappingURL=env.js.map

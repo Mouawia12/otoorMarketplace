@@ -47,5 +47,12 @@ export declare const config: {
         clientId: string;
         clientSecret: string;
     };
+    myfatoorah: {
+        apiToken: string;
+        baseUrl: string;
+        callbackUrl: string;
+        errorUrl: string;
+        currency: string;
+    };
 };
 //# sourceMappingURL=env.d.ts.map

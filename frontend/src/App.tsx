@@ -71,6 +71,7 @@ import CartPage from './pages/CartPage';
 import WishlistPage from './pages/WishlistPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
+import PaymentStatusPage from './pages/PaymentStatusPage';
 
 import SellerCouponsPage from './pages/SellerCouponsPage';
 
@@ -132,6 +133,8 @@ function App() {
           <Route path="wishlist" element={<WishlistPage />} />
           <Route path="checkout" element={<CheckoutPage />} />
           <Route path="order/success" element={<OrderSuccessPage />} />
+          <Route path="payment/success" element={<PaymentStatusPage />} />
+          <Route path="payment/error" element={<PaymentStatusPage />} />
 
           {/* Blog (public) */}
           <Route path="blog" element={withSuspense(<BlogIndex />)} />

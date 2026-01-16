@@ -17,6 +17,7 @@ import footerPagesRouter from "./footerPages";
 import notificationsRouter from "./notifications";
 import settingsRouter from "./settings";
 import torodRouter from "./torod";
+import paymentsRouter from "./payments";
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use("/footer-pages", footerPagesRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/settings", settingsRouter);
 router.use("/torod", torodRouter);
+router.use("/payments", paymentsRouter);
 
 export default router;

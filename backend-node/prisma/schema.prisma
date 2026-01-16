@@ -153,6 +153,12 @@ model Order {
   couponCode      String?     @map("coupon_code")
   status          OrderStatus @default(PENDING)
   paymentMethod   String      @map("payment_method")
+  myfatoorahMethodId Int?     @map("myfatoorah_method_id")
+  myfatoorahMethodCode String? @map("myfatoorah_method_code")
+  myfatoorahInvoiceId String? @map("myfatoorah_invoice_id")
+  myfatoorahPaymentId String? @map("myfatoorah_payment_id")
+  myfatoorahPaymentUrl String? @map("myfatoorah_payment_url")
+  myfatoorahStatus String?    @map("myfatoorah_status")
   shippingMethod  String      @map("shipping_method") @default("standard")
   shippingName    String      @map("shipping_name")
   shippingPhone   String      @map("shipping_phone")
@@ -185,6 +191,8 @@ model Order {
   @@index([couponId])
   @@index([redboxShipmentId])
   @@index([redboxTrackingNumber])
+  @@index([myfatoorahInvoiceId])
+  @@index([myfatoorahPaymentId])
 }
 
 model OrderItem {

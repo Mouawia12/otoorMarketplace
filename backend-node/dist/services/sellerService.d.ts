@@ -66,6 +66,10 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
     torod_tracking_number: string | null;
     torod_label_url: string | null;
     torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
     product: {
         id: any;
         seller_id: any;

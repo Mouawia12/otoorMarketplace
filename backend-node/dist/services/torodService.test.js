@@ -42,6 +42,11 @@ const setTestEnv = () => {
     process.env.TOROD_API_URL = "https://demo.stage.torod.co/en/api/";
     process.env.TOROD_CLIENT_ID = "test-client";
     process.env.TOROD_CLIENT_SECRET = "test-secret";
+    process.env.MYFATOORAH_API_TOKEN = "test-token";
+    process.env.MYFATOORAH_BASE_URL = "https://api-sa.myfatoorah.com";
+    process.env.MYFATOORAH_CALLBACK_URL = "https://example.com/payment/success";
+    process.env.MYFATOORAH_ERROR_URL = "https://example.com/payment/error";
+    process.env.MYFATOORAH_CURRENCY = "SAR";
 };
 const mockToken = (baseUrl) => (0, nock_1.default)(baseUrl)
     .post("/token", (body) => typeof body === "string" &&

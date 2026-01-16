@@ -47,6 +47,14 @@ const envSchema = z.object({
     .default("https://demo.stage.torod.co/en/api/"),
   TOROD_CLIENT_ID: z.string().min(1, "TOROD_CLIENT_ID is required"),
   TOROD_CLIENT_SECRET: z.string().min(1, "TOROD_CLIENT_SECRET is required"),
+  MYFATOORAH_API_TOKEN: z.string().min(1, "MYFATOORAH_API_TOKEN is required"),
+  MYFATOORAH_BASE_URL: z
+    .string()
+    .url()
+    .default("https://api-sa.myfatoorah.com"),
+  MYFATOORAH_CALLBACK_URL: z.string().url("MYFATOORAH_CALLBACK_URL is required"),
+  MYFATOORAH_ERROR_URL: z.string().url("MYFATOORAH_ERROR_URL is required"),
+  MYFATOORAH_CURRENCY: z.string().default("SAR"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -85,6 +93,11 @@ const {
   TOROD_API_URL,
   TOROD_CLIENT_ID,
   TOROD_CLIENT_SECRET,
+  MYFATOORAH_API_TOKEN,
+  MYFATOORAH_BASE_URL,
+  MYFATOORAH_CALLBACK_URL,
+  MYFATOORAH_ERROR_URL,
+  MYFATOORAH_CURRENCY,
 } = parsed.data;
 
 const allowedOrigins =
@@ -144,5 +157,12 @@ export const config = {
     baseUrl: TOROD_API_URL.replace(/\/+$/, ""),
     clientId: TOROD_CLIENT_ID,
     clientSecret: TOROD_CLIENT_SECRET,
+  },
+  myfatoorah: {
+    apiToken: MYFATOORAH_API_TOKEN,
+    baseUrl: MYFATOORAH_BASE_URL.replace(/\/+$/, ""),
+    callbackUrl: MYFATOORAH_CALLBACK_URL,
+    errorUrl: MYFATOORAH_ERROR_URL,
+    currency: MYFATOORAH_CURRENCY,
   },
 };

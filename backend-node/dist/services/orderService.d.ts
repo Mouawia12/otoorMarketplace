@@ -2,6 +2,8 @@ import { z } from "zod";
 declare const createOrderSchema: z.ZodObject<{
     buyerId: z.ZodNumber;
     paymentMethod: z.ZodString;
+    paymentMethodId: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
+    paymentMethodCode: z.ZodOptional<z.ZodString>;
     shipping: z.ZodOptional<z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodObject<{
         name: z.ZodString;
         phone: z.ZodString;
@@ -61,6 +63,10 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
     torod_tracking_number: string | null;
     torod_label_url: string | null;
     torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -129,6 +135,117 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
         } | undefined;
     }[];
 }>;
+export declare const syncMyFatoorahPayment: (payload: {
+    paymentId?: string;
+    invoiceId?: string;
+    invoiceStatus?: string;
+    transactionStatus?: string;
+    customerReference?: string;
+    raw?: unknown;
+}) => Promise<{
+    order: {
+        id: number;
+        buyer_id: number;
+        product_id: number | null;
+        quantity: number;
+        unit_price: number;
+        total_amount: number;
+        payment_method: string;
+        shipping_address: string;
+        shipping_name: string;
+        shipping_phone: string;
+        shipping_city: string;
+        shipping_region: string;
+        shipping_method: string;
+        shipping_fee: number;
+        discount_amount: number;
+        coupon_code: string | null;
+        status: string;
+        created_at: string;
+        platform_fee: number;
+        cod_amount: number | null;
+        cod_currency: string | null;
+        customer_city_code: string | null;
+        customer_country: string | null;
+        torod_shipment_id: string | null;
+        torod_tracking_number: string | null;
+        torod_label_url: string | null;
+        torod_status: string | null;
+        payment_method_id: number | null;
+        payment_method_code: string | null;
+        payment_status: string | null;
+        payment_url: string | null;
+        product: {
+            id: any;
+            seller_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            is_tester: boolean;
+            image_urls: string[];
+            status: string;
+            created_at: any;
+            updated_at: any;
+            rating_avg: number;
+            rating_count: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
+        } | undefined;
+        items: {
+            id: number;
+            product_id: number;
+            quantity: number;
+            unit_price: number;
+            total_price: number;
+            product: {
+                id: any;
+                seller_id: any;
+                name_ar: any;
+                name_en: any;
+                description_ar: any;
+                description_en: any;
+                product_type: any;
+                brand: any;
+                category: any;
+                base_price: any;
+                size_ml: any;
+                concentration: any;
+                condition: any;
+                stock_quantity: any;
+                is_tester: boolean;
+                image_urls: string[];
+                status: string;
+                created_at: any;
+                updated_at: any;
+                rating_avg: number;
+                rating_count: any;
+                seller: {
+                    id: any;
+                    full_name: any;
+                    verified_seller: any;
+                } | undefined;
+                is_auction_product: boolean;
+                has_active_auction: any;
+            } | undefined;
+        }[];
+    };
+    payment_status: string;
+    raw: {} | null;
+}>;
 export declare const listOrdersByUser: (userId: number) => Promise<{
     id: number;
     buyer_id: number;
@@ -157,6 +274,10 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
     torod_tracking_number: string | null;
     torod_label_url: string | null;
     torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -261,6 +382,10 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
         torod_tracking_number: string | null;
         torod_label_url: string | null;
         torod_status: string | null;
+        payment_method_id: number | null;
+        payment_method_code: string | null;
+        payment_status: string | null;
+        payment_url: string | null;
         product: {
             id: any;
             seller_id: any;
@@ -363,6 +488,10 @@ export declare const listAllOrders: (status?: string) => Promise<{
     torod_tracking_number: string | null;
     torod_label_url: string | null;
     torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -459,6 +588,10 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
     torod_tracking_number: string | null;
     torod_label_url: string | null;
     torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -555,6 +688,10 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
     torod_tracking_number: string | null;
     torod_label_url: string | null;
     torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -651,6 +788,10 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
     torod_tracking_number: string | null;
     torod_label_url: string | null;
     torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
     product: {
         id: any;
         seller_id: any;
@@ -750,6 +891,10 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
         torod_tracking_number: string | null;
         torod_label_url: string | null;
         torod_status: string | null;
+        payment_method_id: number | null;
+        payment_method_code: string | null;
+        payment_status: string | null;
+        payment_url: string | null;
         product: {
             id: any;
             seller_id: any;
@@ -853,6 +998,10 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
         torod_tracking_number: string | null;
         torod_label_url: string | null;
         torod_status: string | null;
+        payment_method_id: number | null;
+        payment_method_code: string | null;
+        payment_status: string | null;
+        payment_url: string | null;
         product: {
             id: any;
             seller_id: any;

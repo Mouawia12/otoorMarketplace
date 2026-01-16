@@ -144,6 +144,8 @@ router.post("/", (0, auth_1.authenticate)(), async (req, res, next) => {
         const order = await (0, orderService_1.createOrder)({
             buyerId: req.user.id,
             paymentMethod: body.payment_method ?? "COD",
+            paymentMethodId: body.payment_method_id ?? body.paymentMethodId,
+            paymentMethodCode: body.payment_method_code ?? body.paymentMethodCode,
             shipping: shippingInput,
             items,
             couponCode: typeof body.coupon_code === "string" ? body.coupon_code : undefined,

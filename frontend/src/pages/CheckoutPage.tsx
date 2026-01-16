@@ -6,7 +6,6 @@ import { useCartStore } from "../store/cartStore";
 import { useAuthStore } from "../store/authStore";
 import { formatPrice } from "../utils/currency";
 import { clearPendingOrder, savePendingOrder, PendingOrderPayload } from "../utils/pendingOrder";
-import type { BankTransferSettings } from "../types";
 
 const dialCodeOptions = [
   { code: "+966", country: "Saudi Arabia", label: "🇸🇦 Saudi Arabia (+966)" },
@@ -29,6 +28,17 @@ type LocationOption = {
   id: string;
   name: string;
   raw: any;
+};
+
+type PaymentMethod = {
+  id: number;
+  code?: string;
+  nameEn?: string;
+  nameAr?: string;
+  serviceCharge?: number;
+  totalAmount?: number;
+  currency?: string;
+  imageUrl?: string;
 };
 
 const extractList = (payload: any): any[] => {
@@ -116,7 +126,10 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState("");
   const [couponSuccess, setCouponSuccess] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
-  const [bankSettings, setBankSettings] = useState<BankTransferSettings | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<number | null>(null);
   const [countries, setCountries] = useState<any[]>([]);
   const [regions, setRegions] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
@@ -148,16 +161,45 @@ export default function CheckoutPage() {
   }, [setShipping]);
 
   useEffect(() => {
-    const loadBankSettings = async () => {
+    let active = true;
+    const loadPaymentMethods = async () => {
+      if (!Number.isFinite(total) || total <= 0) {
+        setPaymentMethods([]);
+        setSelectedPaymentMethodId(null);
+        return;
+      }
       try {
-        const response = await api.get<BankTransferSettings>("/settings/bank-transfer");
-        setBankSettings(response.data);
-      } catch (error) {
-        console.error("Failed to load bank settings", error);
+        setPaymentLoading(true);
+        setPaymentError(null);
+        const response = await api.post("/payments/myfatoorah/methods", {
+          amount: total,
+          currency: "SAR",
+        });
+        const methods = response.data?.methods ?? [];
+        if (!active) return;
+        setPaymentMethods(methods);
+        setSelectedPaymentMethodId((prev) => {
+          if (prev && methods.some((method: PaymentMethod) => method.id === prev)) {
+            return prev;
+          }
+          return methods[0]?.id ?? null;
+        });
+      } catch (error: any) {
+        if (!active) return;
+        const msg = error?.response?.data?.message || error?.message;
+        setPaymentError(msg ?? t("checkout.paymentMethodsFailed", "تعذّر تحميل طرق الدفع"));
+        setPaymentMethods([]);
+        setSelectedPaymentMethodId(null);
+      } finally {
+        if (active) setPaymentLoading(false);
       }
     };
-    loadBankSettings();
-  }, []);
+
+    loadPaymentMethods();
+    return () => {
+      active = false;
+    };
+  }, [total, t]);
 
   const countryOptions = toOptions(countries, lang);
   const regionOptions = toOptions(regions, lang);
@@ -183,7 +225,7 @@ export default function CheckoutPage() {
     phoneCode: "+966",
     address: "",
     city: "",
-    paymentMethod: "bank" as "card" | "applepay" | "mada" | "cod" | "bank",
+    paymentMethod: "myfatoorah" as "myfatoorah" | "cod",
   });
 
   useEffect(() => {
@@ -357,19 +399,6 @@ export default function CheckoutPage() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const resolvedBankSettings = {
-    bankName: bankSettings?.bankName ?? t('checkout.bankNameValue', 'مصرف الراجحي'),
-    accountName: bankSettings?.accountName ?? t('checkout.accountNameValue', 'شركة عالم العطور للتجارة'),
-    iban: bankSettings?.iban ?? 'SA00 0000 0000 0000 0000 0000',
-    swift: bankSettings?.swift ?? 'RJHISARI',
-    instructions:
-      bankSettings?.instructions ??
-      t(
-        'checkout.bankInstructions',
-        'يرجى تحويل المبلغ خلال ٢٤ ساعة ومشاركة إيصال التحويل مع فريق الدعم ليتم تأكيد الطلب وشحنه.'
-      ),
-  };
-
   const buildCouponItemsPayload = () =>
     items.map((item) => ({
       product_id: Number(item.id),
@@ -441,6 +470,9 @@ export default function CheckoutPage() {
       newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
     }
     if (!formData.address.trim()) newErrors.address = t('checkout.addressRequired');
+    if (formData.paymentMethod === "myfatoorah" && !selectedPaymentMethodId) {
+      newErrors.payment = t('checkout.paymentMethodRequired', 'اختر طريقة الدفع');
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -463,9 +495,15 @@ export default function CheckoutPage() {
       district_name: districtName || undefined,
     };
     const hasMetadata = Object.values(metadata).some(Boolean);
+    const selectedPaymentMethod = paymentMethods.find(
+      (method) => method.id === selectedPaymentMethodId
+    );
+    const isCodPayment = formData.paymentMethod === "cod";
 
     return {
-      payment_method: formData.paymentMethod.toUpperCase(),
+      payment_method: isCodPayment ? "COD" : "MYFATOORAH",
+      payment_method_id: !isCodPayment ? selectedPaymentMethod?.id : undefined,
+      payment_method_code: !isCodPayment ? selectedPaymentMethod?.code : undefined,
       shipping: {
         name: formData.name,
         phone: `${formData.phoneCode} ${formData.phone}`.trim(),
@@ -482,8 +520,8 @@ export default function CheckoutPage() {
         torod_district_id: selectedDistrict,
         torod_shipping_company_id: selectedCourier || undefined,
         torod_metadata: hasMetadata ? metadata : undefined,
-        cod_amount: formData.paymentMethod === "cod" ? total : 0,
-        cod_currency: "SAR",
+        cod_amount: isCodPayment ? total : undefined,
+        cod_currency: isCodPayment ? "SAR" : undefined,
       },
       items: items.map((item) => ({
         productId: Number(item.id),
@@ -500,6 +538,13 @@ export default function CheckoutPage() {
       setSubmitError(null);
       const response = await api.post("/orders", payload);
       const order = response.data ?? {};
+      const paymentUrl = order.payment_url;
+      if (paymentUrl) {
+        clearPendingOrder();
+        clear();
+        window.location.href = paymentUrl;
+        return;
+      }
       const trackingNumber = order.torod_tracking_number;
       const labelUrl = order.torod_label_url;
       const torodStatus = order.torod_status;
@@ -810,81 +855,91 @@ export default function CheckoutPage() {
             {/* Payment Method */}
             <div className="bg-ivory rounded-luxury p-6 shadow-sm">
               <h2 className="text-2xl font-bold text-charcoal mb-6">{t('checkout.payment')}</h2>
+              {paymentLoading && (
+                <p className="text-sm text-taupe mb-4">
+                  {t('checkout.paymentMethodsLoading', 'جارٍ تحميل طرق الدفع...')}
+                </p>
+              )}
+              {paymentError && (
+                <p className="text-sm text-red-500 mb-4">{paymentError}</p>
+              )}
+              {!paymentLoading && !paymentError && paymentMethods.length === 0 && (
+                <p className="text-sm text-taupe mb-4">
+                  {t('checkout.paymentMethodsUnavailable', 'لا توجد طرق دفع متاحة حالياً.')}
+                </p>
+              )}
               <div className="space-y-3">
-                <label className="flex items-center gap-4 p-4 border border-charcoal-light rounded-lg cursor-pointer hover:bg-sand transition opacity-50">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={formData.paymentMethod === "card"}
-                    onChange={() => setFormData({ ...formData, paymentMethod: "card" })}
-                    className="w-5 h-5 text-gold"
-                    disabled
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-charcoal">{t('checkout.creditCard')}</p>
-                    <p className="text-sm text-taupe">{t('checkout.comingSoon')}</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-4 p-4 border border-charcoal-light rounded-lg cursor-pointer hover:bg-sand transition opacity-50">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={formData.paymentMethod === "mada"}
-                    onChange={() => setFormData({ ...formData, paymentMethod: "mada" })}
-                    className="w-5 h-5 text-gold"
-                    disabled
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-charcoal">{t('checkout.mada')}</p>
-                    <p className="text-sm text-taupe">{t('checkout.comingSoon')}</p>
-                  </div>
-                </label>
-
-                <label
-                  className={`flex flex-col gap-2 p-4 border rounded-lg cursor-pointer transition ${
-                    formData.paymentMethod === "bank" ? "border-gold bg-gold/10" : "border-charcoal-light"
-                  }`}
-                >
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-3">
+                {paymentMethods.map((method) => {
+                  const name =
+                    lang === "ar"
+                      ? method.nameAr || method.nameEn || method.code || `#${method.id}`
+                      : method.nameEn || method.nameAr || method.code || `#${method.id}`;
+                  const isSelected =
+                    formData.paymentMethod === "myfatoorah" &&
+                    selectedPaymentMethodId === method.id;
+                  return (
+                    <label
+                      key={method.id}
+                      className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer transition ${
+                        isSelected ? "border-gold bg-gold/10" : "border-charcoal-light"
+                      }`}
+                    >
                       <input
                         type="radio"
                         name="payment"
-                        checked={formData.paymentMethod === "bank"}
-                        onChange={() => setFormData({ ...formData, paymentMethod: "bank" })}
+                        checked={isSelected}
+                        onChange={() => {
+                          setFormData((prev) => ({ ...prev, paymentMethod: "myfatoorah" }));
+                          setSelectedPaymentMethodId(method.id);
+                        }}
                         className="w-5 h-5 text-gold"
                       />
-                      <div>
-                        <p className="font-semibold text-charcoal">{t("checkout.bankTransfer", "التحويل البنكي")}</p>
-                        <p className="text-xs text-charcoal-light">
-                          {t("checkout.bankTransferEta", "يتم تأكيد الطلب بعد استلام الحوالة المصرفية")}
-                        </p>
+                      <div className="flex-1">
+                        <p className="font-semibold text-charcoal">{name}</p>
+                        {typeof method.serviceCharge === "number" && (
+                          <p className="text-xs text-taupe">
+                            {t('checkout.paymentServiceFee', 'رسوم الخدمة')}:{" "}
+                            {formatPrice(method.serviceCharge, lang)}
+                          </p>
+                        )}
                       </div>
-                    </div>
-                    <span className="text-sm text-taupe">{t("checkout.noFees", "بدون رسوم إضافية")}</span>
+                      {method.imageUrl && (
+                        <img
+                          src={method.imageUrl}
+                          alt={name}
+                          className="h-8 w-auto object-contain"
+                          loading="lazy"
+                        />
+                      )}
+                    </label>
+                  );
+                })}
+
+                <label
+                  className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer transition ${
+                    formData.paymentMethod === "cod"
+                      ? "border-gold bg-gold/10"
+                      : "border-charcoal-light"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment"
+                    checked={formData.paymentMethod === "cod"}
+                    onChange={() => setFormData((prev) => ({ ...prev, paymentMethod: "cod" }))}
+                    className="w-5 h-5 text-gold"
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold text-charcoal">
+                      {t('checkout.cashOnDelivery', 'الدفع عند الاستلام')}
+                    </p>
+                    <p className="text-xs text-taupe">
+                      {t('checkout.codNote', 'يتم تحصيل قيمة الطلب عند التسليم')}
+                    </p>
                   </div>
-                  {formData.paymentMethod === "bank" && (
-                    <div className="text-sm text-charcoal bg-white rounded-xl border border-gold/40 p-3 space-y-1">
-                      <p>
-                        <strong>{t("checkout.bankNameLabel", "اسم البنك")}:</strong> {resolvedBankSettings.bankName}
-                      </p>
-                      <p>
-                        <strong>{t("checkout.accountName", "اسم المستفيد")}:</strong> {resolvedBankSettings.accountName}
-                      </p>
-                      <p>
-                        <strong>{t("checkout.iban", "رقم الآيبان")}:</strong> {resolvedBankSettings.iban}
-                      </p>
-                      <p>
-                        <strong>{t("checkout.swift", "سويفت كود")}:</strong> {resolvedBankSettings.swift}
-                      </p>
-                      <p className="text-[13px] text-taupe leading-5 whitespace-pre-line">
-                        {resolvedBankSettings.instructions}
-                      </p>
-                    </div>
-                  )}
                 </label>
               </div>
+              {errors.payment && <p className="text-red-500 text-sm mt-3">{errors.payment}</p>}
             </div>
           </div>
 

@@ -120,6 +120,10 @@ export interface Order {
   unit_price: number;
   total_amount: number;
   payment_method: string;
+  payment_method_id?: number | null;
+  payment_method_code?: string | null;
+  payment_status?: string | null;
+  payment_url?: string | null;
   shipping_address: string;
   shipping_name?: string;
   shipping_phone?: string;

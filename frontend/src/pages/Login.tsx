@@ -39,7 +39,12 @@ export default function Login() {
     try {
       setProcessingPending(true);
       const response = await api.post('/orders', pending);
+      const paymentUrl = response.data?.payment_url;
       clearPendingOrder();
+      if (paymentUrl) {
+        window.location.href = paymentUrl;
+        return true;
+      }
       navigate(`/order/success?orderId=${response.data.id}`, { replace: true });
       return true;
     } catch (err: any) {

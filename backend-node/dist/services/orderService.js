@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getOrderTracking = exports.getOrderLabel = exports.updateOrderStatus = exports.confirmOrderDelivery = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersWithPagination = exports.listOrdersByUser = exports.createOrder = void 0;
+exports.getOrderTracking = exports.getOrderLabel = exports.updateOrderStatus = exports.confirmOrderDelivery = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersWithPagination = exports.listOrdersByUser = exports.syncMyFatoorahPayment = exports.createOrder = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
@@ -9,6 +9,7 @@ const productService_1 = require("./productService");
 const env_1 = require("../config/env");
 const couponService_1 = require("./couponService");
 const torodService_1 = require("./torodService");
+const myFatoorahService_1 = require("./myFatoorahService");
 const orderItemSchema = zod_1.z.object({
     productId: zod_1.z.coerce.number().int().positive(),
     quantity: zod_1.z.coerce.number().int().positive(),
@@ -103,6 +104,8 @@ const shippingDetailsSchema = zod_1.z.preprocess((value) => {
 const createOrderSchema = zod_1.z.object({
     buyerId: zod_1.z.number().int().positive(),
     paymentMethod: zod_1.z.string().min(2),
+    paymentMethodId: zod_1.z.coerce.number().int().optional(),
+    paymentMethodCode: zod_1.z.string().min(1).optional(),
     shipping: shippingDetailsSchema.optional(),
     items: zod_1.z.array(orderItemSchema).min(1),
     couponCode: zod_1.z.string().min(3).optional(),
@@ -131,6 +134,10 @@ const createOrder = async (input) => {
         throw errors_1.AppError.badRequest("Order items are required");
     }
     const shipping = data.shipping;
+    const normalizedPaymentMethod = data.paymentMethod.trim().toLowerCase();
+    const isCodPayment = normalizedPaymentMethod === "cod";
+    const isMyFatoorahPayment = normalizedPaymentMethod === "myfatoorah";
+    const paymentMethodId = data.paymentMethodId;
     const shippingMethod = normalizeShippingType(shipping.type) ?? "standard";
     const requiresTorodShipment = shippingMethod === "torod";
     const shippingOption = shippingMethod === "express" ? "express" : "standard";
@@ -158,6 +165,8 @@ const createOrder = async (input) => {
         },
         select: {
             id: true,
+            nameAr: true,
+            nameEn: true,
             stockQuantity: true,
             status: true,
             basePrice: true,
@@ -232,8 +241,7 @@ const createOrder = async (input) => {
     const totalBeforeShipping = Math.max(0, subtotal - discountAmount);
     const totalAmount = totalBeforeShipping + shippingFeeValue;
     const platformFee = totalAmount * env_1.config.platformCommissionRate;
-    const shouldRecordCod = shipping.codAmount !== undefined ||
-        data.paymentMethod.toLowerCase() === "cod";
+    const shouldRecordCod = shipping.codAmount !== undefined || isCodPayment;
     const codAmount = shipping.codAmount !== undefined
         ? shipping.codAmount
         : shouldRecordCod
@@ -255,6 +263,10 @@ const createOrder = async (input) => {
                 buyerId: data.buyerId,
                 status: client_1.OrderStatus.PENDING,
                 paymentMethod: data.paymentMethod,
+                myfatoorahMethodId: isMyFatoorahPayment ? paymentMethodId ?? null : null,
+                myfatoorahMethodCode: isMyFatoorahPayment
+                    ? data.paymentMethodCode ?? null
+                    : null,
                 shippingMethod,
                 shippingName: shipping.name,
                 shippingPhone: shipping.phone,
@@ -328,7 +340,7 @@ const createOrder = async (input) => {
                 region_id: torodRegionId,
                 city_id: torodCityId,
                 district_id: torodDistrictId,
-                payment_method: data.paymentMethod,
+                payment_method: isCodPayment ? "COD" : "PREPAID",
                 cod_amount: codAmount ?? 0,
                 cod_currency: codCurrency,
                 metadata,
@@ -376,6 +388,76 @@ const createOrder = async (input) => {
     if (appliedCoupons.length > 0) {
         await client_2.prisma.$transaction((tx) => (0, couponService_1.finalizeCouponsUsage)(tx, appliedCoupons.map((entry) => entry.coupon)));
     }
+    let paymentUrl = null;
+    if (isMyFatoorahPayment) {
+        if (!paymentMethodId) {
+            throw errors_1.AppError.badRequest("payment_method_id is required");
+        }
+        const buyer = await client_2.prisma.user.findUnique({
+            where: { id: data.buyerId },
+            select: { fullName: true, email: true, phone: true },
+        });
+        const rawInvoiceItems = normalizedItems.map((item) => {
+            const product = productMap.get(item.productId);
+            const name = product?.nameEn ?? product?.nameAr ?? `Item-${item.productId}`;
+            return {
+                name,
+                quantity: item.quantity,
+                unitPrice: Number(item.unitPrice),
+            };
+        });
+        const itemsTotal = rawInvoiceItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+        const invoiceItems = Math.abs(itemsTotal - totalAmount) <= 0.01 ? rawInvoiceItems : undefined;
+        try {
+            const paymentInput = {
+                paymentMethodId,
+                invoiceValue: totalAmount,
+                customerName: buyer?.fullName ?? shipping.name,
+                customerMobile: buyer?.phone ?? shipping.phone,
+                customerReference: `order-${order.id}`,
+            };
+            if (buyer?.email) {
+                paymentInput.customerEmail = buyer.email;
+            }
+            if (invoiceItems) {
+                paymentInput.items = invoiceItems;
+            }
+            const payment = await (0, myFatoorahService_1.executePayment)(paymentInput);
+            paymentUrl = payment.paymentUrl;
+            await client_2.prisma.order.update({
+                where: { id: order.id },
+                data: {
+                    myfatoorahInvoiceId: payment.invoiceId,
+                    myfatoorahPaymentId: payment.paymentId ?? null,
+                    myfatoorahPaymentUrl: payment.paymentUrl,
+                    myfatoorahStatus: "initiated",
+                },
+            });
+        }
+        catch (error) {
+            await client_2.prisma.$transaction(async (tx) => {
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: { status: client_1.OrderStatus.CANCELLED, myfatoorahStatus: "failed" },
+                });
+                for (const item of normalizedItems) {
+                    await tx.product.update({
+                        where: { id: item.productId },
+                        data: {
+                            stockQuantity: {
+                                increment: item.quantity,
+                            },
+                        },
+                    });
+                }
+            });
+            const friendlyMessage = "تعذر بدء عملية الدفع عبر MyFatoorah، حاول مرة أخرى.";
+            if (error instanceof errors_1.AppError) {
+                throw new errors_1.AppError(friendlyMessage, error.statusCode, error.details ?? error);
+            }
+            throw errors_1.AppError.internal(friendlyMessage, error);
+        }
+    }
     const shipmentId = shipment?.id ?? torodOrder?.id;
     const trackingNumber = shipment?.trackingNumber ?? torodOrder?.trackingNumber ?? order.redboxTrackingNumber;
     const labelUrl = shipment?.labelUrl ?? order.redboxLabelUrl;
@@ -395,7 +477,11 @@ const createOrder = async (input) => {
             where: { id: order.id },
             include: orderInclude,
         });
-    return mapOrderToDto(updatedOrder);
+    const mapped = mapOrderToDto(updatedOrder);
+    if (paymentUrl) {
+        mapped.payment_url = paymentUrl;
+    }
+    return mapped;
 };
 exports.createOrder = createOrder;
 const orderInclude = client_1.Prisma.validator()({
@@ -498,10 +584,88 @@ const mapOrderToDto = (order) => {
         torod_tracking_number: order.redboxTrackingNumber ?? null,
         torod_label_url: order.redboxLabelUrl ?? null,
         torod_status: order.redboxStatus ?? null,
+        payment_method_id: order.myfatoorahMethodId ?? null,
+        payment_method_code: order.myfatoorahMethodCode ?? null,
+        payment_status: order.myfatoorahStatus ?? null,
+        payment_url: order.myfatoorahPaymentUrl ?? null,
         product: summaryItem?.product,
         items,
     };
 };
+const parseOrderIdFromReference = (reference) => {
+    if (!reference)
+        return null;
+    const trimmed = reference.trim();
+    if (!trimmed)
+        return null;
+    if (/^\d+$/.test(trimmed)) {
+        return Number(trimmed);
+    }
+    const match = trimmed.match(/(\d+)/g);
+    if (!match)
+        return null;
+    const last = match[match.length - 1];
+    const parsed = Number(last);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+const normalizeStatusValue = (value) => value?.trim().toLowerCase() ?? "";
+const isPaidStatus = (invoiceStatus, transactionStatus) => {
+    const normalized = normalizeStatusValue(transactionStatus) || normalizeStatusValue(invoiceStatus);
+    return ["paid", "success", "successful", "succss", "completed"].includes(normalized);
+};
+const isFailedStatus = (invoiceStatus, transactionStatus) => {
+    const normalized = normalizeStatusValue(transactionStatus) || normalizeStatusValue(invoiceStatus);
+    return ["failed", "error", "declined", "expired", "cancelled", "canceled"].includes(normalized);
+};
+const syncMyFatoorahPayment = async (payload) => {
+    const orderIdFromReference = parseOrderIdFromReference(payload.customerReference);
+    let order = orderIdFromReference
+        ? await client_2.prisma.order.findUnique({
+            where: { id: orderIdFromReference },
+            include: orderInclude,
+        })
+        : null;
+    if (!order && payload.invoiceId) {
+        order = await client_2.prisma.order.findFirst({
+            where: { myfatoorahInvoiceId: payload.invoiceId },
+            include: orderInclude,
+        });
+    }
+    if (!order && payload.paymentId) {
+        order = await client_2.prisma.order.findFirst({
+            where: { myfatoorahPaymentId: payload.paymentId },
+            include: orderInclude,
+        });
+    }
+    if (!order) {
+        throw errors_1.AppError.notFound("Order not found");
+    }
+    const paid = isPaidStatus(payload.invoiceStatus, payload.transactionStatus);
+    const failed = isFailedStatus(payload.invoiceStatus, payload.transactionStatus);
+    const statusText = payload.invoiceStatus ?? payload.transactionStatus ?? order.myfatoorahStatus ?? "pending";
+    const updateData = {
+        myfatoorahStatus: statusText,
+        ...(payload.invoiceId ? { myfatoorahInvoiceId: payload.invoiceId } : {}),
+        ...(payload.paymentId ? { myfatoorahPaymentId: payload.paymentId } : {}),
+    };
+    if (paid && order.status === client_1.OrderStatus.PENDING) {
+        updateData.status = client_1.OrderStatus.PROCESSING;
+    }
+    if (failed && order.status === client_1.OrderStatus.PENDING) {
+        updateData.status = client_1.OrderStatus.CANCELLED;
+    }
+    const updated = await client_2.prisma.order.update({
+        where: { id: order.id },
+        data: updateData,
+        include: orderInclude,
+    });
+    return {
+        order: mapOrderToDto(updated),
+        payment_status: paid ? "paid" : failed ? "failed" : "pending",
+        raw: payload.raw ?? null,
+    };
+};
+exports.syncMyFatoorahPayment = syncMyFatoorahPayment;
 const listOrdersByUser = async (userId) => {
     const orders = await client_2.prisma.order.findMany({
         where: { buyerId: userId },

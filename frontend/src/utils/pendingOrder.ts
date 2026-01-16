@@ -1,5 +1,7 @@
 export type PendingOrderPayload = {
   payment_method: string;
+  payment_method_id?: number;
+  payment_method_code?: string;
   shipping: {
     name: string;
     phone: string;
