@@ -178,9 +178,6 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
     if (!shipping.torodCityId) {
       throw AppError.badRequest("Torod city is required");
     }
-    if (!shipping.torodDistrictId) {
-      throw AppError.badRequest("Torod district is required");
-    }
   }
   const shippingFeeValue =
     shippingOption === "express"
@@ -397,7 +394,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         country_id: torodCountryId,
         region_id: torodRegionId,
         city_id: torodCityId,
-        district_id: torodDistrictId,
+        ...(torodDistrictId ? { district_id: torodDistrictId } : {}),
         payment_method: isCodPayment ? "COD" : "PREPAID",
         cod_amount: codAmount ?? 0,
         cod_currency: codCurrency,

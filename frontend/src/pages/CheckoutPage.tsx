@@ -134,18 +134,15 @@ export default function CheckoutPage() {
   const [regions, setRegions] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
-  const [courierPartners, setCourierPartners] = useState<any[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [selectedRegion, setSelectedRegion] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [selectedCourier, setSelectedCourier] = useState("");
   const [locationsLoading, setLocationsLoading] = useState({
     countries: false,
     regions: false,
     cities: false,
     districts: false,
-    partners: false,
   });
   const [locationsError, setLocationsError] = useState<string | null>(null);
 
@@ -205,10 +202,9 @@ export default function CheckoutPage() {
   const regionOptions = toOptions(regions, lang);
   const cityOptions = toOptions(cities, lang);
   const districtOptions = toOptions(districts, lang);
-  const courierOptions = toOptions(courierPartners, lang);
 
   const setLoading = (
-    key: "countries" | "regions" | "cities" | "districts" | "partners",
+    key: "countries" | "regions" | "cities" | "districts",
     value: boolean
   ) =>
     setLocationsLoading((prev) => ({
@@ -263,11 +259,9 @@ export default function CheckoutPage() {
     setSelectedRegion("");
     setSelectedCity("");
     setSelectedDistrict("");
-    setSelectedCourier("");
     setRegions([]);
     setCities([]);
     setDistricts([]);
-    setCourierPartners([]);
 
     if (!selectedCountry) return undefined;
 
@@ -303,10 +297,8 @@ export default function CheckoutPage() {
     let active = true;
     setSelectedCity("");
     setSelectedDistrict("");
-    setSelectedCourier("");
     setCities([]);
     setDistricts([]);
-    setCourierPartners([]);
 
     if (!selectedRegion) return undefined;
 
@@ -341,34 +333,22 @@ export default function CheckoutPage() {
   useEffect(() => {
     let active = true;
     setSelectedDistrict("");
-    setSelectedCourier("");
     setDistricts([]);
-    setCourierPartners([]);
 
     if (!selectedCity) return undefined;
 
-    const loadDistrictsAndPartners = async () => {
+    const loadDistricts = async () => {
       try {
         setLoading("districts", true);
-        setLoading("partners", true);
         setLocationsError(null);
-        const [districtsResponse, partnersResponse] = await Promise.all([
-          api.get("/torod/districts", {
-            params: { cities_id: selectedCity, page: 1 },
-          }),
-          api.get("/torod/courier-partners", {
-            params: { city_id: selectedCity },
-          }),
-        ]);
+        const districtsResponse = await api.get("/torod/districts", {
+          params: { cities_id: selectedCity, page: 1 },
+        });
         if (!active) return;
         const districtList = extractList(districtsResponse.data);
-        const partnerList = extractList(partnersResponse.data);
         setDistricts(districtList);
-        setCourierPartners(partnerList);
         const firstDistrict = toOptions(districtList, lang)[0];
-        const firstPartner = toOptions(partnerList, lang)[0];
         if (firstDistrict) setSelectedDistrict(firstDistrict.id);
-        if (firstPartner) setSelectedCourier(firstPartner.id);
       } catch (error: any) {
         if (!active) return;
         const msg = error?.response?.data?.message || error?.message;
@@ -376,12 +356,11 @@ export default function CheckoutPage() {
       } finally {
         if (active) {
           setLoading("districts", false);
-          setLoading("partners", false);
         }
       }
     };
 
-    loadDistrictsAndPartners();
+    loadDistricts();
     return () => {
       active = false;
     };
@@ -465,9 +444,8 @@ export default function CheckoutPage() {
     if (!selectedCountry) newErrors.country = t('checkout.countryRequired', 'اختر الدولة');
     if (!selectedRegion) newErrors.region = t('checkout.regionRequired', 'اختر المنطقة');
     if (!selectedCity) newErrors.city = t('checkout.cityRequired');
-    if (!selectedDistrict) newErrors.district = t('checkout.districtRequired', 'اختر الحي');
-    if (courierOptions.length > 0 && !selectedCourier) {
-      newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
+    if (districtOptions.length > 0 && !selectedDistrict) {
+      newErrors.district = t('checkout.districtRequired', 'اختر الحي');
     }
     if (!formData.address.trim()) newErrors.address = t('checkout.addressRequired');
     if (formData.paymentMethod === "myfatoorah" && !selectedPaymentMethodId) {
@@ -518,7 +496,6 @@ export default function CheckoutPage() {
         torod_region_id: selectedRegion,
         torod_city_id: selectedCity,
         torod_district_id: selectedDistrict,
-        torod_shipping_company_id: selectedCourier || undefined,
         torod_metadata: hasMetadata ? metadata : undefined,
         cod_amount: isCodPayment ? total : undefined,
         cod_currency: isCodPayment ? "SAR" : undefined,
@@ -739,7 +716,11 @@ export default function CheckoutPage() {
                     } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
                   >
                     {!selectedDistrict && (
-                      <option value="">{t('checkout.districtPlaceholder')}</option>
+                      <option value="">
+                        {districtOptions.length > 0
+                          ? t('checkout.districtPlaceholder')
+                          : t('checkout.noDistricts', 'لا توجد أحياء متاحة')}
+                      </option>
                     )}
                     {districtOptions.map((option) => (
                       <option key={option.id} value={option.id}>
@@ -750,27 +731,6 @@ export default function CheckoutPage() {
                   {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-charcoal font-semibold mb-2">{t('checkout.courierPartner')}</label>
-                  <select
-                    value={selectedCourier}
-                    onChange={(e) => setSelectedCourier(e.target.value)}
-                    disabled={!selectedCity || locationsLoading.partners}
-                    className={`w-full px-4 py-3 rounded-lg border ${
-                      errors.courier ? 'border-red-500' : 'border-charcoal-light'
-                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
-                  >
-                    {!selectedCourier && (
-                      <option value="">{t('checkout.courierPartnerPlaceholder')}</option>
-                    )}
-                    {courierOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.courier && <p className="text-red-500 text-sm mt-1">{errors.courier}</p>}
-                </div>
 
                 <div className="sm:col-span-2">
                   <label className="block text-charcoal font-semibold mb-2">{t('checkout.address')}</label>

@@ -14,12 +14,8 @@ const setTestEnv = () => {
 
 const mockToken = (baseUrl: string) =>
   nock(baseUrl)
-    .post("/token", (body) =>
-      typeof body === "string" &&
-      body.includes("grant_type=client_credentials") &&
-      body.includes("client_id=test-client") &&
-      body.includes("client_secret=test-secret")
-    )
+    .post("/token")
+    .matchHeader("client-id", "test-client")
     .reply(200, {
       access_token: "torod-token",
       expires_in: 3600,
@@ -118,5 +114,48 @@ describe("torodService", () => {
       trackingNumber: "TRK-123",
       labelUrl: "https://cdn.torod.co/label.pdf",
     });
+  });
+
+  it("returns empty data when courier partners are not available", async () => {
+    const { listCourierPartners, config } = await loadServices();
+
+    mockToken(config.torod.baseUrl);
+
+    nock(config.torod.baseUrl)
+      .get("/courier-partners")
+      .query({ city_id: "1" })
+      .reply(404, { message: "Not Found" });
+
+    nock(config.torod.baseUrl)
+      .get("/courier/partners")
+      .query({ city_id: "1" })
+      .reply(405, { message: "Method Not Allowed" });
+
+    const result = await listCourierPartners("1");
+    expect(result).toEqual({ data: [] });
+  });
+
+  it("returns empty data when districts are unavailable", async () => {
+    const { listDistricts, config } = await loadServices();
+
+    mockToken(config.torod.baseUrl);
+
+    nock(config.torod.baseUrl)
+      .get("/get-all/districts")
+      .query({ cities_id: "1", page: 1 })
+      .reply(406, { message: "No districts available." });
+
+    nock(config.torod.baseUrl)
+      .get("/get-all/districts")
+      .query({ city_id: "1", page: 1 })
+      .reply(406, { message: "No districts available." });
+
+    nock(config.torod.baseUrl)
+      .get("/districts")
+      .query({ city_id: "1", page: 1 })
+      .reply(404, { message: "Not Found" });
+
+    const result = await listDistricts("1");
+    expect(result).toEqual({ data: [] });
   });
 });

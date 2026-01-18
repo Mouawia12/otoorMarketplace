@@ -44,9 +44,11 @@ const resolveToken = (payload: unknown) => {
   const nested = asRecord(data.data ?? data.result);
   return pickString(
     data.access_token,
+    data.bearer_token,
     data.token,
     data.accessToken,
     nested.access_token,
+    nested.bearer_token,
     nested.token,
     nested.accessToken
   );
@@ -104,6 +106,7 @@ const fetchToken = async () => {
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
+      "Client-Id": config.torod.clientId,
     },
   });
   const token = resolveToken(response.data);

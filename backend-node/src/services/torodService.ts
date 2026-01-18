@@ -213,24 +213,63 @@ export const listCities = async (regionId: string, page = 1) => {
 
 export const listDistricts = async (cityId: string, page = 1) => {
   if (!cityId) {
-    throw AppError.badRequest("cities_id is required");
+    throw AppError.badRequest("city_id is required");
   }
-  return torodRequest<unknown>({
-    method: "GET",
-    url: "/get-all/districts",
-    params: { cities_id: cityId, page },
-  });
+  try {
+    return await requestWithFallback<unknown>(
+      [
+        {
+          method: "GET",
+          url: "/get-all/districts",
+          params: { cities_id: cityId, page },
+        },
+        {
+          method: "GET",
+          url: "/get-all/districts",
+          params: { city_id: cityId, page },
+        },
+        {
+          method: "GET",
+          url: "/districts",
+          params: { city_id: cityId, page },
+        },
+      ],
+      "Torod districts request failed"
+    );
+  } catch (error) {
+    if (error instanceof AppError && [404, 406].includes(error.statusCode)) {
+      return { data: [] };
+    }
+    throw error;
+  }
 };
 
 export const listCourierPartners = async (cityId: string) => {
   if (!cityId) {
     throw AppError.badRequest("city_id is required");
   }
-  return torodRequest<unknown>({
-    method: "GET",
-    url: "/courier-partners",
-    params: { city_id: cityId },
-  });
+  try {
+    return await requestWithFallback<unknown>(
+      [
+        {
+          method: "GET",
+          url: "/courier-partners",
+          params: { city_id: cityId },
+        },
+        {
+          method: "GET",
+          url: "/courier/partners",
+          params: { city_id: cityId },
+        },
+      ],
+      "Torod courier partners request failed"
+    );
+  } catch (error) {
+    if (error instanceof AppError && [404, 405, 406].includes(error.statusCode)) {
+      return { data: [] };
+    }
+    throw error;
+  }
 };
 
 export const createOrder = async (payload: TorodOrderPayload): Promise<TorodOrder> => {
