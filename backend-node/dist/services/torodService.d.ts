@@ -36,11 +36,36 @@ export declare const listCountries: (page?: number) => Promise<unknown>;
 export declare const listRegions: (countryId: string, page?: number) => Promise<unknown>;
 export declare const listCities: (regionId: string, page?: number) => Promise<unknown>;
 export declare const listDistricts: (cityId: string, page?: number) => Promise<unknown>;
-export declare const listCourierPartners: (cityId: string) => Promise<unknown>;
+export declare const listAllCourierPartners: (page?: number) => Promise<unknown>;
+type CourierPartnersPayload = {
+    shipper_city_id?: number;
+    customer_city_id: number;
+    payment: string;
+    weight: number;
+    order_total: number;
+    no_of_box: number;
+    type: string;
+    filter_by: string;
+    warehouse?: number | string;
+};
+export declare const listCourierPartners: (payload: CourierPartnersPayload) => Promise<unknown>;
+export declare const listOrderCourierPartners: (payload: {
+    order_id: string;
+    warehouse?: number | string;
+    type?: string;
+    filter_by?: string;
+}) => Promise<unknown>;
 export declare const createOrder: (payload: TorodOrderPayload) => Promise<TorodOrder>;
 export declare const shipOrder: (orderId: string, payload?: TorodShipmentPayload) => Promise<TorodShipment>;
 export declare const trackShipment: (trackingNumber: string) => Promise<TorodShipment>;
 export declare const createShipment: (orderId: string, payload?: TorodShipmentPayload) => Promise<TorodShipment>;
 export declare const getShipment: (trackingNumber: string) => Promise<TorodShipment>;
+export declare const getWalletBalance: () => Promise<unknown>;
+export declare const getPaymentLink: (amount: number) => Promise<unknown>;
+export declare const listOrders: (page?: number) => Promise<unknown>;
 export declare const createWarehouse: (payload: Record<string, unknown>) => Promise<unknown>;
+export declare const createAddress: (payload: Record<string, unknown>) => Promise<unknown>;
+export declare const listAddresses: (page?: number) => Promise<unknown>;
+export declare const listWarehouses: (page?: number) => Promise<unknown>;
+export {};
 //# sourceMappingURL=torodService.d.ts.map

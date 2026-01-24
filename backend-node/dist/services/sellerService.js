@@ -77,6 +77,9 @@ const listSellerProductsWithFilters = async (sellerId, filters = {}) => {
             }
         }
     }
+    if (filters.warehouseId) {
+        where.sellerWarehouseId = filters.warehouseId;
+    }
     const products = await client_2.prisma.product.findMany({
         where,
         include: {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getOrderTracking = exports.getOrderLabel = exports.updateOrderStatus = exports.confirmOrderDelivery = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersWithPagination = exports.listOrdersByUser = exports.syncMyFatoorahPayment = exports.createOrder = void 0;
+exports.getOrderTracking = exports.getOrderLabel = exports.updateOrderStatus = exports.shipTorodOrderForOrder = exports.listTorodPartnersForCheckout = exports.listTorodPartnersForOrder = exports.confirmOrderDelivery = exports.listOrdersForSeller = exports.listAllOrders = exports.listOrdersWithPagination = exports.getOrderById = exports.listOrdersByUser = exports.syncMyFatoorahPayment = exports.createOrder = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
@@ -22,6 +22,16 @@ const listOrdersSchema = zod_1.z.object({
     search: zod_1.z.string().optional(),
     sellerId: zod_1.z.coerce.number().optional(),
 });
+const checkoutPartnersSchema = zod_1.z.object({
+    items: zod_1.z
+        .array(zod_1.z.object({
+        productId: zod_1.z.coerce.number().int().positive(),
+        quantity: zod_1.z.coerce.number().int().positive(),
+    }))
+        .min(1),
+    customer_city_id: zod_1.z.coerce.number().int().positive(),
+    order_total: zod_1.z.coerce.number().positive().optional(),
+});
 const normalizeShippingType = (value) => {
     if (typeof value !== "string") {
         return undefined;
@@ -34,6 +44,295 @@ const normalizeShippingType = (value) => {
         return normalized;
     }
     return undefined;
+};
+const normalizeTorodPhone = (value) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) {
+        return "";
+    }
+    if (digits.startsWith("966")) {
+        const rest = digits.slice(3).replace(/^0+/, "");
+        return `966${rest}`;
+    }
+    const trimmed = digits.replace(/^0+/, "");
+    return trimmed;
+};
+const normalizeMyFatoorahMobile = (value) => {
+    if (!value)
+        return "";
+    const digits = value.replace(/\D/g, "");
+    if (!digits)
+        return "";
+    if (digits.startsWith("966")) {
+        const rest = digits.slice(3);
+        if (rest.length === 9) {
+            return `0${rest}`;
+        }
+        if (rest.length >= 10 && rest.length <= 11) {
+            return rest;
+        }
+        return rest.slice(0, 11);
+    }
+    if (digits.length === 9 && digits.startsWith("5")) {
+        return `0${digits}`;
+    }
+    if (digits.length > 11) {
+        return digits.slice(0, 11);
+    }
+    return digits;
+};
+const resolveProductWeightKg = (product) => {
+    const rawWeight = typeof product.weightKg === "number"
+        ? product.weightKg
+        : product.weightKg instanceof client_1.Prisma.Decimal
+            ? product.weightKg.toNumber()
+            : undefined;
+    if (typeof rawWeight === "number" && Number.isFinite(rawWeight) && rawWeight > 0) {
+        return rawWeight;
+    }
+    if (product.sizeMl && product.sizeMl > 0) {
+        return product.sizeMl / 1000;
+    }
+    return 1;
+};
+const resolveSellerWarehouseCode = async (userId) => {
+    const preferred = await client_2.prisma.sellerWarehouse.findFirst({
+        where: { userId, isDefault: true },
+        select: { warehouseCode: true },
+    });
+    if (preferred?.warehouseCode) {
+        return preferred.warehouseCode;
+    }
+    const fallback = await client_2.prisma.sellerWarehouse.findFirst({
+        where: { userId },
+        orderBy: { id: "asc" },
+        select: { warehouseCode: true },
+    });
+    if (fallback?.warehouseCode) {
+        return fallback.warehouseCode;
+    }
+    const profile = await client_2.prisma.sellerProfile.findUnique({
+        where: { userId },
+        select: { torodWarehouseId: true },
+    });
+    return profile?.torodWarehouseId ?? null;
+};
+const resolveSellerWarehouse = async (userId, warehouseIds) => {
+    if (warehouseIds.size === 1) {
+        const warehouseId = Array.from(warehouseIds)[0];
+        if (warehouseId !== undefined) {
+            const warehouse = await client_2.prisma.sellerWarehouse.findUnique({
+                where: { id: warehouseId },
+                select: { warehouseCode: true, cityId: true },
+            });
+            if (warehouse?.warehouseCode) {
+                return warehouse;
+            }
+        }
+    }
+    const fallback = await client_2.prisma.sellerWarehouse.findFirst({
+        where: { userId },
+        orderBy: [{ isDefault: "desc" }, { id: "asc" }],
+        select: { warehouseCode: true, cityId: true },
+    });
+    if (fallback?.warehouseCode) {
+        return fallback;
+    }
+    const profile = await client_2.prisma.sellerProfile.findUnique({
+        where: { userId },
+        select: { torodWarehouseId: true },
+    });
+    if (!profile?.torodWarehouseId) {
+        return null;
+    }
+    const byCode = await client_2.prisma.sellerWarehouse.findFirst({
+        where: { userId, warehouseCode: profile.torodWarehouseId },
+        select: { warehouseCode: true, cityId: true },
+    });
+    return byCode ?? { warehouseCode: profile.torodWarehouseId, cityId: null };
+};
+const resolveOrderWarehouseCode = async (order) => {
+    const sellerIds = new Set();
+    const warehouseIds = new Set();
+    order.items.forEach((item) => {
+        const product = item.product;
+        if (product?.sellerId) {
+            sellerIds.add(product.sellerId);
+        }
+        if (product?.sellerWarehouseId) {
+            warehouseIds.add(product.sellerWarehouseId);
+        }
+    });
+    if (warehouseIds.size === 1) {
+        const warehouseId = Array.from(warehouseIds)[0];
+        if (warehouseId !== undefined) {
+            const warehouse = await client_2.prisma.sellerWarehouse.findUnique({
+                where: { id: warehouseId },
+                select: { warehouseCode: true },
+            });
+            if (warehouse?.warehouseCode) {
+                return warehouse.warehouseCode;
+            }
+        }
+    }
+    if (sellerIds.size === 1) {
+        const sellerId = Array.from(sellerIds)[0];
+        if (sellerId !== undefined) {
+            return resolveSellerWarehouseCode(sellerId);
+        }
+    }
+    return null;
+};
+const toNumber = (value) => {
+    if (typeof value === "number" && Number.isFinite(value))
+        return value;
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        if (!Number.isNaN(parsed))
+            return parsed;
+    }
+    return undefined;
+};
+const toOptionalNumber = (value) => {
+    if (value === null || value === undefined || value === "") {
+        return undefined;
+    }
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? value : parsed;
+};
+const extractList = (payload) => {
+    if (Array.isArray(payload))
+        return payload;
+    if (payload && typeof payload === "object") {
+        const data = payload;
+        if (Array.isArray(data.data))
+            return data.data;
+        if (Array.isArray(data.result))
+            return data.result;
+        if (data.data && typeof data.data === "object") {
+            const nested = data.data;
+            if (Array.isArray(nested.data))
+                return nested.data;
+            if (Array.isArray(nested.items))
+                return nested.items;
+        }
+        if (Array.isArray(data.items))
+            return data.items;
+    }
+    return [];
+};
+const resolvePartnerId = (partner) => {
+    const raw = partner.id ??
+        partner.courier_id ??
+        partner.partner_id ??
+        partner.shipping_company_id ??
+        partner.company_id ??
+        partner.code;
+    if (typeof raw === "string" || typeof raw === "number") {
+        return String(raw);
+    }
+    return undefined;
+};
+const normalizeTorodPartners = (payload) => {
+    const partners = extractList(payload);
+    return partners
+        .map((partner) => {
+        if (!partner || typeof partner !== "object")
+            return null;
+        const record = partner;
+        const id = resolvePartnerId(record);
+        if (!id)
+            return null;
+        const { supportsCod, supportsPrepaid } = resolvePaymentSupport(record);
+        return {
+            id,
+            name: record.title ??
+                record.title_en ??
+                record.company_name ??
+                record.name ??
+                record.method ??
+                record.carrier_name ??
+                record.service_name ??
+                id,
+            name_ar: record.title_arabic ??
+                record.title_ar ??
+                record.company_name_ar ??
+                record.name_ar ??
+                record.name_arabic ??
+                null,
+            rate: toNumber(record.rate) ??
+                toNumber(record.total_amount) ??
+                toNumber(record.amount) ??
+                toNumber(record.price) ??
+                toNumber(record.cost) ??
+                null,
+            currency: record.currency ??
+                record.currency_code ??
+                record.currency_iso ??
+                null,
+            eta: record.eta ??
+                record.delivery_time ??
+                record.estimated_days ??
+                record.estimated_time ??
+                null,
+            cod_fee: toNumber(record.cod_fee) ??
+                toNumber(record.cod_fee_amount) ??
+                toNumber(record.cod_amount) ??
+                null,
+            supports_cod: supportsCod,
+            supports_prepaid: supportsPrepaid,
+            raw: record,
+        };
+    })
+        .filter(Boolean);
+};
+const normalizeTokens = (value) => {
+    if (Array.isArray(value)) {
+        return value.map((entry) => String(entry).toLowerCase());
+    }
+    if (typeof value === "string") {
+        return value
+            .split(/[,\s/|]+/)
+            .map((entry) => entry.trim().toLowerCase())
+            .filter(Boolean);
+    }
+    return [];
+};
+const resolvePaymentSupport = (raw) => {
+    const toBool = (value) => typeof value === "boolean" ? value : value === "1" ? true : value === "0" ? false : undefined;
+    const codKeys = ["cod_available", "cash_on_delivery", "supports_cod", "allow_cod", "is_cod"];
+    const prepaidKeys = ["prepaid_available", "supports_prepaid", "allow_prepaid", "is_prepaid"];
+    let supportsCod;
+    let supportsPrepaid;
+    for (const key of codKeys) {
+        if (key in raw) {
+            supportsCod = toBool(raw[key]);
+            if (supportsCod !== undefined)
+                break;
+        }
+    }
+    for (const key of prepaidKeys) {
+        if (key in raw) {
+            supportsPrepaid = toBool(raw[key]);
+            if (supportsPrepaid !== undefined)
+                break;
+        }
+    }
+    const tokens = normalizeTokens(raw.payment_methods ??
+        raw.payment_method ??
+        raw.payment_types ??
+        raw.payment_type ??
+        raw.supported_payment_methods ??
+        raw.supported_payment_types);
+    if (tokens.length > 0) {
+        if (tokens.some((token) => ["cod", "cash", "cash_on_delivery"].includes(token))) {
+            supportsCod = true;
+        }
+        if (tokens.some((token) => ["prepaid", "card", "online"].includes(token))) {
+            supportsPrepaid = true;
+        }
+    }
+    return { supportsCod, supportsPrepaid };
 };
 const shippingDetailsSchema = zod_1.z.preprocess((value) => {
     if (value && typeof value === "object") {
@@ -54,31 +353,35 @@ const shippingDetailsSchema = zod_1.z.preprocess((value) => {
             customerCountry: shipping.customerCountry ?? shipping.customer_country ?? "SA",
             codAmount: shipping.codAmount ?? shipping.cod_amount,
             codCurrency: shipping.codCurrency ?? shipping.cod_currency,
-            torodShippingCompanyId: shipping.torodShippingCompanyId ??
+            torodShippingCompanyId: toOptionalNumber(shipping.torodShippingCompanyId ??
                 shipping.torod_shipping_company_id ??
                 shipping.shippingCompanyId ??
-                shipping.shipping_company_id,
+                shipping.shipping_company_id),
             torodWarehouseId: shipping.torodWarehouseId ??
                 shipping.torod_warehouse_id ??
                 shipping.warehouseId ??
                 shipping.warehouse_id,
-            torodCountryId: shipping.torodCountryId ??
+            torodCountryId: toOptionalNumber(shipping.torodCountryId ??
                 shipping.torod_country_id ??
                 shipping.countryId ??
-                shipping.country_id,
-            torodRegionId: shipping.torodRegionId ??
+                shipping.country_id),
+            torodRegionId: toOptionalNumber(shipping.torodRegionId ??
                 shipping.torod_region_id ??
                 shipping.regionId ??
-                shipping.region_id,
-            torodCityId: shipping.torodCityId ??
+                shipping.region_id),
+            torodCityId: toOptionalNumber(shipping.torodCityId ??
                 shipping.torod_city_id ??
                 shipping.cityId ??
-                shipping.city_id,
-            torodDistrictId: shipping.torodDistrictId ??
+                shipping.city_id),
+            torodDistrictId: toOptionalNumber(shipping.torodDistrictId ??
                 shipping.torod_district_id ??
                 shipping.districtId ??
-                shipping.district_id,
+                shipping.district_id),
             torodMetadata: shipping.torodMetadata ?? shipping.torod_metadata ?? shipping.metadata,
+            deferTorodShipment: shipping.deferTorodShipment ??
+                shipping.defer_torod_shipment ??
+                shipping.deferShipment ??
+                shipping.defer_shipment,
         };
     }
     return value;
@@ -93,13 +396,14 @@ const shippingDetailsSchema = zod_1.z.preprocess((value) => {
     customerCountry: zod_1.z.string().default("SA"),
     codAmount: zod_1.z.coerce.number().nonnegative().optional(),
     codCurrency: zod_1.z.string().default("SAR"),
-    torodShippingCompanyId: zod_1.z.string().optional(),
+    torodShippingCompanyId: zod_1.z.coerce.number().int().positive().optional(),
     torodWarehouseId: zod_1.z.string().optional(),
-    torodCountryId: zod_1.z.string().optional(),
-    torodRegionId: zod_1.z.string().optional(),
-    torodCityId: zod_1.z.string().optional(),
-    torodDistrictId: zod_1.z.string().optional(),
+    torodCountryId: zod_1.z.coerce.number().int().positive().optional(),
+    torodRegionId: zod_1.z.coerce.number().int().positive().optional(),
+    torodCityId: zod_1.z.coerce.number().int().positive().optional(),
+    torodDistrictId: zod_1.z.coerce.number().int().positive().optional(),
     torodMetadata: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional(),
+    deferTorodShipment: zod_1.z.coerce.boolean().optional(),
 }));
 const createOrderSchema = zod_1.z.object({
     buyerId: zod_1.z.number().int().positive(),
@@ -135,11 +439,18 @@ const createOrder = async (input) => {
     }
     const shipping = data.shipping;
     const normalizedPaymentMethod = data.paymentMethod.trim().toLowerCase();
+    if (normalizedPaymentMethod === "cod") {
+        throw errors_1.AppError.badRequest("Cash on delivery is disabled");
+    }
     const isCodPayment = normalizedPaymentMethod === "cod";
     const isMyFatoorahPayment = normalizedPaymentMethod === "myfatoorah";
     const paymentMethodId = data.paymentMethodId;
     const shippingMethod = normalizeShippingType(shipping.type) ?? "standard";
     const requiresTorodShipment = shippingMethod === "torod";
+    const deferTorodShipment = requiresTorodShipment
+        ? shipping.deferTorodShipment ??
+            !(shipping.torodShippingCompanyId && shipping.torodShippingCompanyId > 0)
+        : false;
     const shippingOption = shippingMethod === "express" ? "express" : "standard";
     if (requiresTorodShipment) {
         if (!shipping.torodCountryId) {
@@ -151,8 +462,8 @@ const createOrder = async (input) => {
         if (!shipping.torodCityId) {
             throw errors_1.AppError.badRequest("Torod city is required");
         }
-        if (!shipping.torodDistrictId) {
-            throw errors_1.AppError.badRequest("Torod district is required");
+        if (!deferTorodShipment && !shipping.torodShippingCompanyId) {
+            throw new errors_1.AppError("لا توجد شركة شحن متاحة لهذه المدينة", 422);
         }
     }
     const shippingFeeValue = shippingOption === "express"
@@ -170,10 +481,15 @@ const createOrder = async (input) => {
             stockQuantity: true,
             status: true,
             basePrice: true,
+            sizeMl: true,
+            weightKg: true,
             sellerId: true,
+            sellerWarehouseId: true,
         },
     });
     const productMap = new Map(products.map((product) => [product.id, product]));
+    const sellerIds = new Set();
+    products.forEach((product) => sellerIds.add(product.sellerId));
     if (productMap.size !== aggregatedItems.length) {
         throw errors_1.AppError.badRequest("One or more products are unavailable");
     }
@@ -251,12 +567,109 @@ const createOrder = async (input) => {
     const customerCityCode = shipping.customerCityCode ?? shipping.city;
     const customerCountry = shipping.customerCountry ?? "SA";
     const torodShippingCompanyId = shipping.torodShippingCompanyId;
-    const torodWarehouseId = shipping.torodWarehouseId;
+    let torodWarehouseId = shipping.torodWarehouseId;
     const torodCountryId = shipping.torodCountryId;
     const torodRegionId = shipping.torodRegionId;
     const torodCityId = shipping.torodCityId;
     const torodDistrictId = shipping.torodDistrictId;
     const torodMetadata = shipping.torodMetadata;
+    if (requiresTorodShipment && !deferTorodShipment && !torodWarehouseId) {
+        const warehouseIds = new Set(products
+            .map((product) => product.sellerWarehouseId)
+            .filter((value) => typeof value === "number" && Number.isFinite(value)));
+        if (warehouseIds.size === 1) {
+            const warehouseId = Array.from(warehouseIds)[0];
+            if (warehouseId !== undefined) {
+                const warehouse = await client_2.prisma.sellerWarehouse.findUnique({
+                    where: { id: warehouseId },
+                    select: { warehouseCode: true },
+                });
+                if (warehouse?.warehouseCode) {
+                    torodWarehouseId = warehouse.warehouseCode;
+                }
+            }
+        }
+    }
+    if (requiresTorodShipment && !deferTorodShipment && !torodWarehouseId) {
+        if (sellerIds.size !== 1) {
+            throw new errors_1.AppError("Warehouse is required for Torod shipping", 422);
+        }
+        const sellerId = Array.from(sellerIds)[0];
+        if (sellerId === undefined) {
+            throw new errors_1.AppError("Warehouse is required for Torod shipping", 422);
+        }
+        const sellerWarehouse = await client_2.prisma.sellerWarehouse.findFirst({
+            where: { userId: sellerId, isDefault: true },
+            select: { warehouseCode: true },
+        });
+        const sellerProfile = await client_2.prisma.sellerProfile.findFirst({
+            where: { userId: sellerId },
+            select: { torodWarehouseId: true },
+        });
+        torodWarehouseId =
+            sellerWarehouse?.warehouseCode ?? sellerProfile?.torodWarehouseId ?? undefined;
+        if (!torodWarehouseId) {
+            throw new errors_1.AppError("Warehouse is required for Torod shipping", 422);
+        }
+    }
+    if (requiresTorodShipment &&
+        !deferTorodShipment &&
+        torodCityId &&
+        torodShippingCompanyId) {
+        const totalQuantity = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
+        const totalWeight = normalizedItems.reduce((sum, item) => {
+            const product = productMap.get(item.productId);
+            const weight = product ? resolveProductWeightKg(product) : 1;
+            return sum + weight * item.quantity;
+        }, 0);
+        const partnersResponse = await (0, torodService_1.listCourierPartners)({
+            shipper_city_id: torodCityId,
+            customer_city_id: torodCityId,
+            payment: isCodPayment ? "coo" : "Prepaid",
+            weight: totalWeight,
+            order_total: totalAmount,
+            no_of_box: Math.max(1, totalQuantity),
+            type: "normal",
+            filter_by: "cheapest",
+            ...(torodWarehouseId ? { warehouse: torodWarehouseId } : {}),
+        });
+        const partners = extractList(partnersResponse);
+        const matched = partners.find((partner) => {
+            if (!partner || typeof partner !== "object")
+                return false;
+            const partnerId = resolvePartnerId(partner);
+            return partnerId === String(torodShippingCompanyId);
+        });
+        if (!matched || typeof matched !== "object") {
+            throw errors_1.AppError.badRequest("Shipping company is not available for the selected city");
+        }
+        const partnerRaw = matched;
+        const { supportsCod, supportsPrepaid } = resolvePaymentSupport(partnerRaw);
+        if (isCodPayment && supportsCod === false) {
+            throw errors_1.AppError.badRequest("Selected shipping company does not support COD");
+        }
+        if (!isCodPayment && supportsPrepaid === false) {
+            throw errors_1.AppError.badRequest("Selected shipping company does not support prepaid");
+        }
+        const minAmount = toNumber(partnerRaw.min_cod_amount) ??
+            toNumber(partnerRaw.min_prepaid_amount) ??
+            toNumber(partnerRaw.min_order_amount) ??
+            toNumber(partnerRaw.min_order_value) ??
+            toNumber(partnerRaw.min_amount) ??
+            toNumber(partnerRaw.min_value);
+        const maxAmount = toNumber(partnerRaw.max_cod_amount) ??
+            toNumber(partnerRaw.max_prepaid_amount) ??
+            toNumber(partnerRaw.max_order_amount) ??
+            toNumber(partnerRaw.max_order_value) ??
+            toNumber(partnerRaw.max_amount) ??
+            toNumber(partnerRaw.max_value);
+        if (minAmount !== undefined && totalAmount < minAmount) {
+            throw errors_1.AppError.badRequest("Order total is below the shipping company minimum");
+        }
+        if (maxAmount !== undefined && totalAmount > maxAmount) {
+            throw errors_1.AppError.badRequest("Order total exceeds the shipping company maximum");
+        }
+    }
     const order = await client_2.prisma.$transaction(async (tx) => {
         const created = await tx.order.create({
             data: {
@@ -328,40 +741,106 @@ const createOrder = async (input) => {
             const metadata = torodMetadata && typeof torodMetadata === "object"
                 ? { ...baseMetadata, ...torodMetadata }
                 : baseMetadata;
+            const torodAddressType = "address_city";
+            const buyer = await client_2.prisma.user.findUnique({
+                where: { id: data.buyerId },
+                select: { fullName: true, email: true, phone: true },
+            });
+            if (!buyer?.email) {
+                throw errors_1.AppError.badRequest("Customer email is required");
+            }
+            const buyerName = shipping.name?.trim() || buyer.fullName?.trim() || "";
+            const buyerPhone = buyer.phone?.trim() || shipping.phone;
+            const torodPhone = normalizeTorodPhone(buyerPhone);
+            if (!torodPhone) {
+                throw errors_1.AppError.badRequest("Customer phone number is required");
+            }
+            const totalQuantity = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
+            const totalWeight = normalizedItems.reduce((sum, item) => {
+                const product = productMap.get(item.productId);
+                const weight = product ? resolveProductWeightKg(product) : 1;
+                return sum + weight * item.quantity;
+            }, 0);
             const torodOrderPayload = {
                 reference: `order-${order.id}`,
-                customer_name: shipping.name,
-                customer_phone: shipping.phone,
+                name: buyerName || shipping.name,
+                email: buyer.email,
+                phone_number: torodPhone,
+                customer_name: buyerName || shipping.name,
+                customer_phone: torodPhone,
                 customer_address: shipping.address,
                 customer_city: shipping.city,
                 customer_region: shipping.region,
                 customer_country: customerCountry,
+                type: torodAddressType,
                 country_id: torodCountryId,
                 region_id: torodRegionId,
                 city_id: torodCityId,
-                district_id: torodDistrictId,
-                payment_method: isCodPayment ? "COD" : "PREPAID",
+                address: shipping.address,
+                payment: isCodPayment ? "coo" : "Prepaid",
+                payment_method: isCodPayment ? "COD" : "Prepaid",
+                order_total: totalAmount,
+                weight: totalWeight > 0 ? totalWeight : 1,
+                no_of_box: totalQuantity > 0 ? totalQuantity : 1,
                 cod_amount: codAmount ?? 0,
                 cod_currency: codCurrency,
                 metadata,
-                items: normalizedItems.map((item) => ({
-                    name: `Item-${item.productId}`,
-                    quantity: item.quantity,
-                    price: Number(item.unitPrice),
-                    sku: String(item.productId),
-                })),
+                item_description: normalizedItems
+                    .map((item) => {
+                    const product = productMap.get(item.productId);
+                    const name = product?.nameEn ?? product?.nameAr ?? `Item-${item.productId}`;
+                    return `${name} x${item.quantity}`;
+                })
+                    .join(", "),
+                items: normalizedItems.map((item) => {
+                    const product = productMap.get(item.productId);
+                    const weight = product ? resolveProductWeightKg(product) : 1;
+                    if (weight <= 0) {
+                        throw errors_1.AppError.badRequest("Item weight must be greater than zero");
+                    }
+                    return {
+                        name: `Item-${item.productId}`,
+                        quantity: item.quantity,
+                        price: Number(item.unitPrice),
+                        weight,
+                        sku: String(item.productId),
+                    };
+                }),
             };
+            console.log("TOROD ORDER CREATE PAYLOAD:", torodOrderPayload);
             torodOrder = await (0, torodService_1.createOrder)(torodOrderPayload);
-            const shipmentPayload = {};
-            if (torodShippingCompanyId) {
-                shipmentPayload.shipping_company_id = torodShippingCompanyId;
+            if (!deferTorodShipment) {
+                const shipmentPayload = {};
+                if (torodShippingCompanyId) {
+                    shipmentPayload.shipping_company_id = torodShippingCompanyId;
+                    shipmentPayload.courier_partner_id = Number(torodShippingCompanyId);
+                    shipmentPayload.type = "normal";
+                }
+                if (torodWarehouseId) {
+                    shipmentPayload.warehouse_id = torodWarehouseId;
+                    shipmentPayload.warehouse = torodWarehouseId;
+                }
+                console.log("TOROD SHIP ORDER PAYLOAD:", {
+                    orderId: torodOrder.id,
+                    payload: Object.keys(shipmentPayload).length > 0 ? shipmentPayload : undefined,
+                });
+                shipment = await (0, torodService_1.shipOrder)(torodOrder.id, Object.keys(shipmentPayload).length > 0 ? shipmentPayload : undefined);
             }
-            if (torodWarehouseId) {
-                shipmentPayload.warehouse_id = torodWarehouseId;
+            else {
+                console.log("TOROD SHIP ORDER SKIPPED:", {
+                    orderId: torodOrder.id,
+                    reason: "deferred",
+                });
             }
-            shipment = await (0, torodService_1.shipOrder)(torodOrder.id, Object.keys(shipmentPayload).length > 0 ? shipmentPayload : undefined);
         }
         catch (error) {
+            const responsePayload = error?.response?.data;
+            if (responsePayload) {
+                console.error("TOROD ORDER ERROR RESPONSE:", responsePayload);
+            }
+            if (error instanceof errors_1.AppError && error.details) {
+                console.error("TOROD ORDER ERROR DETAILS:", error.details);
+            }
             await client_2.prisma.$transaction(async (tx) => {
                 await tx.order.update({
                     where: { id: order.id },
@@ -378,11 +857,18 @@ const createOrder = async (input) => {
                     });
                 }
             });
-            const friendlyMessage = "تعذر إنشاء الشحنة مع شركة التوصيل، حاول مرة أخرى أو اختر طريقة شحن أخرى.";
+            const resolvedMessage = error instanceof errors_1.AppError
+                ? error.message
+                : error
+                    ?.response?.data?.message ||
+                    error
+                        ?.response?.data?.error ||
+                    error?.message;
             if (error instanceof errors_1.AppError) {
-                throw new errors_1.AppError(friendlyMessage, error.statusCode, error.details ?? error);
+                throw new errors_1.AppError(error.message, error.statusCode, error.details ?? error);
             }
-            throw errors_1.AppError.internal(friendlyMessage, error);
+            throw errors_1.AppError.internal(resolvedMessage ||
+                "تعذر إنشاء الشحنة مع شركة التوصيل، حاول مرة أخرى أو اختر طريقة شحن أخرى.", error);
         }
     }
     if (appliedCoupons.length > 0) {
@@ -412,8 +898,8 @@ const createOrder = async (input) => {
             const paymentInput = {
                 paymentMethodId,
                 invoiceValue: totalAmount,
-                customerName: buyer?.fullName ?? shipping.name,
-                customerMobile: buyer?.phone ?? shipping.phone,
+                customerName: shipping.name ?? buyer?.fullName ?? "",
+                customerMobile: normalizeMyFatoorahMobile(buyer?.phone ?? shipping.phone),
                 customerReference: `order-${order.id}`,
             };
             if (buyer?.email) {
@@ -451,22 +937,34 @@ const createOrder = async (input) => {
                     });
                 }
             });
-            const friendlyMessage = "تعذر بدء عملية الدفع عبر MyFatoorah، حاول مرة أخرى.";
+            const fallbackMessage = "تعذر بدء عملية الدفع عبر MyFatoorah، حاول مرة أخرى.";
             if (error instanceof errors_1.AppError) {
-                throw new errors_1.AppError(friendlyMessage, error.statusCode, error.details ?? error);
+                const details = error.details ?? error;
+                const validationErrors = details
+                    ?.ValidationErrors;
+                const firstValidation = Array.isArray(validationErrors) ? validationErrors[0] : undefined;
+                const validationMessage = firstValidation
+                    ? [firstValidation.Name, firstValidation.Error].filter(Boolean).join(": ")
+                    : undefined;
+                const apiMessage = typeof details?.Message === "string"
+                    ? details.Message
+                    : undefined;
+                const message = validationMessage || apiMessage || error.message || fallbackMessage;
+                throw new errors_1.AppError(message, error.statusCode, details);
             }
-            throw errors_1.AppError.internal(friendlyMessage, error);
+            throw errors_1.AppError.internal(fallbackMessage, error);
         }
     }
-    const shipmentId = shipment?.id ?? torodOrder?.id;
+    const torodOrderId = torodOrder?.id ?? order.redboxShipmentId;
     const trackingNumber = shipment?.trackingNumber ?? torodOrder?.trackingNumber ?? order.redboxTrackingNumber;
     const labelUrl = shipment?.labelUrl ?? order.redboxLabelUrl;
     const shipmentStatus = shipment?.status ?? torodOrder?.status ?? "created";
+    const redboxShipmentId = torodOrderId ?? shipment?.id ?? order.redboxShipmentId;
     const updatedOrder = shipment || torodOrder
         ? await client_2.prisma.order.update({
             where: { id: order.id },
             data: {
-                redboxShipmentId: shipmentId ?? order.redboxShipmentId,
+                redboxShipmentId: redboxShipmentId,
                 redboxTrackingNumber: trackingNumber ?? order.redboxTrackingNumber,
                 redboxLabelUrl: labelUrl ?? order.redboxLabelUrl,
                 redboxStatus: shipmentStatus ?? "created",
@@ -580,6 +1078,7 @@ const mapOrderToDto = (order) => {
         cod_currency: order.codCurrency ?? null,
         customer_city_code: order.customerCityCode ?? null,
         customer_country: order.customerCountry ?? null,
+        torod_order_id: order.redboxShipmentId ?? null,
         torod_shipment_id: order.redboxShipmentId ?? null,
         torod_tracking_number: order.redboxTrackingNumber ?? null,
         torod_label_url: order.redboxLabelUrl ?? null,
@@ -675,6 +1174,17 @@ const listOrdersByUser = async (userId) => {
     return orders.map(mapOrderToDto);
 };
 exports.listOrdersByUser = listOrdersByUser;
+const getOrderById = async (orderId) => {
+    const order = await client_2.prisma.order.findUnique({
+        where: { id: orderId },
+        include: orderInclude,
+    });
+    if (!order) {
+        throw errors_1.AppError.notFound("Order not found");
+    }
+    return mapOrderToDto(order);
+};
+exports.getOrderById = getOrderById;
 const buildOrdersSearchWhere = (search) => {
     if (!search) {
         return undefined;
@@ -845,6 +1355,159 @@ const confirmOrderDelivery = async (orderId, buyerId) => {
     return mapOrderToDto(updated);
 };
 exports.confirmOrderDelivery = confirmOrderDelivery;
+const listTorodPartnersForOrder = async (orderId, actorId, actorRoles, payload) => {
+    const order = await client_2.prisma.order.findUnique({
+        where: { id: orderId },
+        include: orderInclude,
+    });
+    if (!order) {
+        throw errors_1.AppError.notFound("Order not found");
+    }
+    assertOrderAccess(order, actorId, actorRoles);
+    if (order.shippingMethod?.toLowerCase() !== "torod") {
+        throw errors_1.AppError.badRequest("Order is not a Torod shipment");
+    }
+    const torodOrderId = order.redboxShipmentId;
+    if (!torodOrderId) {
+        throw errors_1.AppError.badRequest("Torod order id is missing for this order");
+    }
+    const normalizedRoles = actorRoles.map((role) => role.toUpperCase());
+    const isAdmin = normalizedRoles.some((role) => ["ADMIN", "SUPER_ADMIN"].includes(role));
+    const warehouse = payload?.warehouse?.trim() ||
+        (isAdmin
+            ? await resolveOrderWarehouseCode(order)
+            : await resolveSellerWarehouseCode(actorId));
+    if (!warehouse) {
+        throw errors_1.AppError.badRequest("Warehouse is required for Torod courier partners");
+    }
+    const response = await (0, torodService_1.listOrderCourierPartners)({
+        order_id: torodOrderId,
+        warehouse,
+        type: payload?.type ?? "normal",
+        filter_by: payload?.filter_by ?? "cheapest",
+        ...(payload?.is_insurance !== undefined ? { is_insurance: payload.is_insurance } : {}),
+    });
+    const partners = normalizeTorodPartners(response);
+    return {
+        order_id: torodOrderId,
+        warehouse,
+        partners,
+    };
+};
+exports.listTorodPartnersForOrder = listTorodPartnersForOrder;
+const listTorodPartnersForCheckout = async (payload) => {
+    const data = checkoutPartnersSchema.parse(payload ?? {});
+    const itemIds = data.items.map((item) => item.productId);
+    const products = await client_2.prisma.product.findMany({
+        where: { id: { in: itemIds } },
+        select: {
+            id: true,
+            sellerId: true,
+            sellerWarehouseId: true,
+            basePrice: true,
+            sizeMl: true,
+            weightKg: true,
+        },
+    });
+    if (products.length !== itemIds.length) {
+        throw errors_1.AppError.badRequest("One or more products are unavailable");
+    }
+    const sellerIds = new Set(products.map((product) => product.sellerId));
+    if (sellerIds.size !== 1) {
+        throw errors_1.AppError.badRequest("Torod checkout requires items from a single seller");
+    }
+    const warehouseIds = new Set(products
+        .map((product) => product.sellerWarehouseId)
+        .filter((value) => typeof value === "number" && Number.isFinite(value)));
+    const sellerId = Array.from(sellerIds)[0];
+    if (sellerId === undefined) {
+        throw errors_1.AppError.badRequest("Torod checkout requires items from a single seller");
+    }
+    const warehouse = await resolveSellerWarehouse(sellerId, warehouseIds);
+    if (!warehouse?.warehouseCode) {
+        throw errors_1.AppError.badRequest("Warehouse is required for Torod courier partners");
+    }
+    const quantityMap = new Map();
+    data.items.forEach((item) => {
+        quantityMap.set(item.productId, (quantityMap.get(item.productId) ?? 0) + item.quantity);
+    });
+    const totalWeight = products.reduce((sum, product) => {
+        const quantity = quantityMap.get(product.id) ?? 1;
+        return sum + resolveProductWeightKg(product) * quantity;
+    }, 0);
+    const orderTotal = data.order_total ??
+        products.reduce((sum, product) => {
+            const quantity = quantityMap.get(product.id) ?? 1;
+            return sum + product.basePrice.toNumber() * quantity;
+        }, 0);
+    const totalQuantity = Array.from(quantityMap.values()).reduce((sum, qty) => sum + qty, 0);
+    const response = await (0, torodService_1.listCourierPartners)({
+        customer_city_id: data.customer_city_id,
+        payment: "Prepaid",
+        weight: totalWeight > 0 ? totalWeight : 1,
+        order_total: orderTotal > 0 ? orderTotal : 1,
+        no_of_box: Math.max(1, totalQuantity),
+        type: "normal",
+        filter_by: "cheapest",
+        ...(warehouse.warehouseCode ? { warehouse: warehouse.warehouseCode } : {}),
+        ...(warehouse.cityId ? { shipper_city_id: warehouse.cityId } : {}),
+    });
+    const partners = normalizeTorodPartners(response);
+    return { partners };
+};
+exports.listTorodPartnersForCheckout = listTorodPartnersForCheckout;
+const shipTorodOrderForOrder = async (orderId, actorId, actorRoles, payload) => {
+    const order = await client_2.prisma.order.findUnique({
+        where: { id: orderId },
+        include: orderInclude,
+    });
+    if (!order) {
+        throw errors_1.AppError.notFound("Order not found");
+    }
+    assertOrderAccess(order, actorId, actorRoles);
+    if (order.shippingMethod?.toLowerCase() !== "torod") {
+        throw errors_1.AppError.badRequest("Order is not a Torod shipment");
+    }
+    const torodOrderId = order.redboxShipmentId;
+    if (!torodOrderId) {
+        throw errors_1.AppError.badRequest("Torod order id is missing for this order");
+    }
+    const normalizedRoles = actorRoles.map((role) => role.toUpperCase());
+    const isAdmin = normalizedRoles.some((role) => ["ADMIN", "SUPER_ADMIN"].includes(role));
+    const warehouse = payload.warehouse?.trim() ||
+        (isAdmin
+            ? await resolveOrderWarehouseCode(order)
+            : await resolveSellerWarehouseCode(actorId));
+    if (!warehouse) {
+        throw errors_1.AppError.badRequest("Warehouse is required for Torod shipment");
+    }
+    const courierPartnerId = payload.courier_partner_id ?? payload.shipping_company_id;
+    const shipmentPayload = {
+        type: payload.type ?? "normal",
+        warehouse,
+    };
+    if (courierPartnerId) {
+        shipmentPayload.courier_partner_id = courierPartnerId;
+        shipmentPayload.shipping_company_id = courierPartnerId;
+    }
+    if (payload.is_own !== undefined)
+        shipmentPayload.is_own = payload.is_own;
+    if (payload.is_insurance !== undefined)
+        shipmentPayload.is_insurance = payload.is_insurance;
+    const shipment = await (0, torodService_1.shipOrder)(torodOrderId, shipmentPayload);
+    const updated = await client_2.prisma.order.update({
+        where: { id: order.id },
+        data: {
+            status: client_1.OrderStatus.SHIPPED,
+            redboxTrackingNumber: shipment.trackingNumber ?? order.redboxTrackingNumber,
+            redboxLabelUrl: shipment.labelUrl ?? order.redboxLabelUrl,
+            redboxStatus: shipment.status ?? order.redboxStatus ?? "created",
+        },
+        include: orderInclude,
+    });
+    return mapOrderToDto(updated);
+};
+exports.shipTorodOrderForOrder = shipTorodOrderForOrder;
 const updateOrderStatus = async (orderId, status, actorRoles) => {
     const allowedStatuses = [
         { from: [client_1.OrderStatus.PENDING], to: client_1.OrderStatus.PROCESSING },
@@ -886,16 +1549,29 @@ const getOrderLabel = async (orderId, actorId, actorRoles) => {
         throw errors_1.AppError.notFound("Order not found");
     }
     assertOrderAccess(order, actorId, actorRoles);
-    if (!order.redboxTrackingNumber || order.shippingMethod?.toLowerCase() !== "torod") {
-        throw errors_1.AppError.badRequest("لا توجد شحنة طُرُد مرتبطة بهذا الطلب");
+    if (order.shippingMethod?.toLowerCase() !== "torod") {
+        throw errors_1.AppError.badRequest("لم يتم إصدار بوليصة الشحن لهذا الطلب بعد");
     }
-    const shipment = await (0, torodService_1.trackShipment)(order.redboxTrackingNumber);
-    const labelUrl = shipment.labelUrl || order.redboxLabelUrl || "";
+    if (!order.redboxTrackingNumber && !order.redboxLabelUrl) {
+        throw errors_1.AppError.badRequest("لم يتم إصدار بوليصة الشحن لهذا الطلب بعد");
+    }
+    let shipment;
+    if (order.redboxTrackingNumber) {
+        try {
+            shipment = await (0, torodService_1.trackShipment)(order.redboxTrackingNumber);
+        }
+        catch (error) {
+            if (!(error instanceof errors_1.AppError) || error.statusCode < 400 || error.statusCode >= 500) {
+                throw error;
+            }
+        }
+    }
+    const labelUrl = shipment?.labelUrl || order.redboxLabelUrl || "";
     const updated = await client_2.prisma.order.update({
         where: { id: order.id },
         data: {
             redboxLabelUrl: labelUrl || order.redboxLabelUrl,
-            redboxTrackingNumber: shipment.trackingNumber ?? order.redboxTrackingNumber,
+            redboxTrackingNumber: shipment?.trackingNumber ?? order.redboxTrackingNumber,
         },
         include: orderInclude,
     });

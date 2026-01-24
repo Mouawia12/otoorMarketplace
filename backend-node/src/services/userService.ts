@@ -44,6 +44,7 @@ export const getUserProfile = async (userId: number) => {
           national_id: user.sellerProfile.nationalId,
           iban: user.sellerProfile.iban,
           bank_name: user.sellerProfile.bankName,
+          torod_warehouse_id: user.sellerProfile.torodWarehouseId ?? null,
           status: user.sellerProfile.status?.toLowerCase?.() ?? user.sellerProfile.status,
         }
       : null,

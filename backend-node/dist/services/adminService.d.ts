@@ -48,6 +48,7 @@ export declare const deleteUserByAdmin: (userId: number, actorRoles: RoleName[],
 export declare const listPendingProducts: () => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -57,6 +58,7 @@ export declare const listPendingProducts: () => Promise<{
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -72,6 +74,11 @@ export declare const listPendingProducts: () => Promise<{
         full_name: any;
         verified_seller: any;
     } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
+    } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;
 }[]>;
@@ -79,6 +86,7 @@ export declare const listProductsForAdmin: (query?: unknown) => Promise<{
     products: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -88,6 +96,7 @@ export declare const listProductsForAdmin: (query?: unknown) => Promise<{
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -103,6 +112,11 @@ export declare const listProductsForAdmin: (query?: unknown) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     }[];
@@ -115,6 +129,7 @@ export declare const listProductsForAdmin: (query?: unknown) => Promise<{
 export declare const updateProductStatusAsAdmin: (productId: number, status: string) => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -124,6 +139,7 @@ export declare const updateProductStatusAsAdmin: (productId: number, status: str
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -138,6 +154,11 @@ export declare const updateProductStatusAsAdmin: (productId: number, status: str
         id: any;
         full_name: any;
         verified_seller: any;
+    } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
     } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;

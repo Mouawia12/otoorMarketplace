@@ -93,10 +93,7 @@ describe("torodService", () => {
     mockToken(config.torod.baseUrl);
 
     nock(config.torod.baseUrl)
-      .post("/order/ship-process", (body) => {
-        const payload = body as { order_id?: string; shipping_company_id?: string };
-        return payload?.order_id === "ORD-1" && payload.shipping_company_id === "COMP-1";
-      })
+      .post("/order/ship/process")
       .reply(200, {
         data: {
           shipment_id: "SHIP-123",
@@ -122,16 +119,23 @@ describe("torodService", () => {
     mockToken(config.torod.baseUrl);
 
     nock(config.torod.baseUrl)
-      .get("/courier-partners")
-      .query({ city_id: "1" })
+      .post("/courier/partners/by/cityid")
       .reply(404, { message: "Not Found" });
 
     nock(config.torod.baseUrl)
-      .get("/courier/partners")
-      .query({ city_id: "1" })
+      .post("/courier/partners/list")
       .reply(405, { message: "Method Not Allowed" });
 
-    const result = await listCourierPartners("1");
+    const result = await listCourierPartners({
+      shipper_city_id: 1,
+      customer_city_id: 1,
+      payment: "COD",
+      weight: 1,
+      order_total: 1,
+      no_of_box: 1,
+      type: "normal",
+      filter_by: "cheapest",
+    });
     expect(result).toEqual({ data: [] });
   });
 

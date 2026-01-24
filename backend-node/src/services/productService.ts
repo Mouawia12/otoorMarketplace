@@ -36,9 +36,15 @@ export const normalizeProduct = (product: any) => {
     return status === AuctionStatus.ACTIVE || status === AuctionStatus.SCHEDULED;
   });
 
+  const weightKg =
+    typeof plain.weightKg === "number"
+      ? plain.weightKg
+      : plain.weightKg?.toNumber?.();
+
   return {
     id: plain.id,
     seller_id: plain.sellerId,
+    seller_warehouse_id: plain.sellerWarehouseId ?? null,
     name_ar: plain.nameAr,
     name_en: plain.nameEn,
     description_ar: plain.descriptionAr,
@@ -48,6 +54,7 @@ export const normalizeProduct = (product: any) => {
     category: plain.category,
     base_price: plain.basePrice,
     size_ml: plain.sizeMl,
+    weight_kg: typeof weightKg === "number" && Number.isFinite(weightKg) ? weightKg : null,
     concentration: plain.concentration,
     condition: plain.condition?.toLowerCase?.() ?? plain.condition,
     stock_quantity: plain.stockQuantity,
@@ -63,6 +70,13 @@ export const normalizeProduct = (product: any) => {
           id: plain.seller.id,
           full_name: plain.seller.fullName,
           verified_seller: plain.seller.verifiedSeller,
+        }
+      : undefined,
+    seller_warehouse: plain.sellerWarehouse
+      ? {
+          id: plain.sellerWarehouse.id,
+          warehouse_code: plain.sellerWarehouse.warehouseCode,
+          warehouse_name: plain.sellerWarehouse.warehouseName,
         }
       : undefined,
     is_auction_product: auctions.length > 0,
@@ -400,6 +414,7 @@ const imageUrlSchema = z
 
 const productInputSchema = z.object({
   sellerId: z.coerce.number().int().positive(),
+  sellerWarehouseId: z.coerce.number().int().positive().optional(),
   nameAr: z.string().min(2),
   nameEn: z.string().min(2),
   descriptionAr: z.string().min(4),
@@ -409,6 +424,7 @@ const productInputSchema = z.object({
   category: z.string().min(1),
   basePrice: z.coerce.number().positive(),
   sizeMl: z.coerce.number().int().positive(),
+  weightKg: z.coerce.number().positive().optional(),
   concentration: z.string().min(1),
   condition: z.nativeEnum(ProductCondition),
   stockQuantity: z.coerce.number().int().nonnegative(),
@@ -447,9 +463,29 @@ export const createProduct = async (
     .map((url) => normalizeImagePathForStorage(url))
     .filter((value): value is string => Boolean(value));
 
+  let sellerWarehouseId = data.sellerWarehouseId ?? null;
+  if (sellerWarehouseId) {
+    const warehouse = await prisma.sellerWarehouse.findFirst({
+      where: { id: sellerWarehouseId, userId: data.sellerId },
+      select: { id: true },
+    });
+    if (!warehouse) {
+      throw AppError.badRequest("Selected warehouse is not available for this seller");
+    }
+  } else {
+    const fallbackWarehouse = await prisma.sellerWarehouse.findFirst({
+      where: { userId: data.sellerId, isDefault: true },
+      select: { id: true },
+    });
+    if (fallbackWarehouse) {
+      sellerWarehouseId = fallbackWarehouse.id;
+    }
+  }
+
   const product = await prisma.product.create({
     data: {
       sellerId: data.sellerId,
+      sellerWarehouseId,
       nameAr: data.nameAr,
       nameEn: data.nameEn,
       slug,
@@ -460,6 +496,7 @@ export const createProduct = async (
       category: data.category,
       basePrice: new Prisma.Decimal(data.basePrice),
       sizeMl: data.sizeMl,
+      weightKg: data.weightKg ? new Prisma.Decimal(data.weightKg) : null,
       concentration: data.concentration,
       condition: data.condition,
       stockQuantity: data.stockQuantity,
@@ -475,6 +512,7 @@ export const createProduct = async (
     include: {
       images: true,
       auctions: true,
+      sellerWarehouse: true,
       seller: {
         select: {
           id: true,
@@ -532,10 +570,12 @@ const updateProductSchema = z.object({
   category: z.string().min(1).optional(),
   basePrice: z.coerce.number().positive().optional(),
   sizeMl: z.coerce.number().int().positive().optional(),
+  weightKg: z.coerce.number().positive().optional(),
   concentration: z.string().min(1).optional(),
   condition: z.nativeEnum(ProductCondition).optional(),
   stockQuantity: z.coerce.number().int().nonnegative().optional(),
   isTester: z.boolean().optional(),
+  sellerWarehouseId: z.coerce.number().int().positive().optional(),
   status: z
     .union([
       z.nativeEnum(ProductStatus),
@@ -572,10 +612,21 @@ export const updateProduct = async (
   if (data.category !== undefined) updateData.category = data.category;
   if (data.basePrice !== undefined) updateData.basePrice = new Prisma.Decimal(data.basePrice);
   if (data.sizeMl !== undefined) updateData.sizeMl = data.sizeMl;
+  if (data.weightKg !== undefined) updateData.weightKg = new Prisma.Decimal(data.weightKg);
   if (data.concentration !== undefined) updateData.concentration = data.concentration;
   if (data.condition !== undefined) updateData.condition = data.condition;
   if (data.stockQuantity !== undefined) updateData.stockQuantity = data.stockQuantity;
   if (data.isTester !== undefined) updateData.isTester = data.isTester;
+  if (data.sellerWarehouseId !== undefined) {
+    const warehouse = await prisma.sellerWarehouse.findFirst({
+      where: { id: data.sellerWarehouseId, userId: sellerId },
+      select: { id: true },
+    });
+    if (!warehouse) {
+      throw AppError.badRequest("Selected warehouse is not available for this seller");
+    }
+    updateData.sellerWarehouse = { connect: { id: data.sellerWarehouseId } };
+  }
   if (data.status !== undefined) {
     const isAdmin =
       options?.roles?.some(
@@ -583,14 +634,21 @@ export const updateProduct = async (
       ) ?? false;
     if (typeof data.status === "string") {
       const normalized = data.status.toLowerCase();
-      if (normalized === "pending" || normalized === "published") {
-        updateData.status = isAdmin ? ProductStatus.PUBLISHED : ProductStatus.PENDING_REVIEW;
+      if (normalized === "pending") {
+        updateData.status = ProductStatus.PENDING_REVIEW;
+      } else if (normalized === "published") {
+        updateData.status =
+          isAdmin || product.status === ProductStatus.PUBLISHED
+            ? ProductStatus.PUBLISHED
+            : ProductStatus.PENDING_REVIEW;
       } else {
         updateData.status = normalized.toUpperCase() as ProductStatus;
       }
     } else {
       updateData.status =
-        !isAdmin && data.status === ProductStatus.PUBLISHED
+        !isAdmin &&
+        data.status === ProductStatus.PUBLISHED &&
+        product.status !== ProductStatus.PUBLISHED
           ? ProductStatus.PENDING_REVIEW
           : data.status;
     }
@@ -619,6 +677,7 @@ export const updateProduct = async (
     include: {
       images: { orderBy: { sortOrder: "asc" as const } },
       auctions: true,
+      sellerWarehouse: true,
       seller: {
         select: {
           id: true,

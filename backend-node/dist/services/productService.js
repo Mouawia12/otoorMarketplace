@@ -40,9 +40,13 @@ const normalizeProduct = (product) => {
         const status = typeof auction?.status === "string" ? auction.status.toUpperCase() : "";
         return status === client_1.AuctionStatus.ACTIVE || status === client_1.AuctionStatus.SCHEDULED;
     });
+    const weightKg = typeof plain.weightKg === "number"
+        ? plain.weightKg
+        : plain.weightKg?.toNumber?.();
     return {
         id: plain.id,
         seller_id: plain.sellerId,
+        seller_warehouse_id: plain.sellerWarehouseId ?? null,
         name_ar: plain.nameAr,
         name_en: plain.nameEn,
         description_ar: plain.descriptionAr,
@@ -52,6 +56,7 @@ const normalizeProduct = (product) => {
         category: plain.category,
         base_price: plain.basePrice,
         size_ml: plain.sizeMl,
+        weight_kg: typeof weightKg === "number" && Number.isFinite(weightKg) ? weightKg : null,
         concentration: plain.concentration,
         condition: plain.condition?.toLowerCase?.() ?? plain.condition,
         stock_quantity: plain.stockQuantity,
@@ -67,6 +72,13 @@ const normalizeProduct = (product) => {
                 id: plain.seller.id,
                 full_name: plain.seller.fullName,
                 verified_seller: plain.seller.verifiedSeller,
+            }
+            : undefined,
+        seller_warehouse: plain.sellerWarehouse
+            ? {
+                id: plain.sellerWarehouse.id,
+                warehouse_code: plain.sellerWarehouse.warehouseCode,
+                warehouse_name: plain.sellerWarehouse.warehouseName,
             }
             : undefined,
         is_auction_product: auctions.length > 0,
@@ -360,6 +372,7 @@ const imageUrlSchema = zod_1.z
     .refine((value) => /^https?:\/\//.test(value) || value.startsWith("/"), "Image URL must be an absolute or relative URL");
 const productInputSchema = zod_1.z.object({
     sellerId: zod_1.z.coerce.number().int().positive(),
+    sellerWarehouseId: zod_1.z.coerce.number().int().positive().optional(),
     nameAr: zod_1.z.string().min(2),
     nameEn: zod_1.z.string().min(2),
     descriptionAr: zod_1.z.string().min(4),
@@ -369,6 +382,7 @@ const productInputSchema = zod_1.z.object({
     category: zod_1.z.string().min(1),
     basePrice: zod_1.z.coerce.number().positive(),
     sizeMl: zod_1.z.coerce.number().int().positive(),
+    weightKg: zod_1.z.coerce.number().positive().optional(),
     concentration: zod_1.z.string().min(1),
     condition: zod_1.z.nativeEnum(client_1.ProductCondition),
     stockQuantity: zod_1.z.coerce.number().int().nonnegative(),
@@ -394,9 +408,29 @@ const createProduct = async (input, options) => {
     const sanitizedImages = data.imageUrls
         .map((url) => (0, assets_1.normalizeImagePathForStorage)(url))
         .filter((value) => Boolean(value));
+    let sellerWarehouseId = data.sellerWarehouseId ?? null;
+    if (sellerWarehouseId) {
+        const warehouse = await client_2.prisma.sellerWarehouse.findFirst({
+            where: { id: sellerWarehouseId, userId: data.sellerId },
+            select: { id: true },
+        });
+        if (!warehouse) {
+            throw errors_1.AppError.badRequest("Selected warehouse is not available for this seller");
+        }
+    }
+    else {
+        const fallbackWarehouse = await client_2.prisma.sellerWarehouse.findFirst({
+            where: { userId: data.sellerId, isDefault: true },
+            select: { id: true },
+        });
+        if (fallbackWarehouse) {
+            sellerWarehouseId = fallbackWarehouse.id;
+        }
+    }
     const product = await client_2.prisma.product.create({
         data: {
             sellerId: data.sellerId,
+            sellerWarehouseId,
             nameAr: data.nameAr,
             nameEn: data.nameEn,
             slug,
@@ -407,6 +441,7 @@ const createProduct = async (input, options) => {
             category: data.category,
             basePrice: new client_1.Prisma.Decimal(data.basePrice),
             sizeMl: data.sizeMl,
+            weightKg: data.weightKg ? new client_1.Prisma.Decimal(data.weightKg) : null,
             concentration: data.concentration,
             condition: data.condition,
             stockQuantity: data.stockQuantity,
@@ -422,6 +457,7 @@ const createProduct = async (input, options) => {
         include: {
             images: true,
             auctions: true,
+            sellerWarehouse: true,
             seller: {
                 select: {
                     id: true,
@@ -476,10 +512,12 @@ const updateProductSchema = zod_1.z.object({
     category: zod_1.z.string().min(1).optional(),
     basePrice: zod_1.z.coerce.number().positive().optional(),
     sizeMl: zod_1.z.coerce.number().int().positive().optional(),
+    weightKg: zod_1.z.coerce.number().positive().optional(),
     concentration: zod_1.z.string().min(1).optional(),
     condition: zod_1.z.nativeEnum(client_1.ProductCondition).optional(),
     stockQuantity: zod_1.z.coerce.number().int().nonnegative().optional(),
     isTester: zod_1.z.boolean().optional(),
+    sellerWarehouseId: zod_1.z.coerce.number().int().positive().optional(),
     status: zod_1.z
         .union([
         zod_1.z.nativeEnum(client_1.ProductStatus),
@@ -515,6 +553,8 @@ const updateProduct = async (productId, sellerId, payload, options) => {
         updateData.basePrice = new client_1.Prisma.Decimal(data.basePrice);
     if (data.sizeMl !== undefined)
         updateData.sizeMl = data.sizeMl;
+    if (data.weightKg !== undefined)
+        updateData.weightKg = new client_1.Prisma.Decimal(data.weightKg);
     if (data.concentration !== undefined)
         updateData.concentration = data.concentration;
     if (data.condition !== undefined)
@@ -523,12 +563,28 @@ const updateProduct = async (productId, sellerId, payload, options) => {
         updateData.stockQuantity = data.stockQuantity;
     if (data.isTester !== undefined)
         updateData.isTester = data.isTester;
+    if (data.sellerWarehouseId !== undefined) {
+        const warehouse = await client_2.prisma.sellerWarehouse.findFirst({
+            where: { id: data.sellerWarehouseId, userId: sellerId },
+            select: { id: true },
+        });
+        if (!warehouse) {
+            throw errors_1.AppError.badRequest("Selected warehouse is not available for this seller");
+        }
+        updateData.sellerWarehouse = { connect: { id: data.sellerWarehouseId } };
+    }
     if (data.status !== undefined) {
         const isAdmin = options?.roles?.some((role) => role === client_1.RoleName.ADMIN || role === client_1.RoleName.SUPER_ADMIN) ?? false;
         if (typeof data.status === "string") {
             const normalized = data.status.toLowerCase();
-            if (normalized === "pending" || normalized === "published") {
-                updateData.status = isAdmin ? client_1.ProductStatus.PUBLISHED : client_1.ProductStatus.PENDING_REVIEW;
+            if (normalized === "pending") {
+                updateData.status = client_1.ProductStatus.PENDING_REVIEW;
+            }
+            else if (normalized === "published") {
+                updateData.status =
+                    isAdmin || product.status === client_1.ProductStatus.PUBLISHED
+                        ? client_1.ProductStatus.PUBLISHED
+                        : client_1.ProductStatus.PENDING_REVIEW;
             }
             else {
                 updateData.status = normalized.toUpperCase();
@@ -536,7 +592,9 @@ const updateProduct = async (productId, sellerId, payload, options) => {
         }
         else {
             updateData.status =
-                !isAdmin && data.status === client_1.ProductStatus.PUBLISHED
+                !isAdmin &&
+                    data.status === client_1.ProductStatus.PUBLISHED &&
+                    product.status !== client_1.ProductStatus.PUBLISHED
                     ? client_1.ProductStatus.PENDING_REVIEW
                     : data.status;
         }
@@ -562,6 +620,7 @@ const updateProduct = async (productId, sellerId, payload, options) => {
         include: {
             images: { orderBy: { sortOrder: "asc" } },
             auctions: true,
+            sellerWarehouse: true,
             seller: {
                 select: {
                     id: true,

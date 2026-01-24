@@ -7,5 +7,8 @@ ALTER TABLE `Order`
   ADD COLUMN `myfatoorah_payment_url` VARCHAR(600) NULL AFTER `myfatoorah_payment_id`,
   ADD COLUMN `myfatoorah_status` VARCHAR(191) NULL AFTER `myfatoorah_payment_url`;
 
+-- Align column length with Prisma schema.
+ALTER TABLE `Order` MODIFY `myfatoorah_payment_url` VARCHAR(191) NULL;
+
 CREATE INDEX `Order_myfatoorah_invoice_id_idx` ON `Order`(`myfatoorah_invoice_id`);
 CREATE INDEX `Order_myfatoorah_payment_id_idx` ON `Order`(`myfatoorah_payment_id`);

@@ -11,11 +11,17 @@ const MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 250;
 const client = axios_1.default.create({
     baseURL: env_1.config.torod.baseUrl,
-    timeout: 10000,
+    timeout: 20000,
+    headers: {
+        Accept: "application/json",
+    },
 });
 const authClient = axios_1.default.create({
     baseURL: env_1.config.torod.baseUrl,
-    timeout: 10000,
+    timeout: 20000,
+    headers: {
+        Accept: "application/json",
+    },
 });
 const DEFAULT_TOKEN_TTL_MS = 45 * 60 * 1000;
 const TOKEN_REFRESH_BUFFER_MS = 30 * 1000;
@@ -26,7 +32,7 @@ const pickString = (...values) => values.find((value) => typeof value === "strin
 const resolveToken = (payload) => {
     const data = asRecord(payload);
     const nested = asRecord(data.data ?? data.result);
-    return pickString(data.access_token, data.token, data.accessToken, nested.access_token, nested.token, nested.accessToken);
+    return pickString(data.access_token, data.bearer_token, data.token, data.accessToken, nested.access_token, nested.bearer_token, nested.token, nested.accessToken);
 };
 const resolveExpiry = (payload) => {
     const data = asRecord(payload);
@@ -72,6 +78,7 @@ const fetchToken = async () => {
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",
             Accept: "application/json",
+            "Client-Id": env_1.config.torod.clientId,
         },
     });
     const token = resolveToken(response.data);
@@ -105,7 +112,9 @@ client.interceptors.request.use(async (request) => {
     const token = await getAccessToken();
     headers.Authorization = `Bearer ${token}`;
     headers["Client-Id"] = env_1.config.torod.clientId;
-    headers["Content-Type"] = "application/json";
+    if (!headers["Content-Type"] && !headers["content-type"]) {
+        headers["Content-Type"] = "application/json";
+    }
     request.headers = headers;
     return request;
 });
@@ -123,6 +132,19 @@ const extractPayload = (response) => {
         }
     }
     return payload;
+};
+const normalizeApiMessage = (value, fallback) => {
+    if (typeof value === "string" && value.trim().length > 0) {
+        return value;
+    }
+    if (value && typeof value === "object") {
+        const record = value;
+        const first = Object.values(record).find((item) => typeof item === "string");
+        if (typeof first === "string" && first.trim().length > 0) {
+            return first;
+        }
+    }
+    return fallback;
 };
 const toAppError = (message, statusCode, details) => {
     switch (statusCode) {
@@ -143,7 +165,7 @@ const torodRequest = async (request, attempt = 1) => {
         const response = await client.request(request);
         const payload = response.data;
         if (payload?.success === false) {
-            const message = payload?.message || payload?.error || "Torod request was rejected";
+            const message = normalizeApiMessage(payload?.message || payload?.error, "Torod request was rejected");
             throw toAppError(message, response.status || 400, payload);
         }
         return extractPayload(response);
@@ -154,6 +176,9 @@ const torodRequest = async (request, attempt = 1) => {
         }
         if (axios_1.default.isAxiosError(error)) {
             const statusCode = error.response?.status;
+            if (error.code === "ECONNABORTED") {
+                throw toAppError("Torod request timed out", 504);
+            }
             if (statusCode === 401 && attempt < MAX_ATTEMPTS) {
                 invalidateToken();
                 return (0, exports.torodRequest)(request, attempt + 1);
@@ -166,9 +191,8 @@ const torodRequest = async (request, attempt = 1) => {
                 await delay(delayMs);
                 return (0, exports.torodRequest)(request, attempt + 1);
             }
-            const apiMessage = error.response?.data?.message ||
-                error.response?.data?.error ||
-                error.message;
+            const apiMessage = normalizeApiMessage(error.response?.data?.message ||
+                error.response?.data?.error, error.message);
             throw toAppError(apiMessage || "Torod request failed", statusCode || 500, error.response?.data);
         }
         throw errors_1.AppError.internal("Torod request failed", error);

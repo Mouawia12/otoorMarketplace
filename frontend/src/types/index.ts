@@ -15,6 +15,7 @@ export interface User {
     national_id?: string;
     iban?: string;
     bank_name?: string;
+    torod_warehouse_id?: string | null;
   } | null;
   seller_profile_submitted?: boolean;
   verified_seller?: boolean;
@@ -34,6 +35,7 @@ export interface Product {
   category: string;
   base_price: number;
   size_ml: number;
+  weight_kg?: number | null;
   concentration: string;
   condition?: 'new' | 'used';
   stock_quantity: number;
@@ -42,6 +44,12 @@ export interface Product {
   status: string;
   created_at: string;
   updated_at: string;
+  seller_warehouse_id?: number | null;
+  seller_warehouse?: {
+    id: number;
+    warehouse_code: string;
+    warehouse_name: string;
+  };
   rating_avg?: number;
   rating_count?: number;
   is_auction_product?: boolean;
@@ -134,6 +142,7 @@ export interface Order {
   status: string;
   created_at: string;
   product?: Product;
+  torod_order_id?: string | null;
   torod_shipment_id?: string | null;
   torod_tracking_number?: string | null;
   torod_label_url?: string | null;
@@ -187,6 +196,33 @@ export interface SupportTicket {
     email?: string;
   };
   replies?: SupportReply[];
+}
+
+export interface ManualShipment {
+  id: number;
+  user_id: number;
+  torod_order_id?: string | null;
+  tracking_number?: string | null;
+  label_url?: string | null;
+  status?: string | null;
+  warehouse_code: string;
+  warehouse_name?: string | null;
+  courier_partner_id?: number | null;
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string | null;
+  address: string;
+  country_id?: number | null;
+  region_id?: number | null;
+  city_id?: number | null;
+  district_id?: number | null;
+  order_total: number;
+  weight: number;
+  no_of_box: number;
+  payment: string;
+  item_description?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ModerationQueueItem {

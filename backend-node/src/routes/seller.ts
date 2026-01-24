@@ -9,6 +9,18 @@ import {
   listSellerOrders,
   listSellerEarnings,
 } from "../services/sellerService";
+import {
+  listSellerWarehouses,
+  createSellerWarehouse,
+  updateSellerWarehouse,
+  deleteSellerWarehouse,
+  transferWarehouseProducts,
+} from "../services/sellerWarehouseService";
+import {
+  createManualShipment,
+  listManualShipments,
+  listManualShipmentPartners,
+} from "../services/manualShipmentService";
 import { createAuction, listAuctions } from "../services/auctionService";
 import { AppError } from "../utils/errors";
 import {
@@ -38,7 +50,14 @@ router.get("/products", sellerOnly, async (req, res, next) => {
       throw AppError.unauthorized();
     }
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    const filters = status ? { status } : {};
+    const warehouseId =
+      typeof req.query.warehouse_id === "string" && req.query.warehouse_id
+        ? Number(req.query.warehouse_id)
+        : undefined;
+    const filters = {
+      ...(status ? { status } : {}),
+      ...(warehouseId ? { warehouseId } : {}),
+    };
     const products = await listSellerProductsWithFilters(req.user.id, filters);
     res.json(products);
   } catch (error) {
@@ -195,6 +214,131 @@ router.get("/product-templates/:id", sellerOnly, async (req, res, next) => {
     }
     const template = await getProductTemplateById(id);
     res.json(template);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/warehouses", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const warehouses = await listSellerWarehouses(req.user.id);
+    res.json({ warehouses });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/warehouses", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const warehouse = await createSellerWarehouse(req.user.id, req.body ?? {});
+    res.status(201).json(warehouse);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/warehouses/:id", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const warehouseId = Number(req.params.id);
+    if (Number.isNaN(warehouseId)) {
+      throw AppError.badRequest("Invalid warehouse id");
+    }
+    const warehouse = await updateSellerWarehouse(req.user.id, warehouseId, req.body ?? {});
+    res.json(warehouse);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/warehouses/:id", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const warehouseId = Number(req.params.id);
+    if (Number.isNaN(warehouseId)) {
+      throw AppError.badRequest("Invalid warehouse id");
+    }
+    const result = await deleteSellerWarehouse(req.user.id, warehouseId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/warehouses/transfer-products", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const sourceWarehouseId = Number(req.body?.source_warehouse_id);
+    const targetWarehouseId = Number(req.body?.target_warehouse_id);
+    const productIds = Array.isArray(req.body?.product_ids)
+      ? req.body.product_ids.map((id: unknown) => Number(id)).filter((id: number) => Number.isFinite(id))
+      : [];
+    if (!Number.isFinite(sourceWarehouseId) || !Number.isFinite(targetWarehouseId)) {
+      throw AppError.badRequest("Invalid warehouse id");
+    }
+    const result = await transferWarehouseProducts(
+      req.user.id,
+      sourceWarehouseId,
+      targetWarehouseId,
+      productIds
+    );
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/manual-shipments", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const response = await listManualShipments(req.user.id, req.user.roles);
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/manual-shipments/partners", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const response = await listManualShipmentPartners(
+      req.user.id,
+      req.user.roles,
+      req.body ?? {}
+    );
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/manual-shipments", sellerOnly, async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const response = await createManualShipment(
+      req.user.id,
+      req.user.roles,
+      req.body ?? {}
+    );
+    res.status(201).json(response);
   } catch (error) {
     next(error);
   }

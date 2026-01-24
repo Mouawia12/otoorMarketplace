@@ -376,6 +376,13 @@ type ProductFormModalProps = {
   product?: Product;
 };
 
+type SellerWarehouseOption = {
+  id: number;
+  warehouseCode: string;
+  warehouseName: string;
+  isDefault?: boolean;
+};
+
 type ProductFormState = {
   name_en: string;
   name_ar: string;
@@ -384,6 +391,7 @@ type ProductFormState = {
   category: string;
   base_price: string;
   size_ml: string;
+  weight_kg: string;
   concentration: string;
   stock_quantity: string;
   description_en: string;
@@ -391,6 +399,7 @@ type ProductFormState = {
   image_urls: string[];
   condition: 'NEW' | 'USED';
   is_tester: boolean;
+  seller_warehouse_id: string;
 };
 
 const createInitialFormState = (): ProductFormState => ({
@@ -401,6 +410,7 @@ const createInitialFormState = (): ProductFormState => ({
   category: '',
   base_price: '',
   size_ml: '',
+  weight_kg: '',
   concentration: 'N/A',
   stock_quantity: '',
   description_en: '',
@@ -408,6 +418,7 @@ const createInitialFormState = (): ProductFormState => ({
   image_urls: [],
   condition: 'NEW',
   is_tester: false,
+  seller_warehouse_id: '',
 });
 
 function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: ProductFormModalProps) {
@@ -420,6 +431,8 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const [warehouses, setWarehouses] = useState<SellerWarehouseOption[]>([]);
+  const [warehousesLoading, setWarehousesLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -434,6 +447,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         category: product.category || '',
         base_price: product.base_price?.toString?.() || '',
         size_ml: product.size_ml?.toString?.() || '',
+        weight_kg: product.weight_kg?.toString?.() || '',
         concentration: product.concentration || '',
         stock_quantity: product.stock_quantity?.toString?.() || '',
         description_en: product.description_en || '',
@@ -445,6 +459,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
           : [],
         condition: (product.condition?.toUpperCase?.() === 'USED' ? 'USED' : 'NEW'),
         is_tester: Boolean(product.is_tester),
+        seller_warehouse_id: product.seller_warehouse_id ? String(product.seller_warehouse_id) : '',
       });
       setSelectedTemplateId(null);
     } else if (mode === 'add') {
@@ -453,6 +468,40 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       setTemplateQuery('');
     }
   }, [isOpen, mode, product]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const loadWarehouses = async () => {
+      try {
+        setWarehousesLoading(true);
+        const response = await api.get('/seller/warehouses');
+        const list = (response.data?.warehouses ?? []) as SellerWarehouseOption[];
+        if (cancelled) return;
+        setWarehouses(list);
+        const preferred =
+          list.find((entry) => entry.isDefault) ??
+          list[0];
+        setFormData((prev) => ({
+          ...prev,
+          seller_warehouse_id: prev.seller_warehouse_id || (preferred ? String(preferred.id) : ''),
+        }));
+      } catch (error) {
+        if (!cancelled) {
+          setWarehouses([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setWarehousesLoading(false);
+        }
+      }
+    };
+
+    loadWarehouses();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -502,13 +551,23 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       const imageUrls = formData.image_urls;
       const parsedPrice = parseNumericInput(formData.base_price);
       const parsedSize = parseInt(convertArabicDigits(formData.size_ml || '0'), 10);
+      const parsedWeight = parseNumericInput(formData.weight_kg);
       const parsedStock = parseInt(convertArabicDigits(formData.stock_quantity || '0'), 10);
+      const parsedWarehouseId = formData.seller_warehouse_id
+        ? Number(formData.seller_warehouse_id)
+        : undefined;
 
       if (!parsedPrice || Number.isNaN(parsedPrice)) {
         alert(t('seller.invalidPrice', 'Please enter a valid price'));
         return;
       }
 
+      const nextStatus =
+        intent === 'draft'
+          ? 'DRAFT'
+          : product?.status === 'published'
+            ? 'PUBLISHED'
+            : 'PENDING_REVIEW';
       const payload = {
         nameEn: formData.name_en,
         nameAr: formData.name_ar,
@@ -517,6 +576,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         category: formData.category,
         basePrice: parsedPrice,
         sizeMl: parsedSize,
+        weightKg: Number.isFinite(parsedWeight) && parsedWeight > 0 ? parsedWeight : undefined,
         concentration: formData.concentration,
         stockQuantity: parsedStock,
         descriptionEn: formData.description_en,
@@ -524,7 +584,8 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         condition: formData.condition || 'NEW',
         isTester: formData.is_tester,
         imageUrls,
-        status: intent === 'draft' ? 'DRAFT' : 'PENDING_REVIEW',
+        sellerWarehouseId: parsedWarehouseId,
+        status: nextStatus,
       };
 
       if (mode === 'add') {
@@ -581,6 +642,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       category: template.category || '',
       base_price: (template.base_price ?? '').toString(),
       size_ml: (template.size_ml ?? '').toString(),
+      weight_kg: '',
       concentration: template.concentration || 'N/A',
       stock_quantity: '',
       description_en: template.description_en || '',
@@ -588,6 +650,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       image_urls: template.image_urls?.slice?.() || [],
       condition: 'NEW',
       is_tester: false,
+      seller_warehouse_id: formData.seller_warehouse_id,
     });
   };
 
@@ -845,6 +908,50 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                 required
               />
             </div>
+            <div>
+              <label className="block text-charcoal font-semibold mb-2">{t('seller.weightKg', 'Weight (kg)')}</label>
+              <input
+                type="number"
+                value={formData.weight_kg}
+                onChange={handleChange('weight_kg')}
+                className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                placeholder="0.25"
+                min="0"
+                step="0.01"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-charcoal font-semibold mb-2">{t('seller.productWarehouse', 'Warehouse')}</label>
+            <select
+              value={formData.seller_warehouse_id}
+              onChange={handleChange('seller_warehouse_id')}
+              className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+              disabled={warehousesLoading}
+            >
+              {warehousesLoading && (
+                <option value="">{t('common.loading')}</option>
+              )}
+              {!warehousesLoading && warehouses.length === 0 && (
+                <option value="">{t('seller.noWarehouses', 'لا توجد مستودعات')}</option>
+              )}
+              {!warehousesLoading && warehouses.length > 0 && (
+                <>
+                  <option value="">{t('seller.selectWarehouse', 'اختر المستودع')}</option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>
+                      {warehouse.warehouseName} ({warehouse.warehouseCode})
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+            {warehouses.length > 0 && !formData.seller_warehouse_id && (
+              <p className="text-xs text-taupe mt-1">
+                {t('seller.warehouseDefaultHint', 'سيتم استخدام المستودع الافتراضي إذا لم تختر مستودعًا')}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

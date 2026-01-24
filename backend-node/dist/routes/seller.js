@@ -5,6 +5,8 @@ const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
 const productService_1 = require("../services/productService");
 const sellerService_1 = require("../services/sellerService");
+const sellerWarehouseService_1 = require("../services/sellerWarehouseService");
+const manualShipmentService_1 = require("../services/manualShipmentService");
 const auctionService_1 = require("../services/auctionService");
 const errors_1 = require("../utils/errors");
 const productTemplateService_1 = require("../services/productTemplateService");
@@ -29,7 +31,13 @@ router.get("/products", sellerOnly, async (req, res, next) => {
             throw errors_1.AppError.unauthorized();
         }
         const status = typeof req.query.status === "string" ? req.query.status : undefined;
-        const filters = status ? { status } : {};
+        const warehouseId = typeof req.query.warehouse_id === "string" && req.query.warehouse_id
+            ? Number(req.query.warehouse_id)
+            : undefined;
+        const filters = {
+            ...(status ? { status } : {}),
+            ...(warehouseId ? { warehouseId } : {}),
+        };
         const products = await (0, sellerService_1.listSellerProductsWithFilters)(req.user.id, filters);
         res.json(products);
     }
@@ -174,6 +182,118 @@ router.get("/product-templates/:id", sellerOnly, async (req, res, next) => {
         }
         const template = await (0, productTemplateService_1.getProductTemplateById)(id);
         res.json(template);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/warehouses", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const warehouses = await (0, sellerWarehouseService_1.listSellerWarehouses)(req.user.id);
+        res.json({ warehouses });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/warehouses", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const warehouse = await (0, sellerWarehouseService_1.createSellerWarehouse)(req.user.id, req.body ?? {});
+        res.status(201).json(warehouse);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.patch("/warehouses/:id", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const warehouseId = Number(req.params.id);
+        if (Number.isNaN(warehouseId)) {
+            throw errors_1.AppError.badRequest("Invalid warehouse id");
+        }
+        const warehouse = await (0, sellerWarehouseService_1.updateSellerWarehouse)(req.user.id, warehouseId, req.body ?? {});
+        res.json(warehouse);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.delete("/warehouses/:id", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const warehouseId = Number(req.params.id);
+        if (Number.isNaN(warehouseId)) {
+            throw errors_1.AppError.badRequest("Invalid warehouse id");
+        }
+        const result = await (0, sellerWarehouseService_1.deleteSellerWarehouse)(req.user.id, warehouseId);
+        res.json(result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/warehouses/transfer-products", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const sourceWarehouseId = Number(req.body?.source_warehouse_id);
+        const targetWarehouseId = Number(req.body?.target_warehouse_id);
+        const productIds = Array.isArray(req.body?.product_ids)
+            ? req.body.product_ids.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+            : [];
+        if (!Number.isFinite(sourceWarehouseId) || !Number.isFinite(targetWarehouseId)) {
+            throw errors_1.AppError.badRequest("Invalid warehouse id");
+        }
+        const result = await (0, sellerWarehouseService_1.transferWarehouseProducts)(req.user.id, sourceWarehouseId, targetWarehouseId, productIds);
+        res.json(result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get("/manual-shipments", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const response = await (0, manualShipmentService_1.listManualShipments)(req.user.id, req.user.roles);
+        res.json(response);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/manual-shipments/partners", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const response = await (0, manualShipmentService_1.listManualShipmentPartners)(req.user.id, req.user.roles, req.body ?? {});
+        res.json(response);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/manual-shipments", sellerOnly, async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw errors_1.AppError.unauthorized();
+        }
+        const response = await (0, manualShipmentService_1.createManualShipment)(req.user.id, req.user.roles, req.body ?? {});
+        res.status(201).json(response);
     }
     catch (error) {
         next(error);

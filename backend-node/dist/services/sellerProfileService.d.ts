@@ -9,6 +9,7 @@ export declare const upsertSellerProfile: (userId: number, input: unknown) => Pr
     national_id: any;
     iban: any;
     bank_name: any;
+    torod_warehouse_id: any;
     status: any;
     created_at: any;
     updated_at: any;
@@ -28,6 +29,7 @@ export declare const getSellerProfile: (userId: number) => Promise<{
     national_id: any;
     iban: any;
     bank_name: any;
+    torod_warehouse_id: any;
     status: any;
     created_at: any;
     updated_at: any;
@@ -47,6 +49,7 @@ export declare const listSellerProfiles: (status?: SellerStatus) => Promise<{
     national_id: any;
     iban: any;
     bank_name: any;
+    torod_warehouse_id: any;
     status: any;
     created_at: any;
     updated_at: any;
@@ -66,6 +69,7 @@ export declare const updateSellerProfileStatus: (userId: number, status: SellerS
     national_id: any;
     iban: any;
     bank_name: any;
+    torod_warehouse_id: any;
     status: any;
     created_at: any;
     updated_at: any;

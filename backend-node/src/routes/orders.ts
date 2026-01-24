@@ -10,11 +10,15 @@ import {
   listOrdersWithPagination,
   updateOrderStatus,
   confirmOrderDelivery,
+  listTorodPartnersForOrder,
+  listTorodPartnersForCheckout,
+  shipTorodOrderForOrder,
   getOrderLabel,
   getOrderTracking,
 } from "../services/orderService";
 import { AppError } from "../utils/errors";
 import { prisma } from "../prisma/client";
+import axios from "axios";
 
 const ALLOWED_STATUS_PARAMS = [
   "pending",
@@ -115,9 +119,44 @@ router.post("/", authenticate(), async (req, res, next) => {
     // Debug logging to diagnose 403/auth issues in production
     console.log("ORDER AUTH USER:", req.user);
     console.log("ORDER AUTH HEADER:", req.headers.authorization);
+    console.log("ORDER BODY RAW:", req.body);
     console.log("ORDER PAYLOAD:", req.body);
 
     const body = req.body ?? {};
+    const shippingMethodRaw =
+      body.shipping?.shipping_method ??
+      body.shipping?.shippingMethod ??
+      body.shipping?.type ??
+      body.shipping_method ??
+      body.shippingMethod ??
+      body.shipping_type;
+    const shippingCompanyIdRaw =
+      body.shipping?.shipping_company_id ??
+      body.shipping?.torod_shipping_company_id ??
+      body.shipping_company_id ??
+      body.torod_shipping_company_id;
+    const shippingCompanyId = Number(shippingCompanyIdRaw);
+    const hasShippingCompany =
+      typeof shippingCompanyIdRaw !== "undefined" &&
+      typeof shippingCompanyIdRaw !== "object" &&
+      Number.isFinite(shippingCompanyId) &&
+      shippingCompanyId > 0;
+    const normalizedShippingMethod =
+      typeof shippingMethodRaw === "string" ? shippingMethodRaw.trim().toLowerCase() : "";
+    const deferTorodShipment =
+      Boolean(
+        body.shipping?.deferTorodShipment ??
+          body.shipping?.defer_torod_shipment ??
+          body.deferTorodShipment ??
+          body.defer_torod_shipment
+      ) || (normalizedShippingMethod === "torod" && !hasShippingCompany);
+
+    if (normalizedShippingMethod === "torod" && !hasShippingCompany && !deferTorodShipment) {
+      res.status(422).json({
+        message: "لا توجد شركة شحن متاحة لهذه المدينة",
+      });
+      return;
+    }
 
     let items = body.items;
     if (!Array.isArray(items) || items.length === 0) {
@@ -156,6 +195,7 @@ router.post("/", authenticate(), async (req, res, next) => {
             cod_amount: body.cod_amount,
             cod_currency: body.cod_currency,
             torod_shipping_company_id: body.torod_shipping_company_id,
+            defer_torod_shipment: deferTorodShipment,
             torod_warehouse_id: body.torod_warehouse_id,
             torod_country_id: body.torod_country_id,
             torod_region_id: body.torod_region_id,
@@ -234,6 +274,72 @@ router.post("/:id/confirm-delivery", authenticate(), async (req, res, next) => {
   }
 });
 
+router.post(
+  "/:id/torod/partners",
+  authenticate({ roles: [RoleName.SUPER_ADMIN, RoleName.ADMIN, RoleName.SELLER] }),
+  async (req, res, next) => {
+    try {
+      if (!req.user) {
+        throw AppError.unauthorized();
+      }
+
+      const orderId = Number(req.params.id);
+      if (Number.isNaN(orderId)) {
+        throw AppError.badRequest("Invalid order id");
+      }
+
+      const result = await listTorodPartnersForOrder(
+        orderId,
+        req.user.id,
+        req.user.roles,
+        req.body ?? {}
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post("/torod/partners/checkout", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+    const result = await listTorodPartnersForCheckout(req.body ?? {});
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post(
+  "/:id/torod/ship",
+  authenticate({ roles: [RoleName.SUPER_ADMIN, RoleName.ADMIN, RoleName.SELLER] }),
+  async (req, res, next) => {
+    try {
+      if (!req.user) {
+        throw AppError.unauthorized();
+      }
+
+      const orderId = Number(req.params.id);
+      if (Number.isNaN(orderId)) {
+        throw AppError.badRequest("Invalid order id");
+      }
+
+      const result = await shipTorodOrderForOrder(
+        orderId,
+        req.user.id,
+        req.user.roles,
+        req.body ?? {}
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 router.get("/:id/label", authenticate(), async (req, res, next) => {
   try {
     if (!req.user) {
@@ -247,6 +353,107 @@ router.get("/:id/label", authenticate(), async (req, res, next) => {
 
     const result = await getOrderLabel(orderId, req.user.id, req.user.roles);
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/label/print", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+
+    const orderId = Number(req.params.id);
+    if (Number.isNaN(orderId)) {
+      throw AppError.badRequest("Invalid order id");
+    }
+
+    const result = await getOrderLabel(orderId, req.user.id, req.user.roles);
+    const labelUrl = result.label_url;
+    if (!labelUrl) {
+      throw AppError.notFound("Label not found");
+    }
+
+    const resolvedUrl = labelUrl.startsWith("http")
+      ? labelUrl
+      : `${req.protocol}://${req.get("host")}${labelUrl.startsWith("/") ? "" : "/"}${labelUrl}`;
+
+    const response = await axios.get<ArrayBuffer>(resolvedUrl, {
+      responseType: "arraybuffer",
+      timeout: 20000,
+    });
+
+    const responseContentType = response.headers["content-type"];
+    const contentType =
+      responseContentType && responseContentType.includes("pdf")
+        ? responseContentType
+        : "application/pdf";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", "inline; filename=label.pdf");
+    res.send(Buffer.from(response.data));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/label/print-view", authenticate(), async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized();
+    }
+
+    const orderId = Number(req.params.id);
+    if (Number.isNaN(orderId)) {
+      throw AppError.badRequest("Invalid order id");
+    }
+
+    const printUrl = `${req.baseUrl}/${orderId}/label/print`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`
+      <!doctype html>
+      <html lang="ar">
+        <head>
+          <meta charset="utf-8" />
+          <title>طباعة بوليصة الشحن</title>
+          <style>
+            html, body { margin: 0; padding: 0; height: 100%; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+            #status { padding: 16px; text-align: center; }
+            iframe { border: 0; width: 100%; height: 100%; display: none; }
+          </style>
+        </head>
+        <body>
+          <div id="status">جاري تحميل البوليصة...</div>
+          <iframe id="label-frame" src="about:blank"></iframe>
+          <script>
+            const frame = document.getElementById('label-frame');
+            const statusEl = document.getElementById('status');
+            fetch("${printUrl}", { credentials: "include" })
+              .then((response) => response.blob())
+              .then((blob) => {
+                const url = URL.createObjectURL(blob);
+                frame.src = url;
+                frame.style.display = "block";
+                statusEl.style.display = "none";
+                frame.onload = () => {
+                  setTimeout(() => {
+                    try {
+                      frame.contentWindow && frame.contentWindow.focus();
+                      frame.contentWindow && frame.contentWindow.print();
+                    } catch (err) {
+                      window.print();
+                    }
+                  }, 300);
+                };
+              })
+              .catch(() => {
+                statusEl.textContent = "تعذر تحميل البوليصة";
+              });
+          </script>
+        </body>
+      </html>
+    `);
   } catch (error) {
     next(error);
   }

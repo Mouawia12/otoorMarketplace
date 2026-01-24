@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -6,6 +6,11 @@ import { useCartStore } from "../store/cartStore";
 import { useAuthStore } from "../store/authStore";
 import { formatPrice } from "../utils/currency";
 import { clearPendingOrder, savePendingOrder, PendingOrderPayload } from "../utils/pendingOrder";
+import {
+  shouldDisablePlaceOrder,
+  shouldDisableTorodShipping,
+  shouldFetchCourierPartners,
+} from "../utils/checkoutGuards";
 
 const dialCodeOptions = [
   { code: "+966", country: "Saudi Arabia", label: "🇸🇦 Saudi Arabia (+966)" },
@@ -51,7 +56,7 @@ const extractList = (payload: any): any[] => {
   return [];
 };
 
-const resolveOption = (item: any, lang: "ar" | "en"): LocationOption | null => {
+const resolveOption = (item: any, lang: "ar" | "en" | "fr"): LocationOption | null => {
   const id =
     item?.id ??
     item?.country_id ??
@@ -91,6 +96,19 @@ const resolveOption = (item: any, lang: "ar" | "en"): LocationOption | null => {
     item?.company_name_en ??
     item?.partner_name_en;
 
+  const nameFr =
+    item?.name_fr ??
+    item?.nameFr ??
+    item?.title_fr ??
+    item?.titleFr ??
+    item?.fr ??
+    item?.district_name_fr ??
+    item?.city_name_fr ??
+    item?.region_name_fr ??
+    item?.country_name_fr ??
+    item?.company_name_fr ??
+    item?.partner_name_fr;
+
   const fallback =
     item?.name ??
     item?.title ??
@@ -103,16 +121,92 @@ const resolveOption = (item: any, lang: "ar" | "en"): LocationOption | null => {
     item?.country_name ??
     id;
 
-  const name = (lang === "ar" ? nameAr : nameEn) ?? fallback;
+  const name = (lang === "ar" ? nameAr : lang === "fr" ? nameFr : nameEn) ?? fallback;
 
   if (!id || !name) return null;
   return { id: String(id), name: String(name), raw: item };
 };
 
-const toOptions = (list: any[], lang: "ar" | "en") =>
+const toOptions = (list: any[], lang: "ar" | "en" | "fr") =>
   list
     .map((item) => resolveOption(item, lang))
     .filter(Boolean) as LocationOption[];
+
+const toNumber = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return undefined;
+};
+
+const pickNumber = (raw: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    if (key in raw) {
+      const value = toNumber(raw[key]);
+      if (value !== undefined) return value;
+    }
+  }
+  return undefined;
+};
+
+const normalizePaymentTokens = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).toLowerCase());
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,\s/|]+/)
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const resolvePaymentSupport = (raw: Record<string, unknown>) => {
+  const codKeys = ["cod_available", "cash_on_delivery", "supports_cod", "allow_cod", "is_cod"];
+  const prepaidKeys = ["prepaid_available", "supports_prepaid", "allow_prepaid", "is_prepaid"];
+
+  const toBool = (value: unknown) =>
+    typeof value === "boolean" ? value : value === "1" ? true : value === "0" ? false : undefined;
+
+  let supportsCod: boolean | undefined;
+  let supportsPrepaid: boolean | undefined;
+
+  for (const key of codKeys) {
+    if (key in raw) {
+      supportsCod = toBool(raw[key]);
+      if (supportsCod !== undefined) break;
+    }
+  }
+
+  for (const key of prepaidKeys) {
+    if (key in raw) {
+      supportsPrepaid = toBool(raw[key]);
+      if (supportsPrepaid !== undefined) break;
+    }
+  }
+
+  const tokens = normalizePaymentTokens(
+    raw.payment_methods ??
+      raw.payment_method ??
+      raw.payment_types ??
+      raw.payment_type ??
+      raw.supported_payment_methods ??
+      raw.supported_payment_types
+  );
+  if (tokens.length > 0) {
+    if (tokens.some((token) => ["cod", "cash", "cash_on_delivery"].includes(token))) {
+      supportsCod = true;
+    }
+    if (tokens.some((token) => ["prepaid", "card", "online"].includes(token))) {
+      supportsPrepaid = true;
+    }
+  }
+
+  return { supportsCod, supportsPrepaid };
+};
 
 export default function CheckoutPage() {
   const { t, i18n } = useTranslation();
@@ -120,7 +214,11 @@ export default function CheckoutPage() {
   const { items, shipping, setShipping, coupons, setCoupons, totals, clear } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   const { sub, discount, shipping: shippingCost, total } = totals();
-  const lang = i18n.language as 'ar' | 'en';
+  const lang = i18n.language?.startsWith("ar")
+    ? "ar"
+    : i18n.language?.startsWith("fr")
+    ? "fr"
+    : "en";
 
   const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState("");
@@ -134,10 +232,15 @@ export default function CheckoutPage() {
   const [regions, setRegions] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
+  const [courierPartners, setCourierPartners] = useState<any[]>([]);
+  const [courierLoading, setCourierLoading] = useState(false);
+  const [courierError, setCourierError] = useState<string | null>(null);
+  const previousCourierCityId = useRef<number | null>(null);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [selectedRegion, setSelectedRegion] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedCourierPartner, setSelectedCourierPartner] = useState("");
   const [locationsLoading, setLocationsLoading] = useState({
     countries: false,
     regions: false,
@@ -202,6 +305,10 @@ export default function CheckoutPage() {
   const regionOptions = toOptions(regions, lang);
   const cityOptions = toOptions(cities, lang);
   const districtOptions = toOptions(districts, lang);
+  const courierOptions = toOptions(courierPartners, lang);
+  const numericSelectedCity = toNumber(selectedCity);
+  const noCourierForCity =
+    Boolean(selectedCity) && !courierLoading && courierOptions.length === 0;
 
   const setLoading = (
     key: "countries" | "regions" | "cities" | "districts",
@@ -221,7 +328,7 @@ export default function CheckoutPage() {
     phoneCode: "+966",
     address: "",
     city: "",
-    paymentMethod: "myfatoorah" as "myfatoorah" | "cod",
+    paymentMethod: "myfatoorah" as "myfatoorah",
   });
 
   useEffect(() => {
@@ -262,6 +369,9 @@ export default function CheckoutPage() {
     setRegions([]);
     setCities([]);
     setDistricts([]);
+    setCourierPartners([]);
+    setSelectedCourierPartner("");
+    setCourierError(null);
 
     if (!selectedCountry) return undefined;
 
@@ -299,6 +409,9 @@ export default function CheckoutPage() {
     setSelectedDistrict("");
     setCities([]);
     setDistricts([]);
+    setCourierPartners([]);
+    setSelectedCourierPartner("");
+    setCourierError(null);
 
     if (!selectedRegion) return undefined;
 
@@ -334,6 +447,9 @@ export default function CheckoutPage() {
     let active = true;
     setSelectedDistrict("");
     setDistricts([]);
+    setCourierPartners([]);
+    setSelectedCourierPartner("");
+    setCourierError(null);
 
     if (!selectedCity) return undefined;
 
@@ -366,6 +482,54 @@ export default function CheckoutPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCity]);
+
+  useEffect(() => {
+    let active = true;
+    setCourierPartners([]);
+    setSelectedCourierPartner("");
+    setCourierError(null);
+
+    if (!numericSelectedCity) {
+      previousCourierCityId.current = null;
+      return undefined;
+    }
+
+    if (!shouldFetchCourierPartners(previousCourierCityId.current, numericSelectedCity)) {
+      return undefined;
+    }
+
+    const loadCourierPartners = async () => {
+      try {
+        setCourierLoading(true);
+        const orderTotal = Number(total);
+        const response = await api.post("/orders/torod/partners/checkout", {
+          customer_city_id: numericSelectedCity,
+          order_total: Number.isFinite(orderTotal) && orderTotal > 0 ? orderTotal : undefined,
+          items: items.map((item) => ({
+            productId: Number(item.id),
+            quantity: item.qty,
+          })),
+        });
+        const list = response.data?.partners ?? extractList(response.data);
+        if (!active) return;
+        setCourierPartners(list);
+        const first = toOptions(list, lang)[0];
+        if (first) setSelectedCourierPartner(first.id);
+        previousCourierCityId.current = numericSelectedCity;
+      } catch (error: any) {
+        if (!active) return;
+        const msg = error?.response?.data?.message || error?.message;
+        setCourierError(msg ?? t("checkout.courierLoadFailed", "تعذّر تحميل شركات الشحن"));
+      } finally {
+        if (active) setCourierLoading(false);
+      }
+    };
+
+    loadCourierPartners();
+    return () => {
+      active = false;
+    };
+  }, [numericSelectedCity, lang, t, items, total]);
 
   useEffect(() => {
     const cityName = findOptionName(cityOptions, selectedCity);
@@ -434,7 +598,8 @@ export default function CheckoutPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
+    const selectedCourier = courierOptions.find((option) => option.id === selectedCourierPartner);
+    const selectedCourierId = toNumber(selectedCourier?.id ?? selectedCourierPartner);
     if (!formData.name.trim()) newErrors.name = t('checkout.nameRequired');
     if (!formData.phone.trim()) {
       newErrors.phone = t('checkout.phoneRequired');
@@ -447,9 +612,66 @@ export default function CheckoutPage() {
     if (districtOptions.length > 0 && !selectedDistrict) {
       newErrors.district = t('checkout.districtRequired', 'اختر الحي');
     }
+    if (courierOptions.length > 0 && !selectedCourierPartner) {
+      if (shipping !== "torod") {
+        newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
+      }
+    }
     if (!formData.address.trim()) newErrors.address = t('checkout.addressRequired');
     if (formData.paymentMethod === "myfatoorah" && !selectedPaymentMethodId) {
       newErrors.payment = t('checkout.paymentMethodRequired', 'اختر طريقة الدفع');
+    }
+
+    if (selectedCourier?.raw) {
+      const raw = selectedCourier.raw as Record<string, unknown>;
+      const isCodPayment = false;
+      const { supportsPrepaid } = resolvePaymentSupport(raw);
+      if (!isCodPayment && supportsPrepaid === false) {
+        newErrors.courier = t(
+          'checkout.courierPrepaidNotSupported',
+          'شركة الشحن المختارة لا تدعم الدفع الإلكتروني'
+        );
+      }
+
+      const minAmount =
+        pickNumber(raw, [
+          "min_cod_amount",
+          "min_prepaid_amount",
+          "min_order_amount",
+          "min_order_value",
+          "min_amount",
+          "min_value",
+        ]) ?? undefined;
+      const maxAmount =
+        pickNumber(raw, [
+          "max_cod_amount",
+          "max_prepaid_amount",
+          "max_order_amount",
+          "max_order_value",
+          "max_amount",
+          "max_value",
+        ]) ?? undefined;
+
+      if (typeof total === "number" && Number.isFinite(total)) {
+        if (minAmount !== undefined && total < minAmount) {
+          newErrors.courier = t(
+            'checkout.courierAmountTooLow',
+            'قيمة الطلب أقل من الحد الأدنى لشركة الشحن'
+          );
+        }
+        if (maxAmount !== undefined && total > maxAmount) {
+          newErrors.courier = t(
+            'checkout.courierAmountTooHigh',
+            'قيمة الطلب أعلى من الحد الأقصى لشركة الشحن'
+          );
+        }
+      }
+    }
+
+    if (courierOptions.length > 0 && (!selectedCourierId || selectedCourierId <= 0)) {
+      if (shipping !== "torod") {
+        newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
+      }
     }
 
     setErrors(newErrors);
@@ -460,6 +682,28 @@ export default function CheckoutPage() {
     if (!validateForm()) {
       return null;
     }
+
+    const countryId = toNumber(selectedCountry);
+    const regionId = toNumber(selectedRegion);
+    const cityId = toNumber(selectedCity);
+    const districtId = toNumber(selectedDistrict);
+    const shippingCompanyId = toNumber(selectedCourierPartner);
+    const torodDisabled = shouldDisableTorodShipping(
+      courierOptions.length,
+      Boolean(selectedCity),
+      courierLoading
+    );
+
+    if (!countryId || !regionId || !cityId) {
+      setSubmitError(
+        t('checkout.locationsLoadFailed', 'تعذّر تحميل بيانات العنوان')
+      );
+      return null;
+    }
+
+    const deferTorodShipment =
+      shipping === "torod" &&
+      (torodDisabled || !shippingCompanyId || shippingCompanyId <= 0);
 
     const countryName = findOptionName(countryOptions, selectedCountry);
     const regionName = findOptionName(regionOptions, selectedRegion);
@@ -476,29 +720,47 @@ export default function CheckoutPage() {
     const selectedPaymentMethod = paymentMethods.find(
       (method) => method.id === selectedPaymentMethodId
     );
-    const isCodPayment = formData.paymentMethod === "cod";
+    const isCodPayment = false;
+    const useDistrict =
+      districtId !== undefined && districtId > 0 && districtOptions.length > 0;
+
+    const totalAmount = Number(total);
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      setSubmitError(
+        t('checkout.orderFailed', 'Failed to place order')
+      );
+      return null;
+    }
 
     return {
-      payment_method: isCodPayment ? "COD" : "MYFATOORAH",
+      payment_method: "MYFATOORAH",
       payment_method_id: !isCodPayment ? selectedPaymentMethod?.id : undefined,
       payment_method_code: !isCodPayment ? selectedPaymentMethod?.code : undefined,
+      total_amount: totalAmount,
       shipping: {
-        name: formData.name,
-        phone: `${formData.phoneCode} ${formData.phone}`.trim(),
-        city: cityName || formData.city,
-        region: regionName || cityName || formData.city,
-        address: formData.address,
+        name: String(formData.name ?? "").trim(),
+        phone: String(`${formData.phoneCode} ${formData.phone}`.trim()),
+        city: String(cityName || formData.city || ""),
+        region: String(regionName || cityName || formData.city || ""),
+        address: String(formData.address || ""),
         type: "torod",
         shipping_method: "TOROD",
-        customer_city_code: selectedCity,
-        customer_country: countryName || "SA",
-        torod_country_id: selectedCountry,
-        torod_region_id: selectedRegion,
-        torod_city_id: selectedCity,
-        torod_district_id: selectedDistrict,
+        customer_city_code: String(selectedCity),
+        customer_country: String(countryName || "SA"),
+        torod_country_id: countryId,
+        torod_region_id: regionId,
+        torod_city_id: cityId,
+        ...(useDistrict ? { torod_district_id: districtId } : {}),
+        defer_torod_shipment: deferTorodShipment,
+        ...(shippingCompanyId
+          ? {
+              torod_shipping_company_id: shippingCompanyId,
+              shipping_company_id: shippingCompanyId,
+            }
+          : {}),
         torod_metadata: hasMetadata ? metadata : undefined,
-        cod_amount: isCodPayment ? total : undefined,
-        cod_currency: isCodPayment ? "SAR" : undefined,
+        cod_amount: undefined,
+        cod_currency: undefined,
       },
       items: items.map((item) => ({
         productId: Number(item.id),
@@ -540,7 +802,15 @@ export default function CheckoutPage() {
     } catch (error: any) {
       console.error("Failed to place order", error);
       const apiMessage = error?.response?.data?.message || error?.response?.data?.detail;
-      setSubmitError(apiMessage ?? t('checkout.orderFailed', 'Failed to place order'));
+      const fallback =
+        error?.message || JSON.stringify(error);
+      const message =
+        typeof apiMessage === "string"
+          ? apiMessage
+          : apiMessage !== undefined
+          ? JSON.stringify(apiMessage)
+          : fallback;
+      setSubmitError(message ?? t('checkout.orderFailed', 'Failed to place order'));
     } finally {
       setPlacingOrder(false);
     }
@@ -731,6 +1001,35 @@ export default function CheckoutPage() {
                   {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
                 </div>
 
+                <div className="sm:col-span-1">
+                  <label className="block text-charcoal font-semibold mb-2">
+                    {t('checkout.courierPartner', 'شركة الشحن')}
+                  </label>
+                  <select
+                    value={selectedCourierPartner}
+                    onChange={(e) => setSelectedCourierPartner(e.target.value)}
+                    disabled={!selectedCity || courierLoading || courierOptions.length === 0}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.courier ? 'border-red-500' : 'border-charcoal-light'
+                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                  >
+                    {!selectedCourierPartner && (
+                      <option value="">
+                        {courierOptions.length > 0
+                          ? t('checkout.courierPlaceholder', 'اختر شركة الشحن')
+                          : t('checkout.courierUnavailable', 'لا توجد شركات شحن متاحة')}
+                      </option>
+                    )}
+                    {courierOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.courier && <p className="text-red-500 text-sm mt-1">{errors.courier}</p>}
+                  {courierError && <p className="text-red-500 text-sm mt-1">{courierError}</p>}
+                </div>
+
 
                 <div className="sm:col-span-2">
                   <label className="block text-charcoal font-semibold mb-2">{t('checkout.address')}</label>
@@ -762,6 +1061,7 @@ export default function CheckoutPage() {
                     checked={shipping === "torod"}
                     onChange={() => setShipping("torod")}
                     className="w-5 h-5 text-gold"
+                    disabled={!selectedCity || courierLoading}
                   />
                   <div className="flex-1">
                     <p className="font-semibold text-charcoal">
@@ -773,6 +1073,14 @@ export default function CheckoutPage() {
                   </div>
                   <p className="font-bold text-gold">{t('checkout.free')}</p>
                 </label>
+                {noCourierForCity && (
+                  <p className="text-amber-600 text-sm">
+                    {t(
+                      'checkout.noCouriersDeferred',
+                      'لا توجد شركات شحن الآن لهذه المدينة، سيتم اختيار شركة الشحن لاحقًا من لوحة البائع.'
+                    )}
+                  </p>
+                )}
 
                 <label className="flex items-center gap-4 p-4 border border-charcoal-light rounded-lg cursor-pointer hover:bg-sand transition">
                   <input
@@ -875,29 +1183,6 @@ export default function CheckoutPage() {
                   );
                 })}
 
-                <label
-                  className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer transition ${
-                    formData.paymentMethod === "cod"
-                      ? "border-gold bg-gold/10"
-                      : "border-charcoal-light"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={formData.paymentMethod === "cod"}
-                    onChange={() => setFormData((prev) => ({ ...prev, paymentMethod: "cod" }))}
-                    className="w-5 h-5 text-gold"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-charcoal">
-                      {t('checkout.cashOnDelivery', 'الدفع عند الاستلام')}
-                    </p>
-                    <p className="text-xs text-taupe">
-                      {t('checkout.codNote', 'يتم تحصيل قيمة الطلب عند التسليم')}
-                    </p>
-                  </div>
-                </label>
               </div>
               {errors.payment && <p className="text-red-500 text-sm mt-3">{errors.payment}</p>}
             </div>
@@ -1045,7 +1330,13 @@ export default function CheckoutPage() {
 
               <button
                 onClick={handlePlaceOrder}
-                disabled={placingOrder}
+                disabled={shouldDisablePlaceOrder(
+                  shipping,
+                  courierOptions.length,
+                  Boolean(selectedCity),
+                  courierLoading,
+                  placingOrder
+                )}
                 className="w-full bg-gold text-charcoal py-4 rounded-luxury hover:bg-gold-hover transition font-bold text-lg disabled:opacity-60"
               >
                 {placingOrder ? t('common.loading') : t('checkout.placeOrder')}

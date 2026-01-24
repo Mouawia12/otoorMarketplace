@@ -325,6 +325,17 @@ export default function ProductDetailPage() {
                 </span>
               )}
             </div>
+            {product.seller?.id && (
+              <div className="mt-3">
+                <Link
+                  to={`/store/${product.seller.id}`}
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-charcoal border border-sand/70 px-3 py-2 rounded-luxury hover:bg-sand/60 transition"
+                >
+                  زيارة متجر البائع
+                  <span aria-hidden>↗</span>
+                </Link>
+              </div>
+            )}
           </div>
 
           <div className="bg-sand rounded-luxury p-6">

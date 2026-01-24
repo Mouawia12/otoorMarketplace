@@ -5,15 +5,23 @@ const zod_1 = require("zod");
 const errors_1 = require("../utils/errors");
 const errorHandler = (err, _req, res, _next) => {
     if (err instanceof errors_1.AppError) {
+        console.warn("Handled error:", {
+            statusCode: err.statusCode,
+            message: err.message,
+            details: err.details,
+            path: _req.originalUrl,
+            method: _req.method,
+        });
         return res.status(err.statusCode).json({
             message: err.message,
             details: err.details,
         });
     }
     if (err instanceof zod_1.ZodError) {
-        return res.status(400).json({
-            message: "Validation error",
-            errors: err.flatten(),
+        const firstMessage = err.issues.find((issue) => typeof issue.message === "string")?.message ??
+            "Validation error";
+        return res.status(422).json({
+            message: firstMessage,
         });
     }
     console.error("Unexpected error:", err);

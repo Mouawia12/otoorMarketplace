@@ -18,6 +18,7 @@ import UsedPerfumes from './pages/UsedPerfumes';
 import AuctionsPerfumes from './pages/AuctionsPerfumes';
 import AuctionDetailPage from './pages/AuctionDetailPage';
 import Orders from './pages/Orders';
+import SellerStorePage from './pages/SellerStorePage';
 
 import AccountOverviewPage from './pages/AccountOverviewPage';
 import OrdersPage from './pages/OrdersPage';
@@ -37,6 +38,10 @@ import SellerOrdersPage from './pages/SellerOrdersPage';
 import SellerMyOrdersPage from './pages/SellerMyOrdersPage';
 import SellerEarningsPage from './pages/SellerEarningsPage';
 import SellerSupportPage from './pages/SellerSupportPage';
+import SellerManualShipmentPage from './pages/SellerManualShipmentPage';
+import SellerWarehouseManagementPage from './pages/SellerWarehouseManagementPage';
+import SellerWarehousesPage from './pages/SellerWarehousesPage';
+import LabelPrintView from './pages/LabelPrintView';
 
 const AdminLayout = lazy(() => import('./pages/admin/layout/AdminLayout'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
@@ -55,6 +60,7 @@ const AdminProductLibraryPage = lazy(() => import('./pages/AdminProductLibraryPa
 const AdminChangePassword = lazy(() => import('./pages/admin/AdminChangePassword'));
 const AdminCouponsPage = lazy(() => import('./pages/AdminCouponsPage'));
 const AdminSitePagesPage = lazy(() => import('./pages/AdminSitePagesPage'));
+const AdminWalletSettingsPage = lazy(() => import('./pages/AdminWalletSettingsPage'));
 const AdminBlogList = lazy(() => import('./pages/admin/blog/AdminBlogList'));
 const AdminBlogEdit = lazy(() => import('./pages/admin/blog/AdminBlogEdit'));
 
@@ -108,6 +114,7 @@ function App() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ScrollToTop />
       <Routes>
+        <Route path="orders/:id/label/print-view" element={<LabelPrintView />} />
         <Route path="/" element={<Layout />}>
           {/* Public */}
           <Route index element={<Home />} />
@@ -123,6 +130,7 @@ function App() {
           <Route path="products" element={<Products />} />
           <Route path="products/:id" element={<ProductDetail />} />
           <Route path="p/:id" element={<ProductDetailPage />} />
+          <Route path="store/:sellerId" element={<SellerStorePage />} />
 
           <Route path="auctions/:id" element={<AuctionDetailPage />} />
           <Route path="auction/:id" element={<AuctionDetailPage />} />
@@ -178,6 +186,9 @@ function App() {
             <Route path="auctions" element={<SellerAuctionsPage />} />
             <Route path="orders" element={<SellerOrdersPage />} />
             <Route path="my-orders" element={<SellerMyOrdersPage />} />
+            <Route path="manual-shipments" element={<SellerManualShipmentPage />} />
+            <Route path="warehouse-management" element={<SellerWarehouseManagementPage />} />
+            <Route path="warehouses" element={<SellerWarehousesPage />} />
             <Route path="coupons" element={<SellerCouponsPage />} />
             <Route path="earnings" element={<SellerEarningsPage />} />
             <Route path="support" element={<SellerSupportPage />} />
@@ -191,6 +202,7 @@ function App() {
             <Route path="library" element={withSuspense(<AdminProductLibraryPage />)} />
             <Route path="auctions" element={withSuspense(<AdminAuctionsPage />)} />
             <Route path="orders" element={withSuspense(<AdminOrdersPage />)} />
+            <Route path="manual-shipments" element={<SellerManualShipmentPage />} />
             <Route path="users" element={withSuspense(<AdminUsersPage />)} />
             <Route path="auth-requests" element={withSuspense(<AdminAuthRequestsPage />)} />
             <Route path="seller-profiles" element={withSuspense(<AdminSellerProfilesPage />)} />
@@ -206,6 +218,7 @@ function App() {
             <Route path="support" element={withSuspense(<AdminSupportPage />)} />
             <Route path="reports" element={withSuspense(<AdminReportsPage />)} />
             <Route path="settings" element={withSuspense(<AdminSettingsPage />)} />
+            <Route path="settings/wallet" element={withSuspense(<AdminWalletSettingsPage />)} />
             <Route path="pages" element={withSuspense(<AdminSitePagesPage />)} />
             <Route path="audit" element={withSuspense(<AdminAuditPage />)} />
           </Route>

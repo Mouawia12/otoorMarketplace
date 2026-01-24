@@ -18,6 +18,7 @@ export declare const getUserProfile: (userId: number) => Promise<{
         national_id: string;
         iban: string;
         bank_name: string;
+        torod_warehouse_id: string | null;
         status: string;
     } | null;
     seller_profile_submitted: boolean;

@@ -28,10 +28,12 @@ export declare const addToWishlist: (input: z.infer<typeof wishlistInputSchema>)
         category: string;
         basePrice: import("@prisma/client/runtime/library").Decimal;
         sizeMl: number;
+        weightKg: import("@prisma/client/runtime/library").Decimal | null;
         concentration: string;
         condition: import(".prisma/client").$Enums.ProductCondition;
         stockQuantity: number;
         isTester: boolean;
+        sellerWarehouseId: number | null;
         sellerId: number;
     };
     id: number;
@@ -65,10 +67,12 @@ export declare const listWishlist: (userId: number) => Promise<{
         category: string;
         basePrice: import("@prisma/client/runtime/library").Decimal;
         sizeMl: number;
+        weightKg: import("@prisma/client/runtime/library").Decimal | null;
         concentration: string;
         condition: import(".prisma/client").$Enums.ProductCondition;
         stockQuantity: number;
         isTester: boolean;
+        sellerWarehouseId: number | null;
         sellerId: number;
     };
     id: number;

@@ -8,9 +8,11 @@ export declare const getSellerDashboardStats: (sellerId: number) => Promise<{
 }>;
 export declare const listSellerProductsWithFilters: (sellerId: number, filters?: {
     status?: string;
+    warehouseId?: number;
 }) => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -20,6 +22,7 @@ export declare const listSellerProductsWithFilters: (sellerId: number, filters?:
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -34,6 +37,11 @@ export declare const listSellerProductsWithFilters: (sellerId: number, filters?:
         id: any;
         full_name: any;
         verified_seller: any;
+    } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
     } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;
@@ -62,6 +70,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
+    torod_order_id: string | null;
     torod_shipment_id: string | null;
     torod_tracking_number: string | null;
     torod_label_url: string | null;
@@ -73,6 +82,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -82,6 +92,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -97,6 +108,11 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     } | undefined;
@@ -109,6 +125,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -118,6 +135,7 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -132,6 +150,11 @@ export declare const listSellerOrders: (sellerId: number, status?: string) => Pr
                 id: any;
                 full_name: any;
                 verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
             } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;

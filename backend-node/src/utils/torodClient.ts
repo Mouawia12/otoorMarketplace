@@ -17,12 +17,18 @@ const RETRY_BASE_DELAY_MS = 250;
 
 const client = axios.create({
   baseURL: config.torod.baseUrl,
-  timeout: 10000,
+  timeout: 20000,
+  headers: {
+    Accept: "application/json",
+  },
 });
 
 const authClient = axios.create({
   baseURL: config.torod.baseUrl,
-  timeout: 10000,
+  timeout: 20000,
+  headers: {
+    Accept: "application/json",
+  },
 });
 
 const DEFAULT_TOKEN_TTL_MS = 45 * 60 * 1000;
@@ -150,7 +156,9 @@ client.interceptors.request.use(async (request) => {
   const token = await getAccessToken();
   headers.Authorization = `Bearer ${token}`;
   headers["Client-Id"] = config.torod.clientId;
-  headers["Content-Type"] = "application/json";
+  if (!headers["Content-Type"] && !headers["content-type"]) {
+    headers["Content-Type"] = "application/json";
+  }
   request.headers = headers;
   return request;
 });
@@ -171,6 +179,20 @@ const extractPayload = <T>(response: AxiosResponse<TorodApiResponse<T>>) => {
     }
   }
   return payload as unknown as T;
+};
+
+const normalizeApiMessage = (value: unknown, fallback: string) => {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const first = Object.values(record).find((item) => typeof item === "string");
+    if (typeof first === "string" && first.trim().length > 0) {
+      return first;
+    }
+  }
+  return fallback;
 };
 
 const toAppError = (message: string, statusCode: number, details?: unknown) => {
@@ -197,8 +219,10 @@ export const torodRequest = async <T>(
     const payload = response.data;
 
     if (payload?.success === false) {
-      const message =
-        payload?.message || payload?.error || "Torod request was rejected";
+      const message = normalizeApiMessage(
+        payload?.message || payload?.error,
+        "Torod request was rejected"
+      );
       throw toAppError(message, response.status || 400, payload);
     }
 
@@ -210,6 +234,9 @@ export const torodRequest = async <T>(
 
     if (axios.isAxiosError(error)) {
       const statusCode = error.response?.status;
+      if (error.code === "ECONNABORTED") {
+        throw toAppError("Torod request timed out", 504);
+      }
 
       if (statusCode === 401 && attempt < MAX_ATTEMPTS) {
         invalidateToken();
@@ -227,10 +254,11 @@ export const torodRequest = async <T>(
         return torodRequest<T>(request, attempt + 1);
       }
 
-      const apiMessage =
-        (error.response?.data as { message?: string; error?: string })?.message ||
-        (error.response?.data as { message?: string; error?: string })?.error ||
-        error.message;
+      const apiMessage = normalizeApiMessage(
+        (error.response?.data as { message?: unknown; error?: unknown })?.message ||
+          (error.response?.data as { message?: unknown; error?: unknown })?.error,
+        error.message
+      );
 
       throw toAppError(
         apiMessage || "Torod request failed",

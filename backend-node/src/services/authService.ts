@@ -34,6 +34,7 @@ const mapSellerProfile = (profile: UserWithRoles['sellerProfile']) => {
     national_id: profile.nationalId,
     iban: profile.iban,
     bank_name: profile.bankName,
+    torod_warehouse_id: profile.torodWarehouseId ?? null,
     status: profile.status?.toLowerCase?.() ?? profile.status,
     created_at: profile.createdAt,
     updated_at: profile.updatedAt,

@@ -19,13 +19,14 @@ declare const createOrderSchema: z.ZodObject<{
         customerCountry: z.ZodDefault<z.ZodString>;
         codAmount: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
         codCurrency: z.ZodDefault<z.ZodString>;
-        torodShippingCompanyId: z.ZodOptional<z.ZodString>;
+        torodShippingCompanyId: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
         torodWarehouseId: z.ZodOptional<z.ZodString>;
-        torodCountryId: z.ZodOptional<z.ZodString>;
-        torodRegionId: z.ZodOptional<z.ZodString>;
-        torodCityId: z.ZodOptional<z.ZodString>;
-        torodDistrictId: z.ZodOptional<z.ZodString>;
+        torodCountryId: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
+        torodRegionId: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
+        torodCityId: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
+        torodDistrictId: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
         torodMetadata: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+        deferTorodShipment: z.ZodOptional<z.ZodCoercedBoolean<unknown>>;
     }, z.core.$strip>>>;
     items: z.ZodArray<z.ZodObject<{
         productId: z.ZodCoercedNumber<unknown>;
@@ -59,6 +60,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
+    torod_order_id: string | null;
     torod_shipment_id: string | null;
     torod_tracking_number: string | null;
     torod_label_url: string | null;
@@ -70,6 +72,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -79,6 +82,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -94,6 +98,11 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     } | undefined;
@@ -106,6 +115,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -115,6 +125,7 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -129,6 +140,11 @@ export declare const createOrder: (input: z.infer<typeof createOrderSchema>) => 
                 id: any;
                 full_name: any;
                 verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
             } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
@@ -167,6 +183,7 @@ export declare const syncMyFatoorahPayment: (payload: {
         cod_currency: string | null;
         customer_city_code: string | null;
         customer_country: string | null;
+        torod_order_id: string | null;
         torod_shipment_id: string | null;
         torod_tracking_number: string | null;
         torod_label_url: string | null;
@@ -178,6 +195,7 @@ export declare const syncMyFatoorahPayment: (payload: {
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -187,6 +205,7 @@ export declare const syncMyFatoorahPayment: (payload: {
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -202,6 +221,11 @@ export declare const syncMyFatoorahPayment: (payload: {
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
+            } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
         } | undefined;
@@ -214,6 +238,7 @@ export declare const syncMyFatoorahPayment: (payload: {
             product: {
                 id: any;
                 seller_id: any;
+                seller_warehouse_id: any;
                 name_ar: any;
                 name_en: any;
                 description_ar: any;
@@ -223,6 +248,7 @@ export declare const syncMyFatoorahPayment: (payload: {
                 category: any;
                 base_price: any;
                 size_ml: any;
+                weight_kg: number | null;
                 concentration: any;
                 condition: any;
                 stock_quantity: any;
@@ -237,6 +263,11 @@ export declare const syncMyFatoorahPayment: (payload: {
                     id: any;
                     full_name: any;
                     verified_seller: any;
+                } | undefined;
+                seller_warehouse: {
+                    id: any;
+                    warehouse_code: any;
+                    warehouse_name: any;
                 } | undefined;
                 is_auction_product: boolean;
                 has_active_auction: any;
@@ -270,6 +301,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
+    torod_order_id: string | null;
     torod_shipment_id: string | null;
     torod_tracking_number: string | null;
     torod_label_url: string | null;
@@ -281,6 +313,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -290,6 +323,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -305,6 +339,11 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     } | undefined;
@@ -317,6 +356,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -326,6 +366,7 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -341,11 +382,131 @@ export declare const listOrdersByUser: (userId: number) => Promise<{
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
+            } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
         } | undefined;
     }[];
 }[]>;
+export declare const getOrderById: (orderId: number) => Promise<{
+    id: number;
+    buyer_id: number;
+    product_id: number | null;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    payment_method: string;
+    shipping_address: string;
+    shipping_name: string;
+    shipping_phone: string;
+    shipping_city: string;
+    shipping_region: string;
+    shipping_method: string;
+    shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
+    status: string;
+    created_at: string;
+    platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    torod_order_id: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
+    product: {
+        id: any;
+        seller_id: any;
+        seller_warehouse_id: any;
+        name_ar: any;
+        name_en: any;
+        description_ar: any;
+        description_en: any;
+        product_type: any;
+        brand: any;
+        category: any;
+        base_price: any;
+        size_ml: any;
+        weight_kg: number | null;
+        concentration: any;
+        condition: any;
+        stock_quantity: any;
+        is_tester: boolean;
+        image_urls: string[];
+        status: string;
+        created_at: any;
+        updated_at: any;
+        rating_avg: number;
+        rating_count: any;
+        seller: {
+            id: any;
+            full_name: any;
+            verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
+    } | undefined;
+    items: {
+        id: number;
+        product_id: number;
+        quantity: number;
+        unit_price: number;
+        total_price: number;
+        product: {
+            id: any;
+            seller_id: any;
+            seller_warehouse_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            weight_kg: number | null;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            is_tester: boolean;
+            image_urls: string[];
+            status: string;
+            created_at: any;
+            updated_at: any;
+            rating_avg: number;
+            rating_count: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
+            } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
+        } | undefined;
+    }[];
+}>;
 type ListOrdersOptions = {
     status?: string;
     page?: number;
@@ -378,6 +539,7 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
         cod_currency: string | null;
         customer_city_code: string | null;
         customer_country: string | null;
+        torod_order_id: string | null;
         torod_shipment_id: string | null;
         torod_tracking_number: string | null;
         torod_label_url: string | null;
@@ -389,6 +551,7 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -398,6 +561,7 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -413,6 +577,11 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
+            } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
         } | undefined;
@@ -425,6 +594,7 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
             product: {
                 id: any;
                 seller_id: any;
+                seller_warehouse_id: any;
                 name_ar: any;
                 name_en: any;
                 description_ar: any;
@@ -434,6 +604,7 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
                 category: any;
                 base_price: any;
                 size_ml: any;
+                weight_kg: number | null;
                 concentration: any;
                 condition: any;
                 stock_quantity: any;
@@ -448,6 +619,11 @@ export declare const listOrdersWithPagination: (options?: ListOrdersOptions) => 
                     id: any;
                     full_name: any;
                     verified_seller: any;
+                } | undefined;
+                seller_warehouse: {
+                    id: any;
+                    warehouse_code: any;
+                    warehouse_name: any;
                 } | undefined;
                 is_auction_product: boolean;
                 has_active_auction: any;
@@ -484,6 +660,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
+    torod_order_id: string | null;
     torod_shipment_id: string | null;
     torod_tracking_number: string | null;
     torod_label_url: string | null;
@@ -495,6 +672,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -504,6 +682,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -519,6 +698,11 @@ export declare const listAllOrders: (status?: string) => Promise<{
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     } | undefined;
@@ -531,6 +715,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -540,6 +725,7 @@ export declare const listAllOrders: (status?: string) => Promise<{
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -554,6 +740,11 @@ export declare const listAllOrders: (status?: string) => Promise<{
                 id: any;
                 full_name: any;
                 verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
             } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
@@ -584,6 +775,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
+    torod_order_id: string | null;
     torod_shipment_id: string | null;
     torod_tracking_number: string | null;
     torod_label_url: string | null;
@@ -595,6 +787,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -604,6 +797,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -619,6 +813,11 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     } | undefined;
@@ -631,6 +830,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -640,6 +840,7 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -654,6 +855,11 @@ export declare const listOrdersForSeller: (sellerId: number, status?: string) =>
                 id: any;
                 full_name: any;
                 verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
             } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
@@ -684,6 +890,7 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
+    torod_order_id: string | null;
     torod_shipment_id: string | null;
     torod_tracking_number: string | null;
     torod_label_url: string | null;
@@ -695,6 +902,7 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -704,6 +912,7 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -719,6 +928,11 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     } | undefined;
@@ -731,6 +945,7 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -740,6 +955,7 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -754,6 +970,168 @@ export declare const confirmOrderDelivery: (orderId: number, buyerId: number) =>
                 id: any;
                 full_name: any;
                 verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
+            } | undefined;
+            is_auction_product: boolean;
+            has_active_auction: any;
+        } | undefined;
+    }[];
+}>;
+export declare const listTorodPartnersForOrder: (orderId: number, actorId: number, actorRoles: string[], payload?: {
+    warehouse?: string;
+    type?: string;
+    filter_by?: string;
+    is_insurance?: string | number;
+}) => Promise<{
+    order_id: string;
+    warehouse: string;
+    partners: ({
+        id: string;
+        name: {};
+        name_ar: {} | null;
+        rate: number | null;
+        currency: {} | null;
+        eta: {} | null;
+        cod_fee: number | null;
+        supports_cod: boolean | undefined;
+        supports_prepaid: boolean | undefined;
+        raw: Record<string, unknown>;
+    } | null)[];
+}>;
+export declare const listTorodPartnersForCheckout: (payload: unknown) => Promise<{
+    partners: ({
+        id: string;
+        name: {};
+        name_ar: {} | null;
+        rate: number | null;
+        currency: {} | null;
+        eta: {} | null;
+        cod_fee: number | null;
+        supports_cod: boolean | undefined;
+        supports_prepaid: boolean | undefined;
+        raw: Record<string, unknown>;
+    } | null)[];
+}>;
+export declare const shipTorodOrderForOrder: (orderId: number, actorId: number, actorRoles: string[], payload: {
+    courier_partner_id?: string | number;
+    shipping_company_id?: string | number;
+    warehouse?: string;
+    type?: string;
+    is_own?: string | number;
+    is_insurance?: string | number;
+}) => Promise<{
+    id: number;
+    buyer_id: number;
+    product_id: number | null;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    payment_method: string;
+    shipping_address: string;
+    shipping_name: string;
+    shipping_phone: string;
+    shipping_city: string;
+    shipping_region: string;
+    shipping_method: string;
+    shipping_fee: number;
+    discount_amount: number;
+    coupon_code: string | null;
+    status: string;
+    created_at: string;
+    platform_fee: number;
+    cod_amount: number | null;
+    cod_currency: string | null;
+    customer_city_code: string | null;
+    customer_country: string | null;
+    torod_order_id: string | null;
+    torod_shipment_id: string | null;
+    torod_tracking_number: string | null;
+    torod_label_url: string | null;
+    torod_status: string | null;
+    payment_method_id: number | null;
+    payment_method_code: string | null;
+    payment_status: string | null;
+    payment_url: string | null;
+    product: {
+        id: any;
+        seller_id: any;
+        seller_warehouse_id: any;
+        name_ar: any;
+        name_en: any;
+        description_ar: any;
+        description_en: any;
+        product_type: any;
+        brand: any;
+        category: any;
+        base_price: any;
+        size_ml: any;
+        weight_kg: number | null;
+        concentration: any;
+        condition: any;
+        stock_quantity: any;
+        is_tester: boolean;
+        image_urls: string[];
+        status: string;
+        created_at: any;
+        updated_at: any;
+        rating_avg: number;
+        rating_count: any;
+        seller: {
+            id: any;
+            full_name: any;
+            verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
+        is_auction_product: boolean;
+        has_active_auction: any;
+    } | undefined;
+    items: {
+        id: number;
+        product_id: number;
+        quantity: number;
+        unit_price: number;
+        total_price: number;
+        product: {
+            id: any;
+            seller_id: any;
+            seller_warehouse_id: any;
+            name_ar: any;
+            name_en: any;
+            description_ar: any;
+            description_en: any;
+            product_type: any;
+            brand: any;
+            category: any;
+            base_price: any;
+            size_ml: any;
+            weight_kg: number | null;
+            concentration: any;
+            condition: any;
+            stock_quantity: any;
+            is_tester: boolean;
+            image_urls: string[];
+            status: string;
+            created_at: any;
+            updated_at: any;
+            rating_avg: number;
+            rating_count: any;
+            seller: {
+                id: any;
+                full_name: any;
+                verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
             } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
@@ -784,6 +1162,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
     cod_currency: string | null;
     customer_city_code: string | null;
     customer_country: string | null;
+    torod_order_id: string | null;
     torod_shipment_id: string | null;
     torod_tracking_number: string | null;
     torod_label_url: string | null;
@@ -795,6 +1174,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -804,6 +1184,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -819,6 +1200,11 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
             full_name: any;
             verified_seller: any;
         } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
+        } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
     } | undefined;
@@ -831,6 +1217,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -840,6 +1227,7 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -854,6 +1242,11 @@ export declare const updateOrderStatus: (orderId: number, status: string, actorR
                 id: any;
                 full_name: any;
                 verified_seller: any;
+            } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
             } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
@@ -887,6 +1280,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
         cod_currency: string | null;
         customer_city_code: string | null;
         customer_country: string | null;
+        torod_order_id: string | null;
         torod_shipment_id: string | null;
         torod_tracking_number: string | null;
         torod_label_url: string | null;
@@ -898,6 +1292,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -907,6 +1302,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -922,6 +1318,11 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
+            } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
         } | undefined;
@@ -934,6 +1335,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
             product: {
                 id: any;
                 seller_id: any;
+                seller_warehouse_id: any;
                 name_ar: any;
                 name_en: any;
                 description_ar: any;
@@ -943,6 +1345,7 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
                 category: any;
                 base_price: any;
                 size_ml: any;
+                weight_kg: number | null;
                 concentration: any;
                 condition: any;
                 stock_quantity: any;
@@ -957,6 +1360,11 @@ export declare const getOrderLabel: (orderId: number, actorId: number, actorRole
                     id: any;
                     full_name: any;
                     verified_seller: any;
+                } | undefined;
+                seller_warehouse: {
+                    id: any;
+                    warehouse_code: any;
+                    warehouse_name: any;
                 } | undefined;
                 is_auction_product: boolean;
                 has_active_auction: any;
@@ -994,6 +1402,7 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
         cod_currency: string | null;
         customer_city_code: string | null;
         customer_country: string | null;
+        torod_order_id: string | null;
         torod_shipment_id: string | null;
         torod_tracking_number: string | null;
         torod_label_url: string | null;
@@ -1005,6 +1414,7 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
         product: {
             id: any;
             seller_id: any;
+            seller_warehouse_id: any;
             name_ar: any;
             name_en: any;
             description_ar: any;
@@ -1014,6 +1424,7 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
             category: any;
             base_price: any;
             size_ml: any;
+            weight_kg: number | null;
             concentration: any;
             condition: any;
             stock_quantity: any;
@@ -1029,6 +1440,11 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
                 full_name: any;
                 verified_seller: any;
             } | undefined;
+            seller_warehouse: {
+                id: any;
+                warehouse_code: any;
+                warehouse_name: any;
+            } | undefined;
             is_auction_product: boolean;
             has_active_auction: any;
         } | undefined;
@@ -1041,6 +1457,7 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
             product: {
                 id: any;
                 seller_id: any;
+                seller_warehouse_id: any;
                 name_ar: any;
                 name_en: any;
                 description_ar: any;
@@ -1050,6 +1467,7 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
                 category: any;
                 base_price: any;
                 size_ml: any;
+                weight_kg: number | null;
                 concentration: any;
                 condition: any;
                 stock_quantity: any;
@@ -1064,6 +1482,11 @@ export declare const getOrderTracking: (orderId: number, actorId: number, actorR
                     id: any;
                     full_name: any;
                     verified_seller: any;
+                } | undefined;
+                seller_warehouse: {
+                    id: any;
+                    warehouse_code: any;
+                    warehouse_name: any;
                 } | undefined;
                 is_auction_product: boolean;
                 has_active_auction: any;

@@ -205,6 +205,24 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-h3 text-charcoal">
+              {t('admin.walletSettingsTitle', 'Wallet Settings')}
+            </h2>
+            <p className="text-taupe mt-2">
+              {t('admin.walletSettingsSubtitle', 'Monitor the Torod wallet balance and create a recharge link when needed.')}
+            </p>
+          </div>
+        <a
+          href="/admin/settings/wallet"
+          className="bg-charcoal text-ivory px-5 py-2 rounded-luxury font-semibold hover:opacity-90 transition"
+        >
+          {t('admin.walletOpenSettingsButton', 'Open Wallet Settings')}
+        </a>
+      </div>
+    </div>
+      <div className="bg-white rounded-luxury p-6 shadow-luxury">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-h2 text-charcoal">{t('admin.settings')}</h1>
           {platformSaved && <span className="text-green-600 font-semibold">✓ {t('admin.saved')}</span>}

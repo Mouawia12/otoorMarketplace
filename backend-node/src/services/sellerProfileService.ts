@@ -13,6 +13,7 @@ const profileSchema = z.object({
   national_id: z.string().min(8),
   iban: z.string().min(10),
   bank_name: z.string().min(2),
+  torod_warehouse_id: z.string().trim().min(1),
 });
 
 export const upsertSellerProfile = async (userId: number, input: unknown) => {
@@ -28,6 +29,7 @@ export const upsertSellerProfile = async (userId: number, input: unknown) => {
       nationalId: data.national_id,
       iban: data.iban,
       bankName: data.bank_name,
+      torodWarehouseId: data.torod_warehouse_id,
       status: SellerStatus.PENDING,
     },
     create: {
@@ -39,6 +41,7 @@ export const upsertSellerProfile = async (userId: number, input: unknown) => {
       nationalId: data.national_id,
       iban: data.iban,
       bankName: data.bank_name,
+      torodWarehouseId: data.torod_warehouse_id,
       status: SellerStatus.PENDING,
     },
     include: {
@@ -179,6 +182,7 @@ const mapProfile = (profile: any) => {
     national_id: plain.nationalId,
     iban: plain.iban,
     bank_name: plain.bankName,
+    torod_warehouse_id: plain.torodWarehouseId ?? null,
     status: plain.status?.toLowerCase?.() ?? plain.status,
     created_at: plain.createdAt,
     updated_at: plain.updatedAt,

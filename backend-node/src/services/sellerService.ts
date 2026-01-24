@@ -66,7 +66,7 @@ export const getSellerDashboardStats = async (sellerId: number) => {
 
 export const listSellerProductsWithFilters = async (
   sellerId: number,
-  filters: { status?: string } = {}
+  filters: { status?: string; warehouseId?: number } = {}
 ) => {
   const where: Prisma.ProductWhereInput = {
     sellerId,
@@ -84,6 +84,9 @@ export const listSellerProductsWithFilters = async (
         where.status = match;
       }
     }
+  }
+  if (filters.warehouseId) {
+    where.sellerWarehouseId = filters.warehouseId;
   }
 
   const products = await prisma.product.findMany({

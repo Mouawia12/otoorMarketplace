@@ -3,6 +3,7 @@ import { z } from "zod";
 export declare const normalizeProduct: (product: any) => {
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -12,6 +13,7 @@ export declare const normalizeProduct: (product: any) => {
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -27,6 +29,11 @@ export declare const normalizeProduct: (product: any) => {
         full_name: any;
         verified_seller: any;
     } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
+    } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;
 };
@@ -34,6 +41,7 @@ export declare const listProducts: (query: unknown) => Promise<{
     products: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -43,6 +51,7 @@ export declare const listProducts: (query: unknown) => Promise<{
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -57,6 +66,11 @@ export declare const listProducts: (query: unknown) => Promise<{
             id: any;
             full_name: any;
             verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
         } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
@@ -77,6 +91,7 @@ export declare const listProductSuggestions: (query: unknown) => Promise<{
 export declare const getProductById: (id: number) => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -86,6 +101,7 @@ export declare const getProductById: (id: number) => Promise<{
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -101,12 +117,18 @@ export declare const getProductById: (id: number) => Promise<{
         full_name: any;
         verified_seller: any;
     } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
+    } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;
 }>;
 export declare const getRelatedProducts: (productId: number, limit?: number) => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -116,6 +138,7 @@ export declare const getRelatedProducts: (productId: number, limit?: number) => 
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -130,6 +153,11 @@ export declare const getRelatedProducts: (productId: number, limit?: number) => 
         id: any;
         full_name: any;
         verified_seller: any;
+    } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
     } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;
@@ -143,6 +171,7 @@ export declare const getProductFiltersMeta: () => Promise<{
 }>;
 declare const productInputSchema: z.ZodObject<{
     sellerId: z.ZodCoercedNumber<unknown>;
+    sellerWarehouseId: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
     nameAr: z.ZodString;
     nameEn: z.ZodString;
     descriptionAr: z.ZodString;
@@ -152,6 +181,7 @@ declare const productInputSchema: z.ZodObject<{
     category: z.ZodString;
     basePrice: z.ZodCoercedNumber<unknown>;
     sizeMl: z.ZodCoercedNumber<unknown>;
+    weightKg: z.ZodOptional<z.ZodCoercedNumber<unknown>>;
     concentration: z.ZodString;
     condition: z.ZodEnum<{
         NEW: "NEW";
@@ -173,6 +203,7 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>, 
 }) => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -182,6 +213,7 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>, 
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -196,6 +228,11 @@ export declare const createProduct: (input: z.infer<typeof productInputSchema>, 
         id: any;
         full_name: any;
         verified_seller: any;
+    } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
     } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;
@@ -205,6 +242,7 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
 }) => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -214,6 +252,7 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -229,6 +268,11 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
         full_name: any;
         verified_seller: any;
     } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
+    } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;
 }>;
@@ -236,6 +280,7 @@ export declare const deleteProduct: (productId: number, sellerId: number) => Pro
 export declare const moderateProduct: (productId: number, action: "approve" | "reject") => Promise<{
     id: any;
     seller_id: any;
+    seller_warehouse_id: any;
     name_ar: any;
     name_en: any;
     description_ar: any;
@@ -245,6 +290,7 @@ export declare const moderateProduct: (productId: number, action: "approve" | "r
     category: any;
     base_price: any;
     size_ml: any;
+    weight_kg: number | null;
     concentration: any;
     condition: any;
     stock_quantity: any;
@@ -259,6 +305,11 @@ export declare const moderateProduct: (productId: number, action: "approve" | "r
         id: any;
         full_name: any;
         verified_seller: any;
+    } | undefined;
+    seller_warehouse: {
+        id: any;
+        warehouse_code: any;
+        warehouse_name: any;
     } | undefined;
     is_auction_product: boolean;
     has_active_auction: any;

@@ -30,13 +30,14 @@ export default function SellerLayout() {
   const hasSubmittedProfile = hasSubmittedSellerProfile(user);
   const isProfileCompleteRoute = location.pathname.includes('/seller/profile-complete');
   const isProfileStatusRoute = location.pathname.includes('/seller/profile-status');
+  const isWarehousesRoute = location.pathname.includes('/seller/warehouses');
 
   if (sellerStatus !== 'approved') {
     if (!hasSubmittedProfile) {
-      if (!isProfileCompleteRoute) {
+      if (!isProfileCompleteRoute && !isWarehousesRoute) {
         return <Navigate to="/seller/profile-complete" replace />;
       }
-    } else if (!isProfileStatusRoute && !isProfileCompleteRoute) {
+    } else if (!isProfileStatusRoute && !isProfileCompleteRoute && !isWarehousesRoute) {
       return <Navigate to="/seller/profile-status" replace />;
     }
   }
@@ -48,6 +49,9 @@ export default function SellerLayout() {
     { path: '/seller/auctions', label: t('seller.auctions'), icon: '🔨' },
     { path: '/seller/orders', label: t('seller.customerOrdersNav', 'طلبات العملاء'), icon: '📦' },
     { path: '/seller/my-orders', label: t('seller.myOrdersNav', 'طلباتي'), icon: '🧾' },
+    { path: '/seller/manual-shipments', label: t('seller.manualShipmentsNav', 'طلبات خارجية'), icon: '🚚' },
+    { path: '/seller/warehouses', label: t('seller.warehouses', 'العناوين'), icon: '🏬' },
+    { path: '/seller/warehouse-management', label: t('seller.warehouseManagement', 'إدارة المستودعات'), icon: '📦' },
     { path: '/seller/coupons', label: t('seller.coupons', 'الكوبونات'), icon: '🏷️' },
     { path: '/seller/profile-status', label: t('seller.status', 'حالة الطلب'), icon: '📄' },
     { path: '/seller/earnings', label: t('seller.earnings'), icon: '💰' },

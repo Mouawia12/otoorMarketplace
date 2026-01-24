@@ -57,6 +57,7 @@ export declare const registerUser: (input: z.infer<typeof registerSchema>) => Pr
             national_id: string;
             iban: string;
             bank_name: string;
+            torod_warehouse_id: string | null;
             status: string;
             created_at: Date;
             updated_at: Date;
@@ -87,6 +88,7 @@ export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginS
             national_id: string;
             iban: string;
             bank_name: string;
+            torod_warehouse_id: string | null;
             status: string;
             created_at: Date;
             updated_at: Date;
@@ -119,6 +121,7 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
             national_id: string;
             iban: string;
             bank_name: string;
+            torod_warehouse_id: string | null;
             status: string;
             created_at: Date;
             updated_at: Date;

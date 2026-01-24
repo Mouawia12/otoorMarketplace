@@ -32,12 +32,21 @@ export default function Orders({ view }: OrdersProps = {}) {
   const [submittingReviewKey, setSubmittingReviewKey] = useState<string | null>(null);
   const [printingLabel, setPrintingLabel] = useState(false);
   const [trackingLoading, setTrackingLoading] = useState(false);
+  const [torodShipSubmitting, setTorodShipSubmitting] = useState(false);
 
   const userIsSeller = useMemo(() => user?.roles?.includes('seller'), [user]);
   const userIsAdmin = useMemo(() => user?.roles?.some((r) => ['admin', 'super_admin'].includes(r)), [user]);
 
   const sellerMode = view === 'seller' || (!view && userIsAdmin);
   const buyerMode = view === 'buyer' || (!sellerMode && !userIsAdmin);
+  const canManageTorodShipping = useMemo(
+    () =>
+      (sellerMode || userIsAdmin) &&
+      !!activeOrder?.shipping_method &&
+      activeOrder.shipping_method.toLowerCase().includes("torod") &&
+      !activeOrder.torod_tracking_number,
+    [activeOrder?.shipping_method, activeOrder?.torod_tracking_number, sellerMode, userIsAdmin]
+  );
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -157,6 +166,14 @@ export default function Orders({ view }: OrdersProps = {}) {
     }
   };
 
+  const openLabelWindow = (labelUrl: string) => {
+    if (!labelUrl) return;
+    const resolvedUrl = labelUrl.startsWith("http")
+      ? labelUrl
+      : `${window.location.origin}${labelUrl.startsWith("/") ? "" : "/"}${labelUrl}`;
+    window.open(resolvedUrl, "_blank", "noopener,noreferrer");
+  };
+
   const handlePrintLabel = async (orderId: number) => {
     try {
       setPrintingLabel(true);
@@ -166,10 +183,12 @@ export default function Orders({ view }: OrdersProps = {}) {
         alert(t('orders.labelUnavailable', 'تعذر الحصول على بوليصة الشحن'));
         return;
       }
-      window.open(labelUrl, '_blank', 'noopener,noreferrer');
+      openLabelWindow(`/orders/${orderId}/label/print-view`);
       const updatedOrder = response.data?.order;
       if (updatedOrder) {
-        setOrders((prev) => prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
+        setOrders((prev) =>
+          prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
+        );
         setActiveOrder(updatedOrder);
       }
     } catch (error: any) {
@@ -180,6 +199,29 @@ export default function Orders({ view }: OrdersProps = {}) {
       alert(message);
     } finally {
       setPrintingLabel(false);
+    }
+  };
+
+  const handleTorodShip = async () => {
+    if (!activeOrder) return;
+    try {
+      setTorodShipSubmitting(true);
+      const response = await api.post(`/orders/${activeOrder.id}/torod/ship`, {
+        type: "normal",
+      });
+      const updated = response.data;
+      if (updated?.id) {
+        setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
+        setActiveOrder(updated);
+      }
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.message ||
+          error?.response?.data?.detail ||
+          t("orders.shipFailed", "تعذر إصدار بوليصة الشحن")
+      );
+    } finally {
+      setTorodShipSubmitting(false);
     }
   };
 
@@ -315,6 +357,11 @@ export default function Orders({ view }: OrdersProps = {}) {
                     <span>{t('orders.total')}: {formatPrice(order.total_amount, language)}</span>
                     <span>{t('orders.shippingMethod')}: {getShippingLabel(order.shipping_method)}</span>
                   </div>
+                  {(sellerMode || userIsAdmin) && order.shipping_name && (
+                    <p className="text-xs text-charcoal mt-1">
+                      {t('orders.shippingName')}: <span className="font-semibold">{order.shipping_name}</span>
+                    </p>
+                  )}
                   {(sellerMode || userIsAdmin) && order.shipping_phone && (
                     <p className="text-xs text-charcoal mt-1">
                       {t('orders.customerPhone')}: <span className="font-semibold">{order.shipping_phone}</span>
@@ -386,6 +433,12 @@ export default function Orders({ view }: OrdersProps = {}) {
                     {new Date(activeOrder.created_at).toLocaleString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
                   </p>
                 </div>
+                {(sellerMode || userIsAdmin) && activeOrder.shipping_name && (
+                  <div className="col-span-2 sm:col-span-2 md:col-span-1">
+                    <p className="text-taupe text-xs mb-1">{t('orders.shippingName')}</p>
+                    <p className="font-semibold">{activeOrder.shipping_name}</p>
+                  </div>
+                )}
                 {(sellerMode || userIsAdmin) && activeOrder.shipping_phone && (
                   <div className="col-span-2 sm:col-span-2 md:col-span-1">
                     <p className="text-taupe text-xs mb-1">{t('orders.customerPhone')}</p>
@@ -486,6 +539,36 @@ export default function Orders({ view }: OrdersProps = {}) {
                 </div>
               </div>
 
+              {canManageTorodShipping && (
+                <div className="border border-sand/70 rounded-xl p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="font-semibold text-charcoal">
+                        {t("orders.torodShippingTitle", "شحن طرود")}
+                      </h4>
+                      <p className="text-xs text-taupe">
+                        {t(
+                          "orders.torodShippingHint",
+                          "جلب شركات الشحن المتاحة لهذا الطلب قبل إصدار البوليصة."
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={handleTorodShip}
+                      disabled={torodShipSubmitting}
+                      className="w-full bg-gold text-charcoal rounded-luxury px-4 py-2 text-sm font-semibold hover:bg-gold-hover transition disabled:opacity-60"
+                    >
+                      {torodShipSubmitting
+                        ? t("orders.shippingInProgress", "جاري إصدار البوليصة...")
+                        : t("orders.shipNow", "إصدار بوليصة الشحن")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {(activeOrder.torod_tracking_number ||
                 activeOrder.torod_label_url ||
                 activeOrder.torod_status) && (
@@ -513,29 +596,33 @@ export default function Orders({ view }: OrdersProps = {}) {
                         <span className="font-semibold">{activeOrder.torod_status}</span>
                       </p>
                     )}
-                    {(sellerMode || userIsAdmin) && (
-                      <button
-                        type="button"
-                        onClick={() => handlePrintLabel(activeOrder.id)}
-                        className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition disabled:opacity-60"
-                        disabled={printingLabel}
-                      >
-                        {printingLabel
-                          ? t('orders.labelLoading', 'جاري تحميل البوليصة...')
-                          : t('orders.printLabel', 'طباعة بوليصة الشحن')}
-                        <span aria-hidden>↗</span>
-                      </button>
-                    )}
-                    {activeOrder.torod_label_url && (
-                      <a
-                        href={activeOrder.torod_label_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition"
-                      >
-                        {t('orders.downloadLabel', 'تحميل ملصق الشحنة')}
-                        <span aria-hidden>↗</span>
-                      </a>
+                    {(sellerMode || userIsAdmin) &&
+                      (activeOrder.torod_tracking_number ||
+                        activeOrder.torod_label_url) && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handlePrintLabel(activeOrder.id)}
+                          className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition disabled:opacity-60"
+                          disabled={printingLabel}
+                        >
+                          {printingLabel
+                            ? t('orders.labelLoading', 'جاري تحميل البوليصة...')
+                            : t('orders.printLabel', 'طباعة بوليصة الشحن')}
+                          <span aria-hidden>↗</span>
+                        </button>
+                        {activeOrder.torod_label_url && (
+                          <a
+                            href={activeOrder.torod_label_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition"
+                          >
+                            {t('orders.downloadLabel', 'تحميل بوليصة الشحن')}
+                            <span aria-hidden>↗</span>
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

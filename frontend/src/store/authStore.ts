@@ -22,6 +22,7 @@ export interface User {
     national_id?: string;
     iban?: string;
     bank_name?: string;
+    torod_warehouse_id?: string | null;
   } | null;
   seller_profile_submitted?: boolean;
   verified_seller?: boolean;

@@ -46,6 +46,7 @@ export default function AdminLayout() {
     { path: '/admin/library',   label: t('admin.productLibrary', 'مكتبة المنتجات'), icon: '📚' },
     { path: '/admin/auctions',  label: t('admin.auctions'),  icon: '🔨' },
     { path: '/admin/orders',    label: t('admin.orders'),    icon: '📦' },
+    { path: '/admin/manual-shipments', label: t('admin.manualShipments', 'طلبات خارجية'), icon: '🚚' },
     { path: '/admin/coupons',   label: t('admin.coupons', 'الكوبونات'), icon: '🏷️' },
     { path: '/admin/users',     label: t('admin.users'),     icon: '👥' },
     { path: '/admin/auth-requests', label: t('admin.authRequests'), icon: '✅' },
@@ -61,6 +62,7 @@ export default function AdminLayout() {
     { path: '/admin/pages',     label: t('admin.pagesManager.menuLabel', 'صفحات الموقع'), icon: '📑' },
     { path: '/admin/change-password', label: t('account.updatePassword', 'تغيير كلمة السر'), icon: '🔑' },
     { path: '/admin/settings',  label: t('admin.settings'),  icon: '⚙️' },
+    { path: '/admin/settings/wallet', label: t('admin.walletSettings', 'إعدادات المحفظة'), icon: '👛' },
     { path: '/admin/audit',     label: t('admin.audit'),     icon: '🔍' },
   ];
 

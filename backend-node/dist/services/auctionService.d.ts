@@ -15,6 +15,7 @@ export declare const listAuctions: (query: unknown) => Promise<{
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -24,6 +25,7 @@ export declare const listAuctions: (query: unknown) => Promise<{
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -38,6 +40,11 @@ export declare const listAuctions: (query: unknown) => Promise<{
             id: any;
             full_name: any;
             verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
         } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
@@ -86,6 +93,7 @@ export declare const getAuctionById: (id: number) => Promise<{
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -95,6 +103,7 @@ export declare const getAuctionById: (id: number) => Promise<{
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -109,6 +118,11 @@ export declare const getAuctionById: (id: number) => Promise<{
             id: any;
             full_name: any;
             verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
         } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
@@ -136,6 +150,7 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -145,6 +160,7 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -159,6 +175,11 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
             id: any;
             full_name: any;
             verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
         } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
@@ -238,6 +259,7 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -247,6 +269,7 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -261,6 +284,11 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
             id: any;
             full_name: any;
             verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
         } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;
@@ -288,6 +316,7 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
     product: {
         id: any;
         seller_id: any;
+        seller_warehouse_id: any;
         name_ar: any;
         name_en: any;
         description_ar: any;
@@ -297,6 +326,7 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
         category: any;
         base_price: any;
         size_ml: any;
+        weight_kg: number | null;
         concentration: any;
         condition: any;
         stock_quantity: any;
@@ -311,6 +341,11 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
             id: any;
             full_name: any;
             verified_seller: any;
+        } | undefined;
+        seller_warehouse: {
+            id: any;
+            warehouse_code: any;
+            warehouse_name: any;
         } | undefined;
         is_auction_product: boolean;
         has_active_auction: any;

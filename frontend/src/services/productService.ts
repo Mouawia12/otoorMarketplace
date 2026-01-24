@@ -12,6 +12,7 @@ export interface FetchProductsParams {
   search?: string;
   min_price?: number;
   max_price?: number;
+  seller?: number;
 }
 
 interface ProductsResponse {

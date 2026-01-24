@@ -46,6 +46,8 @@ model User {
   notifications   Notification[]
   adminAuditLogs  AdminAuditLog[] @relation("AdminAuditLogAdmin")
   perfumeImportJobs PerfumeImportJob[]
+  sellerWarehouses SellerWarehouse[]
+  manualShipments  ManualShipment[]
 }
 
 model Role {
@@ -72,6 +74,7 @@ model UserRole {
 model Product {
   id            Int              @id @default(autoincrement())
   sellerId      Int              @map("seller_id")
+  sellerWarehouseId Int?         @map("seller_warehouse_id")
   nameAr        String           @map("name_ar")
   nameEn        String           @map("name_en")
   slug          String           @unique
@@ -82,6 +85,7 @@ model Product {
   category      String
   basePrice     Decimal          @map("base_price") @db.Decimal(10, 2)
   sizeMl        Int              @map("size_ml")
+  weightKg      Decimal?         @map("weight_kg") @db.Decimal(10, 3)
   concentration String
   condition     ProductCondition
   stockQuantity Int              @map("stock_quantity")
@@ -91,6 +95,7 @@ model Product {
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
   seller       User           @relation("SellerProducts", fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerWarehouse SellerWarehouse? @relation(fields: [sellerWarehouseId], references: [id])
   images       ProductImage[]
   auctions     Auction[]
   orderItems   OrderItem[]
@@ -98,6 +103,7 @@ model Product {
   reviews      ProductReview[]
 
   @@index([sellerId])
+  @@index([sellerWarehouseId])
 }
 
 model ProductImage {
@@ -552,10 +558,77 @@ model SellerProfile {
   nationalId      String
   iban            String
   bankName        String
+  torodWarehouseId String?       @map("torod_warehouse_id")
   status          SellerStatus  @default(PENDING)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   user            User          @relation(fields: [userId], references: [id])
+}
+
+model SellerWarehouse {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  torodAddressId  String?  @map("torod_address_id")
+  warehouseCode   String   @map("warehouse_code")
+  warehouseName   String   @map("warehouse_name")
+  type            String
+  countryId       Int?     @map("country_id")
+  regionId        Int?     @map("region_id")
+  cityId          Int?     @map("city_id")
+  districtId      Int?     @map("district_id")
+  address         String?
+  locateAddress   String?  @map("locate_address")
+  latitude        Float?
+  longitude       Float?
+  contactName     String?  @map("contact_name")
+  phoneNumber     String?  @map("phone_number")
+  email           String?
+  zipCode         String?  @map("zip_code")
+  shortAddress    String?  @map("short_address")
+  isDefault       Boolean  @default(false) @map("is_default")
+  isReturnDefault Boolean  @default(false) @map("is_return_default")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+  products Product[]
+
+  @@index([userId])
+  @@index([warehouseCode])
+  @@map("seller_warehouses")
+}
+
+model ManualShipment {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
+  torodOrderId     String?  @map("torod_order_id")
+  trackingNumber   String?  @map("tracking_number")
+  labelUrl         String?  @map("label_url")
+  status           String?
+  warehouseCode    String   @map("warehouse_code")
+  warehouseName    String?  @map("warehouse_name")
+  courierPartnerId Int?     @map("courier_partner_id")
+  customerName     String   @map("customer_name")
+  customerPhone    String   @map("customer_phone")
+  customerEmail    String?  @map("customer_email")
+  address          String
+  countryId        Int?     @map("country_id")
+  regionId         Int?     @map("region_id")
+  cityId           Int?     @map("city_id")
+  districtId       Int?     @map("district_id")
+  orderTotal       Decimal  @map("order_total") @db.Decimal(10, 2)
+  weight           Float
+  noOfBox          Int      @map("no_of_box")
+  payment          String
+  itemDescription  String?  @map("item_description")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([torodOrderId])
+  @@map("manual_shipments")
 }
 
 model PasswordResetToken {

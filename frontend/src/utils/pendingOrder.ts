@@ -2,6 +2,7 @@ export type PendingOrderPayload = {
   payment_method: string;
   payment_method_id?: number;
   payment_method_code?: string;
+  total_amount?: number;
   shipping: {
     name: string;
     phone: string;
@@ -14,13 +15,15 @@ export type PendingOrderPayload = {
     customer_country?: string;
     cod_amount?: number;
     cod_currency?: string;
-    torod_shipping_company_id?: string;
+    torod_shipping_company_id?: number;
+    shipping_company_id?: number;
     torod_warehouse_id?: string;
-    torod_country_id?: string;
-    torod_region_id?: string;
-    torod_city_id?: string;
-    torod_district_id?: string;
+    torod_country_id?: number;
+    torod_region_id?: number;
+    torod_city_id?: number;
+    torod_district_id?: number;
     torod_metadata?: Record<string, unknown>;
+    defer_torod_shipment?: boolean;
   };
   items: Array<{
     productId: number;
