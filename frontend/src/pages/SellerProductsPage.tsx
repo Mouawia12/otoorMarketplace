@@ -433,6 +433,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [warehouses, setWarehouses] = useState<SellerWarehouseOption[]>([]);
   const [warehousesLoading, setWarehousesLoading] = useState(false);
+  const hasWarehouses = warehouses.length > 0;
 
   useEffect(() => {
     if (!isOpen) {
@@ -479,13 +480,6 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         const list = (response.data?.warehouses ?? []) as SellerWarehouseOption[];
         if (cancelled) return;
         setWarehouses(list);
-        const preferred =
-          list.find((entry) => entry.isDefault) ??
-          list[0];
-        setFormData((prev) => ({
-          ...prev,
-          seller_warehouse_id: prev.seller_warehouse_id || (preferred ? String(preferred.id) : ''),
-        }));
       } catch (error) {
         if (!cancelled) {
           setWarehouses([]);
@@ -556,6 +550,20 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       const parsedWarehouseId = formData.seller_warehouse_id
         ? Number(formData.seller_warehouse_id)
         : undefined;
+
+      if (!parsedWarehouseId) {
+        if (!hasWarehouses) {
+          alert(
+            t(
+              'seller.warehouseRequiredCreateFirst',
+              'لا يمكنك إضافة منتج بدون عنوان. الرجاء إضافة عنوان أولاً.'
+            )
+          );
+        } else {
+          alert(t('seller.warehouseRequired', 'يرجى اختيار المستودع أولاً'));
+        }
+        return;
+      }
 
       if (!parsedPrice || Number.isNaN(parsedPrice)) {
         alert(t('seller.invalidPrice', 'Please enter a valid price'));
@@ -947,9 +955,12 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
                 </>
               )}
             </select>
-            {warehouses.length > 0 && !formData.seller_warehouse_id && (
-              <p className="text-xs text-taupe mt-1">
-                {t('seller.warehouseDefaultHint', 'سيتم استخدام المستودع الافتراضي إذا لم تختر مستودعًا')}
+            {!warehousesLoading && !hasWarehouses && (
+              <p className="text-xs text-red-600 mt-1">
+                {t('seller.noWarehouses', 'لا توجد مستودعات')} ·{" "}
+                <a href="/seller/warehouses" className="underline text-gold">
+                  {t('seller.createWarehouse', 'إضافة عنوان الآن')}
+                </a>
               </p>
             )}
           </div>
@@ -1032,7 +1043,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
             <button
               type="submit"
               className="px-4 py-2 rounded-luxury bg-sand text-charcoal font-semibold hover:bg-sand/80 disabled:opacity-50"
-              disabled={loading || uploadingImages}
+              disabled={loading || uploadingImages || !hasWarehouses || !formData.seller_warehouse_id}
             >
               {loading || uploadingImages ? t('common.loading') : t('seller.saveDraft', 'حفظ كمسودة')}
             </button>
@@ -1040,7 +1051,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
               type="button"
               onClick={(e) => handleSubmit(e, 'publish')}
               className="px-4 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover disabled:opacity-50"
-              disabled={loading || uploadingImages}
+              disabled={loading || uploadingImages || !hasWarehouses || !formData.seller_warehouse_id}
             >
               {loading || uploadingImages ? t('common.loading') : t('seller.submitForReview', 'إرسال للمراجعة')}
             </button>

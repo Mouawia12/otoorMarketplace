@@ -409,6 +409,16 @@ const createProduct = async (input, options) => {
         .map((url) => (0, assets_1.normalizeImagePathForStorage)(url))
         .filter((value) => Boolean(value));
     let sellerWarehouseId = data.sellerWarehouseId ?? null;
+    if (!isAdmin && !sellerWarehouseId) {
+        const hasWarehouse = await client_2.prisma.sellerWarehouse.findFirst({
+            where: { userId: data.sellerId },
+            select: { id: true },
+        });
+        if (!hasWarehouse) {
+            throw errors_1.AppError.badRequest("يجب إضافة عنوان/مستودع قبل إضافة منتج");
+        }
+        throw errors_1.AppError.badRequest("يجب اختيار مستودع للمنتج");
+    }
     if (sellerWarehouseId) {
         const warehouse = await client_2.prisma.sellerWarehouse.findFirst({
             where: { id: sellerWarehouseId, userId: data.sellerId },
@@ -416,15 +426,6 @@ const createProduct = async (input, options) => {
         });
         if (!warehouse) {
             throw errors_1.AppError.badRequest("Selected warehouse is not available for this seller");
-        }
-    }
-    else {
-        const fallbackWarehouse = await client_2.prisma.sellerWarehouse.findFirst({
-            where: { userId: data.sellerId, isDefault: true },
-            select: { id: true },
-        });
-        if (fallbackWarehouse) {
-            sellerWarehouseId = fallbackWarehouse.id;
         }
     }
     const product = await client_2.prisma.product.create({

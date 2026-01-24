@@ -464,6 +464,17 @@ export const createProduct = async (
     .filter((value): value is string => Boolean(value));
 
   let sellerWarehouseId = data.sellerWarehouseId ?? null;
+  if (!isAdmin && !sellerWarehouseId) {
+    const hasWarehouse = await prisma.sellerWarehouse.findFirst({
+      where: { userId: data.sellerId },
+      select: { id: true },
+    });
+    if (!hasWarehouse) {
+      throw AppError.badRequest("يجب إضافة عنوان/مستودع قبل إضافة منتج");
+    }
+    throw AppError.badRequest("يجب اختيار مستودع للمنتج");
+  }
+
   if (sellerWarehouseId) {
     const warehouse = await prisma.sellerWarehouse.findFirst({
       where: { id: sellerWarehouseId, userId: data.sellerId },
@@ -471,14 +482,6 @@ export const createProduct = async (
     });
     if (!warehouse) {
       throw AppError.badRequest("Selected warehouse is not available for this seller");
-    }
-  } else {
-    const fallbackWarehouse = await prisma.sellerWarehouse.findFirst({
-      where: { userId: data.sellerId, isDefault: true },
-      select: { id: true },
-    });
-    if (fallbackWarehouse) {
-      sellerWarehouseId = fallbackWarehouse.id;
     }
   }
 
