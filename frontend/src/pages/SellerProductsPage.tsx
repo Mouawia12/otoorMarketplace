@@ -119,9 +119,7 @@ export default function SellerProductsPage() {
 
   const handleStatusChange = async (productId: number, newStatus: string) => {
     try {
-      const normalized =
-        newStatus === 'published' ? 'pending' : newStatus; // البائع يطلب المراجعة بدلاً من النشر المباشر
-      await api.patch(`/seller/products/${productId}`, { status: normalized });
+      await api.patch(`/seller/products/${productId}`, { status: newStatus });
       fetchProducts();
     } catch (error: any) {
       console.error('Failed to update status', error);
@@ -480,6 +478,13 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         const list = (response.data?.warehouses ?? []) as SellerWarehouseOption[];
         if (cancelled) return;
         setWarehouses(list);
+        const preferred = list.find((entry) => entry.isDefault) ?? null;
+        if (preferred) {
+          setFormData((prev) => ({
+            ...prev,
+            seller_warehouse_id: prev.seller_warehouse_id || String(preferred.id),
+          }));
+        }
       } catch (error) {
         if (!cancelled) {
           setWarehouses([]);
@@ -573,9 +578,7 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
       const nextStatus =
         intent === 'draft'
           ? 'DRAFT'
-          : product?.status === 'published'
-            ? 'PUBLISHED'
-            : 'PENDING_REVIEW';
+          : 'PUBLISHED';
       const payload = {
         nameEn: formData.name_en,
         nameAr: formData.name_ar,
@@ -1053,7 +1056,11 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
               className="px-4 py-2 rounded-luxury bg-gold text-charcoal font-semibold hover:bg-gold-hover disabled:opacity-50"
               disabled={loading || uploadingImages || !hasWarehouses || !formData.seller_warehouse_id}
             >
-              {loading || uploadingImages ? t('common.loading') : t('seller.submitForReview', 'إرسال للمراجعة')}
+              {loading || uploadingImages
+                ? t('common.loading')
+                : mode === 'add'
+                  ? t('seller.addProductAction', 'إضافة المنتج')
+                  : t('seller.publishProduct', 'نشر المنتج')}
             </button>
           </div>
         </form>

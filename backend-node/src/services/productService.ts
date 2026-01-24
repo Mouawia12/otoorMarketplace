@@ -443,10 +443,7 @@ export const createProduct = async (
       (role) => role === RoleName.ADMIN || role === RoleName.SUPER_ADMIN
     ) ?? false;
   const requestedStatus = data.status ?? ProductStatus.PUBLISHED;
-  const initialStatus =
-    !isAdmin && requestedStatus === ProductStatus.PUBLISHED
-      ? ProductStatus.PENDING_REVIEW
-      : requestedStatus;
+  const initialStatus = requestedStatus;
   const slugBase = makeSlug(data.nameEn);
 
   const existingSlug = await prisma.product.findFirst({
@@ -640,20 +637,12 @@ export const updateProduct = async (
       if (normalized === "pending") {
         updateData.status = ProductStatus.PENDING_REVIEW;
       } else if (normalized === "published") {
-        updateData.status =
-          isAdmin || product.status === ProductStatus.PUBLISHED
-            ? ProductStatus.PUBLISHED
-            : ProductStatus.PENDING_REVIEW;
+        updateData.status = ProductStatus.PUBLISHED;
       } else {
         updateData.status = normalized.toUpperCase() as ProductStatus;
       }
     } else {
-      updateData.status =
-        !isAdmin &&
-        data.status === ProductStatus.PUBLISHED &&
-        product.status !== ProductStatus.PUBLISHED
-          ? ProductStatus.PENDING_REVIEW
-          : data.status;
+      updateData.status = data.status;
     }
   }
 
