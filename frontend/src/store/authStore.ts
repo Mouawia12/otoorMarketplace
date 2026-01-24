@@ -82,13 +82,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        void api.post('/auth/logout');
-        useWishlistStore.getState().clear();
-        if (typeof window !== 'undefined') {
-          window.location.replace('/');
-          return;
-        }
         set({ user: null, isAuthenticated: false });
+        useAuthStore.persist.clearStorage();
+        useWishlistStore.getState().clear();
+        useWishlistStore.persist.clearStorage();
+        void api.post('/auth/logout', undefined, { timeout: 5000 }).catch(() => null);
+        if (typeof window !== 'undefined') {
+          window.location.assign('/');
+        }
       },
 
       fetchUser: async () => {
