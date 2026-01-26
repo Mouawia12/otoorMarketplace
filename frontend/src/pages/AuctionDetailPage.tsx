@@ -214,8 +214,27 @@ export default function AuctionDetailPage() {
     if (!auction) return;
 
     const now = Date.now();
-    if (auction.status !== 'active' || new Date(auction.end_time).getTime() <= now) {
+    const startMs = new Date(auction.start_time).getTime();
+    const endMs = new Date(auction.end_time).getTime();
+    const rawStatus = typeof auction.status === 'string' ? auction.status.toLowerCase() : '';
+
+    if (rawStatus === 'cancelled') {
+      setBidError(t('auction.cancelled'));
+      return;
+    }
+
+    if (rawStatus === 'completed' || endMs <= now) {
       setBidError(t('auction.ended'));
+      return;
+    }
+
+    if (rawStatus === 'scheduled' || startMs > now) {
+      setBidError(t('auction.notStartedYet'));
+      return;
+    }
+
+    if (auction.status !== 'active') {
+      setBidError(t('common.error'));
       return;
     }
 
@@ -305,10 +324,27 @@ export default function AuctionDetailPage() {
       .map((img) => resolveProductImageUrl(img) || '')
       .filter(Boolean);
   const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
+  const formatAuctionDateTime = (value: string) =>
+    new Date(value).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   const nowMs = Date.now();
-  const isEndedByStatus = auction.status === 'completed' || auction.status === 'cancelled';
-  const isEnded = isEndedByStatus || new Date(auction.end_time).getTime() <= nowMs;
-  const isLive = auction.status === 'active' && !isEnded && new Date(auction.start_time).getTime() <= nowMs;
+  const startMs = new Date(auction.start_time).getTime();
+  const endMs = new Date(auction.end_time).getTime();
+  const rawStatus = typeof auction.status === 'string' ? auction.status.toLowerCase() : '';
+  const isCancelled = rawStatus === 'cancelled';
+  const isEnded = isCancelled || rawStatus === 'completed' || endMs <= nowMs;
+  const isScheduled = !isEnded && startMs > nowMs;
+  const isLive = !isEnded && !isScheduled && startMs <= nowMs && endMs > nowMs;
+  const statusMessage = isScheduled
+    ? t('auction.notStartedYet')
+    : isCancelled
+      ? t('auction.cancelled')
+      : t('auction.ended');
+  const statusTone = isScheduled ? 'text-amber-700' : isCancelled ? 'text-taupe' : 'text-alert';
   const seller = auction.seller || { id: 0, full_name: 'Unknown', verified_seller: false };
   const liveBadgeTone =
     liveStatus === 'connected'
@@ -407,16 +443,31 @@ export default function AuctionDetailPage() {
                   className="text-charcoal font-bold"
                 />
               </div>
-              <div className="flex items-center gap-2 text-xs text-taupe mt-3">
-                <span className={`h-2 w-2 rounded-full ${liveDotTone}`} />
-                <span>
-                  {liveStatus === 'connected'
-                    ? t('auction.liveConnected')
-                    : liveStatus === 'connecting'
-                      ? t('auction.liveConnecting')
-                      : t('auction.liveDisconnected')}
-                </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-taupe mt-3">
+                <div>
+                  {t('auction.startsAt')}: <span className="font-semibold text-charcoal">{formatAuctionDateTime(auction.start_time)}</span>
+                </div>
+                <div>
+                  {t('auction.endsAt')}: <span className="font-semibold text-charcoal">{formatAuctionDateTime(auction.end_time)}</span>
+                </div>
               </div>
+              {isScheduled && (
+                <div className="mt-3 rounded-lg bg-amber-50 text-amber-800 px-3 py-2 text-sm font-medium">
+                  {t('auction.biddingOpensAt', { date: formatAuctionDateTime(auction.start_time) })}
+                </div>
+              )}
+              {isLive && (
+                <div className="flex items-center gap-2 text-xs text-taupe mt-3">
+                  <span className={`h-2 w-2 rounded-full ${liveDotTone}`} />
+                  <span>
+                    {liveStatus === 'connected'
+                      ? t('auction.liveConnected')
+                      : liveStatus === 'connecting'
+                        ? t('auction.liveConnecting')
+                        : t('auction.liveDisconnected')}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Bid Controls */}
@@ -472,8 +523,13 @@ export default function AuctionDetailPage() {
                 </p>
               </div>
             ) : (
-              <div className="text-center py-4">
-                <p className="text-alert font-semibold text-lg">{t('auction.ended')}</p>
+              <div className="text-center py-4 space-y-1">
+                <p className={`font-semibold text-lg ${statusTone}`}>{statusMessage}</p>
+                {isScheduled && (
+                  <p className="text-sm text-taupe">
+                    {t('auction.biddingOpensAt', { date: formatAuctionDateTime(auction.start_time) })}
+                  </p>
+                )}
               </div>
             )}
           </div>

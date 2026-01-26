@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import api from '../lib/api';
 import { useWishlistStore } from './wishlistStore';
 
@@ -26,90 +25,127 @@ export interface User {
   } | null;
   seller_profile_submitted?: boolean;
   verified_seller?: boolean;
+  email_verified?: boolean;
 }
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  authChecked: boolean;
+  initializeAuth: () => Promise<void>;
   login: (email: string, password: string) => Promise<User>;
   loginWithGoogle: (idToken: string, role?: 'buyer' | 'seller') => Promise<User>;
-  register: (data: { email: string; password: string; fullName: string; phone?: string; roles?: string[] }) => Promise<User>;
+  register: (data: { email: string; password: string; fullName: string; phone?: string; roles?: string[] }) => Promise<{
+    user: User | null;
+    requiresVerification: boolean;
+    email?: string;
+  }>;
+  verifyEmail: (token: string) => Promise<User>;
+  resendVerification: (email: string, redirect?: string) => Promise<void>;
   updateProfile: (data: { full_name?: string; phone?: string; avatar_url?: string }) => Promise<User>;
   logout: () => void;
   fetchUser: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      isAuthenticated: false,
+let initializePromise: Promise<void> | null = null;
 
-      login: async (email: string, password: string) => {
-        const response = await api.post('/auth/login', { email, password });
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  user: null,
+  isAuthenticated: false,
+  authChecked: false,
 
-        const { user } = response.data;
-        set({ isAuthenticated: true, user });
-        return user;
-      },
-
-      loginWithGoogle: async (idToken: string, role?: 'buyer' | 'seller') => {
-        const response = await api.post('/auth/google', { idToken, role });
-        const { user } = response.data;
-        set({ isAuthenticated: true, user });
-        return user;
-      },
-
-      register: async (data) => {
-        const payload = {
-          email: data.email,
-          password: data.password,
-          fullName: data.fullName,
-          ...(data.phone ? { phone: data.phone } : {}),
-          ...(data.roles ? { roles: data.roles } : {}),
-        };
-        const response = await api.post('/auth/register', payload);
-        const { user } = response.data;
-        set({ user, isAuthenticated: true });
-        return user;
-      },
-
-      updateProfile: async (data) => {
-        const response = await api.patch('/auth/me', data);
-        const user = response.data;
-        set({ user });
-        return user;
-      },
-
-      logout: () => {
-        set({ user: null, isAuthenticated: false });
-        useAuthStore.persist.clearStorage();
-        useWishlistStore.getState().clear();
-        useWishlistStore.persist.clearStorage();
-        void api.post('/auth/logout', undefined, { timeout: 5000 }).catch(() => null);
-        if (typeof window !== 'undefined') {
-          window.location.assign('/');
-        }
-      },
-
-      fetchUser: async () => {
-        try {
-          const response = await api.get('/auth/me');
-          set({ user: response.data, isAuthenticated: true });
-        } catch (_error) {
-          set({ user: null, isAuthenticated: false });
-        }
-      },
-    }),
-    {
-      name: 'auth',
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
-      onRehydrateStorage: () => (state) => {
-        state?.fetchUser?.();
-      },
+  initializeAuth: async () => {
+    if (initializePromise) {
+      return initializePromise;
     }
-  )
-);
+
+    initializePromise = (async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('auth');
+        }
+        await get().fetchUser();
+      } finally {
+        set({ authChecked: true });
+        initializePromise = null;
+      }
+    })();
+
+    return initializePromise;
+  },
+
+  login: async (email: string, password: string) => {
+    const response = await api.post('/auth/login', { email, password });
+
+    const { user } = response.data;
+    set({ isAuthenticated: true, user, authChecked: true });
+    return user;
+  },
+
+  loginWithGoogle: async (idToken: string, role?: 'buyer' | 'seller') => {
+    const response = await api.post('/auth/google', { idToken, role });
+    const { user } = response.data;
+    set({ isAuthenticated: true, user, authChecked: true });
+    return user;
+  },
+
+  register: async (data) => {
+    const payload = {
+      email: data.email,
+      password: data.password,
+      fullName: data.fullName,
+      ...(data.phone ? { phone: data.phone } : {}),
+      ...(data.roles ? { roles: data.roles } : {}),
+    };
+    const response = await api.post('/auth/register', payload);
+    const user = response.data?.user ?? null;
+    const requiresVerification = Boolean(response.data?.requires_verification) || !user;
+    const email = response.data?.email ?? payload.email;
+    if (user) {
+      set({ user, isAuthenticated: true, authChecked: true });
+      return { user, requiresVerification, email };
+    }
+    set({ user: null, isAuthenticated: false, authChecked: true });
+    return { user: null, requiresVerification, email };
+  },
+
+  verifyEmail: async (token: string) => {
+    const response = await api.post('/auth/verify-email', { token });
+    const { user } = response.data;
+    set({ user, isAuthenticated: true, authChecked: true });
+    return user;
+  },
+
+  resendVerification: async (email: string, redirect?: string) => {
+    await api.post('/auth/resend-verification', {
+      email,
+      ...(redirect ? { redirect } : {}),
+    });
+  },
+
+  updateProfile: async (data) => {
+    const response = await api.patch('/auth/me', data);
+    const user = response.data;
+    set({ user });
+    return user;
+  },
+
+  logout: () => {
+    set({ user: null, isAuthenticated: false, authChecked: true });
+    useWishlistStore.getState().clear();
+    useWishlistStore.persist.clearStorage();
+    void api.post('/auth/logout', undefined, { timeout: 5000 }).catch(() => null);
+    if (typeof window !== 'undefined') {
+      window.location.assign('/');
+    }
+  },
+
+  fetchUser: async () => {
+    try {
+      const response = await api.get('/auth/me');
+      set({ user: response.data, isAuthenticated: true, authChecked: true });
+    } catch (_error) {
+      set({ user: null, isAuthenticated: false, authChecked: true });
+    }
+  },
+}));

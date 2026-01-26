@@ -162,6 +162,7 @@ export default function SellerAuctionsPage() {
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("seller.startingPrice")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("seller.currentBid")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("seller.totalBids")}</th>
+                <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("seller.winner", "الفائز")}</th>
                 <th className="text-right px-4 py-3 text-charcoal font-semibold">{t("seller.status")}</th>
               </tr>
             </thead>
@@ -190,6 +191,25 @@ export default function SellerAuctionsPage() {
                         : "-"}
                     </td>
                     <td className="px-4 py-4 text-charcoal-light">{auction.total_bids ?? 0}</td>
+                    <td className="px-4 py-4 text-charcoal">
+                      {auction.status === "completed" ? (
+                        auction.winner?.bidder?.full_name || auction.winner?.bidder_id ? (
+                          <div className="flex flex-col">
+                            <span className="font-semibold">
+                              {auction.winner?.bidder?.full_name ??
+                                t("seller.unknownWinner", "مستخدم")}
+                            </span>
+                            {auction.winner?.bidder?.email && (
+                              <span className="text-xs text-taupe">{auction.winner.bidder.email}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-taupe">{t("seller.noWinner", "لا يوجد فائز")}</span>
+                        )
+                      ) : (
+                        <span className="text-taupe">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-4">
                       <span className={`px-3 py-1 rounded-full text-sm font-semibold ${statusTone(auction.status)}`}>
                         {t(statusLabelKey(auction.status as AuctionFilter))}

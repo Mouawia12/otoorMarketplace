@@ -81,7 +81,7 @@ const assertCouponIsValid = (coupon: Coupon) => {
   }
 };
 
-const serializeCoupon = (coupon: Coupon) => ({
+const serializeCoupon = (coupon: Coupon & { seller?: { id: number; fullName: string; email: string } | null }) => ({
   id: coupon.id,
   code: coupon.code,
   discount_type: coupon.discountType.toLowerCase(),
@@ -91,6 +91,8 @@ const serializeCoupon = (coupon: Coupon) => ({
   usage_count: coupon.usageCount,
   is_active: coupon.isActive,
   seller_id: coupon.sellerId,
+  seller_email: coupon.seller?.email ?? null,
+  seller_name: coupon.seller?.fullName ?? null,
   created_at: coupon.createdAt,
   updated_at: coupon.updatedAt,
 });
@@ -128,6 +130,80 @@ type CouponLine = {
   quantity: number;
   sellerId: number;
   unitPrice: number;
+};
+
+type SellerSubtotalMap = Map<number, number>;
+
+const toCents = (value: number) => Math.max(0, Math.round(value * 100));
+const fromCents = (value: number) => value / 100;
+
+const computeSellerSubtotals = (lines: CouponLine[]): SellerSubtotalMap => {
+  const subtotals = new Map<number, number>();
+  for (const line of lines) {
+    const lineSubtotal = line.unitPrice * line.quantity;
+    subtotals.set(line.sellerId, (subtotals.get(line.sellerId) ?? 0) + lineSubtotal);
+  }
+  return subtotals;
+};
+
+const computeSellerSubtotalsForCoupon = (coupon: Coupon, lines: CouponLine[]): SellerSubtotalMap => {
+  const targetSellerId = coupon.sellerId ?? null;
+  const eligibleLines =
+    targetSellerId !== null
+      ? lines.filter((line) => line.sellerId === targetSellerId)
+      : lines;
+  return computeSellerSubtotals(eligibleLines);
+};
+
+const mapToRecord = (map: SellerSubtotalMap) =>
+  Array.from(map.entries()).reduce<Record<string, number>>((acc, [sellerId, amount]) => {
+    acc[String(sellerId)] = amount;
+    return acc;
+  }, {});
+
+const allocateDiscountAcrossSellers = (
+  discountAmount: number,
+  sellerSubtotals: SellerSubtotalMap,
+) => {
+  const entries = Array.from(sellerSubtotals.entries()).filter(([, subtotal]) => subtotal > 0);
+  if (entries.length === 0 || discountAmount <= 0) {
+    return {} as Record<string, number>;
+  }
+
+  const totalSubtotalCents = entries.reduce((sum, [, subtotal]) => sum + toCents(subtotal), 0);
+  if (totalSubtotalCents <= 0) {
+    return {} as Record<string, number>;
+  }
+
+  const discountCents = Math.min(toCents(discountAmount), totalSubtotalCents);
+  let remainingDiscountCents = discountCents;
+  const allocations = new Map<number, number>();
+
+  entries.forEach(([sellerId, subtotal], index) => {
+    const subtotalCents = toCents(subtotal);
+    if (subtotalCents <= 0 || remainingDiscountCents <= 0) {
+      allocations.set(sellerId, 0);
+      return;
+    }
+
+    const isLast = index === entries.length - 1;
+    const shareCents = isLast
+      ? remainingDiscountCents
+      : Math.min(
+          remainingDiscountCents,
+          Math.floor((discountCents * subtotalCents) / totalSubtotalCents),
+        );
+
+    allocations.set(sellerId, shareCents);
+    remainingDiscountCents -= shareCents;
+  });
+
+  return Array.from(allocations.entries()).reduce<Record<string, number>>((acc, [sellerId, cents]) => {
+    if (cents > 0) {
+      acc[String(sellerId)] = fromCents(cents);
+    }
+    return acc;
+  }, {});
 };
 
 const computeEligibleSubtotal = (coupon: Coupon, lines: CouponLine[]) => {
@@ -189,8 +265,10 @@ export const validateCoupon = async (input: unknown) => {
     coupons: prepared.coupons.map((entry) => ({
       coupon: serializeCoupon(entry.coupon),
       discount_amount: entry.discountAmount,
+      per_seller_discounts: entry.perSellerDiscounts,
     })),
     total_discount: prepared.totalDiscount,
+    per_seller_discounts: prepared.perSellerDiscounts,
   };
 };
 
@@ -215,7 +293,7 @@ const ensureSellerOwnership = (coupon: Coupon, sellerId?: number) => {
   }
 };
 
-export const listCoupons = async (options?: { sellerId?: number }) => {
+export const listCoupons = async (options?: { sellerId?: number; includeSeller?: boolean }) => {
   const where: Prisma.CouponWhereInput = {};
   if (options?.sellerId) {
     where.sellerId = options.sellerId;
@@ -223,6 +301,19 @@ export const listCoupons = async (options?: { sellerId?: number }) => {
   const coupons = await prisma.coupon.findMany({
     where,
     orderBy: { createdAt: "desc" },
+    ...(options?.includeSeller
+      ? {
+          include: {
+            seller: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+              },
+            },
+          },
+        }
+      : {}),
   });
   return coupons.map(serializeCoupon);
 };
@@ -353,7 +444,12 @@ export const prepareCouponForOrder = async (
     throw AppError.badRequest("لا يمكن تطبيق هذا الكوبون على الطلب الحالي");
   }
   const discountAmount = calculateDiscountAmount(coupon, eligibleSubtotal);
-  return { coupon, discountAmount };
+  const sellerSubtotals = computeSellerSubtotalsForCoupon(coupon, items);
+  const perSellerDiscounts =
+    coupon.sellerId && sellerSubtotals.has(coupon.sellerId)
+      ? { [String(coupon.sellerId)]: discountAmount }
+      : allocateDiscountAcrossSellers(discountAmount, sellerSubtotals);
+  return { coupon, discountAmount, perSellerDiscounts };
 };
 
 export const prepareCouponsForOrder = async (
@@ -386,36 +482,71 @@ export const prepareCouponsForOrder = async (
     coupons.push(coupon);
   }
 
-  const sellerCoveredSubtotal = Array.from(sellerCoupons.values()).reduce(
-    (total, coupon) => total + computeEligibleSubtotal(coupon, items),
-    0,
-  );
-  const totalSubtotal = items.reduce(
-    (total, line) => total + line.unitPrice * line.quantity,
-    0,
-  );
+  const allSellerSubtotals = computeSellerSubtotals(items);
+  const coveredSellerIds = new Set(sellerCoupons.keys());
+  const perSellerDiscountTotals = new Map<number, number>();
 
   const prepared = Array.from(sellerCoupons.values()).map((coupon) => {
+    const sellerSubtotals = computeSellerSubtotalsForCoupon(coupon, items);
     const eligibleSubtotal = computeEligibleSubtotal(coupon, items);
     if (eligibleSubtotal <= 0) {
       throw AppError.badRequest("لا يمكن تطبيق هذا الكوبون على الطلب الحالي");
     }
+    const discountAmount = calculateDiscountAmount(coupon, eligibleSubtotal);
+    const perSellerDiscounts =
+      coupon.sellerId && sellerSubtotals.has(coupon.sellerId)
+        ? { [String(coupon.sellerId)]: discountAmount }
+        : allocateDiscountAcrossSellers(discountAmount, sellerSubtotals);
+
+    Object.entries(perSellerDiscounts).forEach(([sellerId, amount]) => {
+      const numericSellerId = Number(sellerId);
+      perSellerDiscountTotals.set(
+        numericSellerId,
+        (perSellerDiscountTotals.get(numericSellerId) ?? 0) + amount,
+      );
+    });
+
     return {
       coupon,
       eligibleSubtotal,
-      discountAmount: calculateDiscountAmount(coupon, eligibleSubtotal),
+      discountAmount,
+      perSellerDiscounts,
     };
   });
 
   if (globalCoupon) {
-    const remainingSubtotal = Math.max(0, totalSubtotal - sellerCoveredSubtotal);
+    const remainingSellerSubtotals = new Map<number, number>();
+    allSellerSubtotals.forEach((subtotal, sellerId) => {
+      if (!coveredSellerIds.has(sellerId)) {
+        remainingSellerSubtotals.set(sellerId, subtotal);
+      }
+    });
+    const remainingSubtotal = Array.from(remainingSellerSubtotals.values()).reduce(
+      (total, subtotal) => total + subtotal,
+      0,
+    );
     if (remainingSubtotal <= 0) {
       throw AppError.badRequest("لا يمكن تطبيق الكوبون العام على الطلب الحالي");
     }
+    const discountAmount = calculateDiscountAmount(globalCoupon, remainingSubtotal);
+    const perSellerDiscounts = allocateDiscountAcrossSellers(
+      discountAmount,
+      remainingSellerSubtotals,
+    );
+
+    Object.entries(perSellerDiscounts).forEach(([sellerId, amount]) => {
+      const numericSellerId = Number(sellerId);
+      perSellerDiscountTotals.set(
+        numericSellerId,
+        (perSellerDiscountTotals.get(numericSellerId) ?? 0) + amount,
+      );
+    });
+
     prepared.push({
       coupon: globalCoupon,
       eligibleSubtotal: remainingSubtotal,
-      discountAmount: calculateDiscountAmount(globalCoupon, remainingSubtotal),
+      discountAmount,
+      perSellerDiscounts,
     });
   }
 
@@ -427,6 +558,7 @@ export const prepareCouponsForOrder = async (
   return {
     coupons: prepared,
     totalDiscount,
+    perSellerDiscounts: mapToRecord(perSellerDiscountTotals),
   };
 };
 

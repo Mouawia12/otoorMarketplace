@@ -5,6 +5,7 @@ import { prisma } from "../prisma/client";
 import { AppError } from "../utils/errors";
 import { normalizeProduct } from "./productService";
 import { config } from "../config/env";
+import { sendMail } from "../utils/mailer";
 import {
   prepareCouponForOrder,
   prepareCouponsForOrder,
@@ -378,6 +379,103 @@ const resolvePaymentSupport = (raw: Record<string, unknown>) => {
   return { supportsCod, supportsPrepaid };
 };
 
+type InventoryIssueReason =
+  | "PRODUCT_NOT_FOUND"
+  | "PRODUCT_UNAVAILABLE"
+  | "OUT_OF_STOCK"
+  | "INSUFFICIENT_STOCK";
+
+type InventoryIssue = {
+  productId: number;
+  name: string;
+  requestedQuantity: number;
+  availableQuantity: number;
+  reason: InventoryIssueReason;
+};
+
+const resolveProductName = (product: { nameAr: string | null; nameEn: string | null }, fallbackId: number) =>
+  product.nameAr?.trim() || product.nameEn?.trim() || `#${fallbackId}`;
+
+const buildInventoryIssue = (
+  product: { id: number; nameAr: string | null; nameEn: string | null; stockQuantity: number; status: string },
+  requestedQuantity: number
+): InventoryIssue | null => {
+  const name = resolveProductName(product, product.id);
+  const availableQuantity = Math.max(0, product.stockQuantity ?? 0);
+
+  if (product.status !== "PUBLISHED") {
+    return {
+      productId: product.id,
+      name,
+      requestedQuantity,
+      availableQuantity,
+      reason: "PRODUCT_UNAVAILABLE",
+    };
+  }
+
+  if (availableQuantity <= 0) {
+    return {
+      productId: product.id,
+      name,
+      requestedQuantity,
+      availableQuantity,
+      reason: "OUT_OF_STOCK",
+    };
+  }
+
+  if (availableQuantity < requestedQuantity) {
+    return {
+      productId: product.id,
+      name,
+      requestedQuantity,
+      availableQuantity,
+      reason: "INSUFFICIENT_STOCK",
+    };
+  }
+
+  return null;
+};
+
+const assertInventoryOrThrow = (
+  products: Array<{
+    id: number;
+    nameAr: string | null;
+    nameEn: string | null;
+    stockQuantity: number;
+    status: string;
+  }>,
+  aggregatedItems: Array<{ productId: number; quantity: number }>
+) => {
+  const productMap = new Map(products.map((product) => [product.id, product]));
+  const issues: InventoryIssue[] = [];
+
+  for (const item of aggregatedItems) {
+    const product = productMap.get(item.productId);
+    if (!product) {
+      issues.push({
+        productId: item.productId,
+        name: `#${item.productId}`,
+        requestedQuantity: item.quantity,
+        availableQuantity: 0,
+        reason: "PRODUCT_NOT_FOUND",
+      });
+      continue;
+    }
+
+    const issue = buildInventoryIssue(product, item.quantity);
+    if (issue) {
+      issues.push(issue);
+    }
+  }
+
+  if (issues.length > 0) {
+    throw AppError.badRequest("المخزون غير كافٍ لبعض المنتجات", {
+      code: "INSUFFICIENT_STOCK",
+      issues,
+    });
+  }
+};
+
 const shippingDetailsSchema = z.preprocess((value) => {
   if (value && typeof value === "object") {
     const shipping = value as Record<string, unknown>;
@@ -476,11 +574,438 @@ const createOrderSchema = z.object({
   paymentMethod: z.string().min(2),
   paymentMethodId: z.coerce.number().int().optional(),
   paymentMethodCode: z.string().min(1).optional(),
+  language: z.enum(["ar", "en"]).optional(),
   shipping: shippingDetailsSchema.optional(),
   items: z.array(orderItemSchema).min(1),
   couponCode: z.string().min(3).optional(),
   couponCodes: z.array(z.string().min(3)).max(5).optional(),
 });
+
+const orderEmailInclude = Prisma.validator<Prisma.OrderInclude>()({
+  buyer: {
+    select: {
+      email: true,
+      fullName: true,
+    },
+  },
+  items: {
+    include: {
+      product: {
+        include: {
+          images: {
+            orderBy: { sortOrder: "asc" as const },
+          },
+          seller: {
+            select: {
+              id: true,
+              email: true,
+              fullName: true,
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
+type SupportedLang = "ar" | "en";
+
+const normalizeLanguage = (value?: string | null): SupportedLang =>
+  value?.toLowerCase() === "en" ? "en" : "ar";
+
+const resolveAppBaseUrl = () => {
+  try {
+    return new URL(config.auth.emailVerificationUrl).origin;
+  } catch {
+    return config.assetBaseUrl;
+  }
+};
+
+const formatMoney = (value: Prisma.Decimal | number | string) => {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+      ? Number(value)
+      : Number(value);
+  if (!Number.isFinite(numeric)) return "0.00";
+  return numeric.toFixed(2);
+};
+
+const resolveOrderEmailProductName = (
+  product: { nameAr?: string | null; nameEn?: string | null } | null,
+  lang: SupportedLang,
+) => {
+  if (lang === "en") {
+    return product?.nameEn?.trim() || product?.nameAr?.trim() || "Product";
+  }
+  return product?.nameAr?.trim() || product?.nameEn?.trim() || "منتج";
+};
+
+const sendOrderPlacedEmail = async (orderId: number, context: { paid: boolean }) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: orderEmailInclude,
+  });
+
+  if (!order?.buyer?.email) {
+    return;
+  }
+
+  const lang = normalizeLanguage(order.language);
+  const isEn = lang === "en";
+  const brandSignature = config.mail.from.name || (isEn ? "FragraWorld" : "FragraWorld | عالم العطور");
+  const supportEmail = config.support.email;
+  const appBaseUrl = resolveAppBaseUrl();
+  const ordersUrl = `${appBaseUrl}/account/orders`;
+  const sellerOrdersUrl = `${appBaseUrl}/seller/orders`;
+  const orderNumber = `#${order.id}`;
+  const buyerName = order.buyer.fullName || (isEn ? "Valued customer" : "عميلنا العزيز");
+  const totalAmount = formatMoney(order.totalAmount);
+  const shippingFee = formatMoney(order.shippingFee);
+  const discountAmount = formatMoney(order.discountAmount);
+  const subtotalAmount = formatMoney(order.subtotalAmount);
+  const createdAt = new Date(order.createdAt).toLocaleString(isEn ? "en-US" : "ar-SA");
+
+  const paymentMethodLabel = (() => {
+    const method = order.paymentMethod.toLowerCase();
+    if (method.includes("myfatoorah")) {
+      return isEn ? "Online payment (MyFatoorah)" : "دفع إلكتروني (ماي فاتورة)";
+    }
+    if (method.includes("cod")) {
+      return isEn ? "Cash on delivery" : "الدفع عند الاستلام";
+    }
+    return order.paymentMethod;
+  })();
+
+  const paymentStatusLabel = context.paid
+    ? isEn
+      ? "Payment confirmed"
+      : "تم تأكيد الدفع"
+    : isEn
+    ? "Awaiting confirmation"
+    : "بانتظار التأكيد";
+
+  const paymentLine = context.paid
+    ? isEn
+      ? "Your payment has been confirmed and we have already started preparing your order."
+      : "تم تأكيد الدفع بنجاح، وبدأنا تجهيز طلبك مباشرة."
+    : isEn
+    ? "Your order is now in the queue. We will keep you posted at every step."
+    : "طلبك قيد التأكيد الآن، وسنوافيك بالتحديثات خطوة بخطوة.";
+
+  const itemsHtml = order.items
+    .map((item) => {
+      const name = resolveOrderEmailProductName(item.product, lang);
+      const quantity = item.quantity;
+      const lineTotal = formatMoney(item.totalPrice);
+      return `
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #f1ece3;font-weight:600;color:#2c2a29;">${name}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f1ece3;text-align:center;color:#5b534b;">${quantity}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f1ece3;text-align:end;font-weight:700;color:#2c2a29;">${lineTotal} ${isEn ? "SAR" : "ر.س"}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const itemsText = order.items
+    .map((item) => {
+      const name = resolveOrderEmailProductName(item.product, lang);
+      return `- ${name} × ${item.quantity}: ${formatMoney(item.totalPrice)} ${isEn ? "SAR" : "ر.س"}`;
+    })
+    .join("\n");
+
+  const shippingSummary = `${order.shippingName} — ${order.shippingPhone}\n${order.shippingCity} / ${order.shippingRegion}\n${order.shippingAddress}`;
+
+  const plainText = [
+    isEn ? `Hello ${buyerName},` : `مرحباً ${buyerName}،`,
+    "",
+    isEn
+      ? `Your order has been received successfully (${orderNumber}).`
+      : `تم استلام طلبك بنجاح (${orderNumber}).`,
+    paymentLine,
+    "",
+    isEn ? "Order details:" : "تفاصيل الطلب:",
+    `${isEn ? "Order number" : "رقم الطلب"}: ${orderNumber}`,
+    `${isEn ? "Date" : "التاريخ"}: ${createdAt}`,
+    `${isEn ? "Payment method" : "طريقة الدفع"}: ${paymentMethodLabel}`,
+    `${isEn ? "Payment status" : "حالة الدفع"}: ${paymentStatusLabel}`,
+    "",
+    isEn ? "Shipping address:" : "عنوان الشحن:",
+    shippingSummary,
+    "",
+    isEn ? "Items:" : "المنتجات:",
+    itemsText,
+    "",
+    `${isEn ? "Subtotal" : "الإجمالي الفرعي"}: ${subtotalAmount} ${isEn ? "SAR" : "ر.س"}`,
+    `${isEn ? "Discount" : "الخصم"}: ${discountAmount} ${isEn ? "SAR" : "ر.س"}`,
+    `${isEn ? "Shipping" : "الشحن"}: ${shippingFee} ${isEn ? "SAR" : "ر.س"}`,
+    `${isEn ? "Total" : "الإجمالي"}: ${totalAmount} ${isEn ? "SAR" : "ر.س"}`,
+    "",
+    isEn ? `Track your order: ${ordersUrl}` : `يمكنك متابعة طلبك من هنا: ${ordersUrl}`,
+    isEn
+      ? `Need help? Reach us at ${supportEmail}`
+      : `لأي استفسار، يسعدنا خدمتك عبر ${supportEmail}`,
+    "",
+    brandSignature,
+  ].join("\n");
+
+  const headline = isEn ? "Your Order Is Confirmed" : "تم استلام طلبك بنجاح";
+  const marketingTitle = isEn ? "Why this order is special" : "لماذا هذا الطلب مميز؟";
+  const marketingBody = isEn
+    ? "You picked premium selections. We are preparing them with luxury packaging and extra care."
+    : "اخترت عطوراً منتقاة بعناية، ونحن الآن نجهزها لك بأفضل تغليف وتجربة فاخرة تليق بذوقك.";
+  const trackCta = isEn ? "Track Your Order" : "تتبّع طلبك الآن";
+  const readyLine = isEn
+    ? "We are preparing your order carefully. Shipping updates will arrive shortly."
+    : "نجهّز طلبك بعناية، وخلال وقت قصير يصلك إشعار الشحن ✈️";
+  const helpLine = isEn ? "Need help?" : "لأي مساعدة:";
+
+  const htmlDir = isEn ? "ltr" : "rtl";
+  const htmlAlign = isEn ? "left" : "right";
+
+  const html = `
+    <div style="background:#f7f4ef;padding:32px 16px;font-family:'Cairo','Inter','Segoe UI',sans-serif;direction:${htmlDir};text-align:center;color:#2c2a29;">
+      <table role="presentation" style="margin:0 auto;max-width:660px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 18px 45px rgba(0,0,0,0.08);border:1px solid rgba(0,0,0,0.04);">
+        <tr>
+          <td style="padding:28px 28px 12px;background:linear-gradient(135deg,#111 0%,#2b2b2b 100%);color:#f8f5ef;">
+            <div style="font-size:13px;letter-spacing:.6px;opacity:.85;margin-bottom:6px;">${brandSignature}</div>
+            <div style="font-size:26px;font-weight:800;margin:0;">${headline}</div>
+            <div style="margin-top:6px;font-size:14px;opacity:.9;">${orderNumber}</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:26px 28px 8px;text-align:${htmlAlign};">
+            <p style="margin:0 0 8px;font-size:16px;line-height:1.9;color:#3a342f;">${isEn ? "Hello" : "مرحباً"} ${buyerName} ✨</p>
+            <p style="margin:0 0 14px;font-size:15px;line-height:1.9;color:#4d463f;">
+              ${paymentLine}
+            </p>
+
+            <div style="margin:12px 0 16px;border:1px solid #f1ece3;border-radius:14px;padding:12px 14px;background:#fcfaf6;">
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin:4px 0;color:#5b534b;">
+                <span>${isEn ? "Order number" : "رقم الطلب"}</span>
+                <strong style="color:#2c2a29;">${orderNumber}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin:4px 0;color:#5b534b;">
+                <span>${isEn ? "Date" : "التاريخ"}</span>
+                <strong style="color:#2c2a29;">${createdAt}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin:4px 0;color:#5b534b;">
+                <span>${isEn ? "Payment method" : "طريقة الدفع"}</span>
+                <strong style="color:#2c2a29;">${paymentMethodLabel}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin:4px 0;color:#5b534b;">
+                <span>${isEn ? "Payment status" : "حالة الدفع"}</span>
+                <strong style="color:#2c2a29;">${paymentStatusLabel}</strong>
+              </div>
+            </div>
+
+            <div style="margin:16px 0 12px;padding:14px 16px;border-radius:14px;background:#f8f3ea;border:1px solid #f0e6d7;">
+              <div style="font-weight:800;font-size:15px;margin-bottom:8px;">${marketingTitle}</div>
+              <div style="font-size:14px;line-height:1.9;color:#5a524a;">
+                ${marketingBody}
+              </div>
+            </div>
+
+            <div style="margin-top:18px;border:1px solid #f1ece3;border-radius:16px;overflow:hidden;">
+              <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px;">
+                <thead>
+                  <tr style="background:#fbf7f0;color:#5b534b;">
+                    <th style="padding:10px 12px;text-align:${htmlAlign};font-weight:700;">${isEn ? "Item" : "المنتج"}</th>
+                    <th style="padding:10px 12px;text-align:center;font-weight:700;">${isEn ? "Qty" : "الكمية"}</th>
+                    <th style="padding:10px 12px;text-align:end;font-weight:700;">${isEn ? "Total" : "الإجمالي"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <div style="margin-top:16px;border-radius:14px;background:#fcfaf6;border:1px solid #f1ece3;padding:12px 14px;">
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin:4px 0;color:#5b534b;">
+                <span>${isEn ? "Subtotal" : "الإجمالي الفرعي"}</span>
+                <strong style="color:#2c2a29;">${subtotalAmount} ${isEn ? "SAR" : "ر.س"}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin:4px 0;color:#5b534b;">
+                <span>${isEn ? "Discount" : "الخصم"}</span>
+                <strong style="color:#2c2a29;">${discountAmount} ${isEn ? "SAR" : "ر.س"}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin:4px 0;color:#5b534b;">
+                <span>${isEn ? "Shipping" : "الشحن"}</span>
+                <strong style="color:#2c2a29;">${shippingFee} ${isEn ? "SAR" : "ر.س"}</strong>
+              </div>
+              <div style="height:1px;background:#eee4d6;margin:8px 0;"></div>
+              <div style="display:flex;justify-content:space-between;font-size:16px;margin:6px 0;color:#2c2a29;">
+                <span style="font-weight:800;">${isEn ? "Total" : "الإجمالي"}</span>
+                <span style="font-weight:900;">${totalAmount} ${isEn ? "SAR" : "ر.س"}</span>
+              </div>
+            </div>
+
+            <div style="margin:16px 0 10px;border:1px solid #f1ece3;border-radius:14px;padding:12px 14px;background:#fff;">
+              <div style="font-weight:800;font-size:14px;margin-bottom:6px;">${isEn ? "Shipping address" : "عنوان الشحن"}</div>
+              <div style="font-size:13.5px;line-height:1.9;color:#4d463f;white-space:pre-line;">${shippingSummary}</div>
+            </div>
+
+            <div style="margin:24px 0 18px;text-align:center;">
+              <a href="${ordersUrl}" style="display:inline-block;padding:14px 24px;background:#caa56a;color:#2c2a29;font-weight:800;text-decoration:none;border-radius:999px;box-shadow:0 10px 24px rgba(202,165,106,0.35);">
+                ${trackCta}
+              </a>
+            </div>
+
+            <p style="margin:0 0 6px;font-size:13px;line-height:1.8;color:#6a635b;text-align:center;">
+              ${readyLine}
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.8;color:#6a635b;text-align:center;">
+              ${helpLine} <a href="mailto:${supportEmail}" style="color:#a67c52;font-weight:700;text-decoration:none;">${supportEmail}</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f2e9dc;padding:14px 20px;text-align:center;font-size:12.5px;color:#655b50;">
+            ${isEn ? "Thank you for your trust — Team" : "شكرًا لثقتك — فريق"} ${brandSignature}
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  await sendMail({
+    to: order.buyer.email,
+    subject: isEn ? `Order received successfully ${orderNumber}` : `تم استلام طلبك بنجاح ${orderNumber}`,
+    html,
+    text: plainText,
+  });
+
+  const sellersMap = new Map<
+    number,
+    { sellerId: number; email: string; name: string; items: typeof order.items }
+  >();
+
+  for (const item of order.items) {
+    const seller = item.product?.seller;
+    const sellerId = item.product?.sellerId;
+    if (!seller || !sellerId || !seller.email) continue;
+    const existing = sellersMap.get(sellerId);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      sellersMap.set(sellerId, {
+        sellerId,
+        email: seller.email,
+        name: seller.fullName || (isEn ? "Seller" : "البائع"),
+        items: [item],
+      });
+    }
+  }
+
+  for (const sellerEntry of sellersMap.values()) {
+    const sellerItemsHtml = sellerEntry.items
+      .map((item) => {
+        const name = resolveOrderEmailProductName(item.product, lang);
+        return `
+          <tr>
+            <td style="padding:8px 10px;border-bottom:1px solid #f1ece3;">${name}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid #f1ece3;text-align:center;">${item.quantity}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const sellerItemsText = sellerEntry.items
+      .map((item) => `- ${resolveOrderEmailProductName(item.product, lang)} × ${item.quantity}`)
+      .join("\n");
+
+    const sellerSubject = isEn
+      ? `New order received ${orderNumber}`
+      : `لديك طلب جديد ${orderNumber}`;
+
+    const sellerPlainText = [
+      isEn ? `Hello ${sellerEntry.name},` : `مرحباً ${sellerEntry.name}،`,
+      "",
+      isEn
+        ? `You have received a new order (${orderNumber}).`
+        : `لديك طلب جديد (${orderNumber}).`,
+      "",
+      isEn ? "Buyer info:" : "معلومات العميل:",
+      `${order.shippingName} — ${order.shippingPhone}`,
+      `${order.shippingCity} / ${order.shippingRegion}`,
+      order.shippingAddress,
+      "",
+      isEn ? "Payment:" : "الدفع:",
+      `${paymentMethodLabel} — ${paymentStatusLabel}`,
+      "",
+      isEn ? "Items for you:" : "المنتجات الخاصة بك:",
+      sellerItemsText,
+      "",
+      isEn ? `Manage orders: ${sellerOrdersUrl}` : `إدارة الطلبات: ${sellerOrdersUrl}`,
+    ].join("\n");
+
+    const sellerHtml = `
+      <div style="background:#f7f4ef;padding:28px 14px;font-family:'Cairo','Inter','Segoe UI',sans-serif;direction:${htmlDir};text-align:center;color:#2c2a29;">
+        <table role="presentation" style="margin:0 auto;max-width:620px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 14px 36px rgba(0,0,0,0.07);border:1px solid rgba(0,0,0,0.04);">
+          <tr>
+            <td style="padding:22px 24px 10px;background:#111;color:#f8f5ef;">
+              <div style="font-size:13px;opacity:.9;">${brandSignature}</div>
+              <div style="font-size:22px;font-weight:800;margin-top:4px;">
+                ${isEn ? "New order received" : "لديك طلب جديد"}
+              </div>
+              <div style="margin-top:4px;font-size:13px;opacity:.9;">${orderNumber}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 24px;text-align:${htmlAlign};">
+              <div style="margin-bottom:10px;font-weight:700;">${isEn ? "Buyer information" : "معلومات العميل"}</div>
+              <div style="font-size:14px;line-height:1.9;color:#4d463f;white-space:pre-line;margin-bottom:12px;">
+                ${order.shippingName} — ${order.shippingPhone}
+                <br />${order.shippingCity} / ${order.shippingRegion}
+                <br />${order.shippingAddress}
+              </div>
+
+              <div style="margin:12px 0;border:1px solid #f1ece3;border-radius:12px;overflow:hidden;">
+                <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px;">
+                  <thead>
+                    <tr style="background:#fbf7f0;color:#5b534b;">
+                      <th style="padding:8px 10px;text-align:${htmlAlign};">${isEn ? "Item" : "المنتج"}</th>
+                      <th style="padding:8px 10px;text-align:center;">${isEn ? "Qty" : "الكمية"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${sellerItemsHtml}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style="font-size:13.5px;color:#5b534b;margin:8px 0;">
+                ${isEn ? "Payment" : "الدفع"}: <strong style="color:#2c2a29;">${paymentMethodLabel} — ${paymentStatusLabel}</strong>
+              </div>
+
+              <div style="margin-top:16px;text-align:center;">
+                <a href="${sellerOrdersUrl}" style="display:inline-block;padding:12px 20px;background:#caa56a;color:#2c2a29;font-weight:800;text-decoration:none;border-radius:999px;">
+                  ${isEn ? "Open seller orders" : "فتح طلبات البائع"}
+                </a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+
+    void sendMail({
+      to: sellerEntry.email,
+      subject: sellerSubject,
+      html: sellerHtml,
+      text: sellerPlainText,
+    }).catch((error) => {
+      console.error("Failed to send seller order email", {
+        orderId: order.id,
+        sellerId: sellerEntry.sellerId,
+        error,
+      });
+    });
+  }
+};
 
 export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   const data = createOrderSchema.parse(input);
@@ -507,6 +1032,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   }
 
   const shipping = data.shipping;
+  const orderLanguage = normalizeLanguage(data.language);
   const normalizedPaymentMethod = data.paymentMethod.trim().toLowerCase();
   if (normalizedPaymentMethod === "cod") {
     throw AppError.badRequest("Cash on delivery is disabled");
@@ -564,35 +1090,15 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   const sellerIds = new Set<number>();
   products.forEach((product) => sellerIds.add(product.sellerId));
 
-  if (productMap.size !== aggregatedItems.length) {
-    throw AppError.badRequest("One or more products are unavailable");
-  }
+  assertInventoryOrThrow(products, aggregatedItems);
 
   const subtotal = aggregatedItems.reduce((total, item) => {
-    const product = productMap.get(item.productId);
-    if (!product) {
-      throw AppError.badRequest(`Product ${item.productId} not found`);
-    }
+    const product = productMap.get(item.productId)!;
     return total + product.basePrice.toNumber() * item.quantity;
   }, 0);
 
   if (subtotal <= 0) {
     throw AppError.badRequest("Order subtotal must be greater than zero");
-  }
-
-  for (const item of aggregatedItems) {
-    const product = productMap.get(item.productId);
-    if (!product) {
-      throw AppError.badRequest(`Product ${item.productId} not found`);
-    }
-    if (product.status !== "PUBLISHED") {
-      throw AppError.badRequest(`Product ${item.productId} is not available`);
-    }
-    if (product.stockQuantity < item.quantity) {
-      throw AppError.badRequest(
-        `Insufficient stock for product ${item.productId}`
-      );
-    }
   }
 
   const normalizedItems = aggregatedItems.map((item) => {
@@ -776,11 +1282,26 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   }
 
   const order = await prisma.$transaction(async (tx) => {
+    const latestProducts = await tx.product.findMany({
+      where: {
+        id: { in: aggregatedItems.map((item) => item.productId) },
+      },
+      select: {
+        id: true,
+        nameAr: true,
+        nameEn: true,
+        stockQuantity: true,
+        status: true,
+      },
+    });
+    assertInventoryOrThrow(latestProducts, aggregatedItems);
+
     const created = await tx.order.create({
       data: {
         buyerId: data.buyerId,
         status: OrderStatus.PENDING,
         paymentMethod: data.paymentMethod,
+        language: orderLanguage,
         myfatoorahMethodId: isMyFatoorahPayment ? paymentMethodId ?? null : null,
         myfatoorahMethodCode: isMyFatoorahPayment
           ? data.paymentMethodCode ?? null
@@ -834,7 +1355,24 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         },
       });
       if (updateResult.count === 0) {
-        throw AppError.badRequest(`Insufficient stock for product ${item.productId}`);
+        const latest = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: {
+            id: true,
+            nameAr: true,
+            nameEn: true,
+            stockQuantity: true,
+            status: true,
+          },
+        });
+        if (latest) {
+          assertInventoryOrThrow([latest], [
+            { productId: latest.id, quantity: item.quantity },
+          ]);
+        }
+        throw AppError.badRequest("المخزون غير كافٍ لبعض المنتجات", {
+          code: "INSUFFICIENT_STOCK",
+        });
       }
     }
 
@@ -1128,6 +1666,15 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   if (paymentUrl) {
     mapped.payment_url = paymentUrl;
   }
+
+  if (!isMyFatoorahPayment) {
+    void sendOrderPlacedEmail(updatedOrder.id, { paid: false }).catch((error) => {
+      console.error("Failed to send order confirmation email", {
+        orderId: updatedOrder.id,
+        error,
+      });
+    });
+  }
   return mapped;
 };
 
@@ -1342,6 +1889,17 @@ export const syncMyFatoorahPayment = async (payload: {
     data: updateData,
     include: orderInclude,
   });
+
+  const transitionedToProcessing =
+    paid && order.status === OrderStatus.PENDING && updated.status === OrderStatus.PROCESSING;
+  if (transitionedToProcessing) {
+    void sendOrderPlacedEmail(updated.id, { paid: true }).catch((error) => {
+      console.error("Failed to send paid order confirmation email", {
+        orderId: updated.id,
+        error,
+      });
+    });
+  }
 
   return {
     order: mapOrderToDto(updated),
@@ -1644,6 +2202,10 @@ export const listTorodPartnersForCheckout = async (payload: unknown) => {
     where: { id: { in: itemIds } },
     select: {
       id: true,
+      nameAr: true,
+      nameEn: true,
+      stockQuantity: true,
+      status: true,
       sellerId: true,
       sellerWarehouseId: true,
       basePrice: true,
@@ -1652,9 +2214,18 @@ export const listTorodPartnersForCheckout = async (payload: unknown) => {
     },
   });
 
-  if (products.length !== itemIds.length) {
-    throw AppError.badRequest("One or more products are unavailable");
-  }
+  const quantityMap = new Map<number, number>();
+  data.items.forEach((item) => {
+    quantityMap.set(
+      item.productId,
+      (quantityMap.get(item.productId) ?? 0) + item.quantity
+    );
+  });
+  const aggregatedItems = Array.from(quantityMap.entries()).map(([productId, quantity]) => ({
+    productId,
+    quantity,
+  }));
+  assertInventoryOrThrow(products, aggregatedItems);
 
   const sellerIds = new Set(products.map((product) => product.sellerId));
   if (sellerIds.size !== 1) {
@@ -1674,14 +2245,6 @@ export const listTorodPartnersForCheckout = async (payload: unknown) => {
   if (!warehouse?.warehouseCode) {
     throw AppError.badRequest("Warehouse is required for Torod courier partners");
   }
-
-  const quantityMap = new Map<number, number>();
-  data.items.forEach((item) => {
-    quantityMap.set(
-      item.productId,
-      (quantityMap.get(item.productId) ?? 0) + item.quantity
-    );
-  });
 
   const totalWeight = products.reduce((sum, product) => {
     const quantity = quantityMap.get(product.id) ?? 1;

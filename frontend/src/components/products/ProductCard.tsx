@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Product } from '../../types';
@@ -17,14 +18,31 @@ interface ProductCardProps {
   type?: 'new' | 'used' | 'auction';
   currentBid?: number;
   auctionEndDate?: string;
+  auctionStartDate?: string;
   auctionId?: number;
+  auctionStatus?: 'active' | 'scheduled';
 }
 
 function productLink(p: Product) {
   return `/p/${p.id}`;
 }
 
-export default function ProductCard({ product, type = 'new', currentBid, auctionEndDate, auctionId }: ProductCardProps) {
+const truncateText = (value: string, maxLength = 60) => {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+};
+
+type AddState = 'idle' | 'adding' | 'added';
+
+export default function ProductCard({
+  product,
+  type = 'new',
+  currentBid,
+  auctionEndDate,
+  auctionStartDate,
+  auctionId,
+  auctionStatus,
+}: ProductCardProps) {
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
   const dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
@@ -36,14 +54,26 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const removeFromWishlist = useWishlistStore((s) => s.remove);
   const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+  const [addState, setAddState] = useState<AddState>('idle');
+  const addTimerRef = useRef<number | null>(null);
 
   const name = language === 'ar' ? product.name_ar : product.name_en;
+  const displayName = truncateText(name, 60);
   const resolvedImage = resolveProductImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
   const displayPriceRaw = type === 'auction' && currentBid ? currentBid : product.base_price;
   const displayPrice = typeof displayPriceRaw === 'number' && !Number.isNaN(displayPriceRaw) ? displayPriceRaw : 0;
   const isAuction = type === 'auction';
-  const isAuctionEnded =
-    isAuction && auctionEndDate ? new Date(auctionEndDate).getTime() <= Date.now() : false;
+  const nowMs = Date.now();
+  const auctionStartMs = isAuction && auctionStartDate ? new Date(auctionStartDate).getTime() : null;
+  const auctionEndMs = isAuction && auctionEndDate ? new Date(auctionEndDate).getTime() : null;
+  const derivedAuctionStatus: 'active' | 'scheduled' | null = isAuction
+    ? auctionStatus ??
+      (auctionStartMs && auctionStartMs > nowMs ? 'scheduled' : 'active')
+    : null;
+  const isAuctionScheduled = Boolean(
+    isAuction && derivedAuctionStatus === 'scheduled' && auctionStartMs && auctionStartMs > nowMs
+  );
+  const isAuctionEnded = Boolean(isAuction && auctionEndMs && auctionEndMs <= nowMs);
   const isOutOfStock = product.stock_quantity <= 0;
   const conditionLabel =
     product.condition === 'used'
@@ -58,8 +88,54 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   const goodsLabel = t('products.goods', 'Goods');
   const testerBadgeLabel = isTester ? testerLabel : goodsLabel;
   const testerBadgeTone = isTester ? 'bg-rose-500 text-white' : 'bg-emerald-600 text-white';
-  
-  const defaultAuctionEnd = auctionEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const defaultAuctionEnd = auctionEndDate || new Date(nowMs + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const formatAuctionDateTime = (value?: string) => {
+    if (!value) return '';
+    const date = new Date(value);
+    return date.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const auctionButtonLabel = isAuctionEnded
+    ? t('auction.ended')
+    : isAuctionScheduled
+      ? t('auction.scheduled')
+      : t('auction.bidNow');
+
+  const auctionButtonTone = isAuctionEnded
+    ? 'bg-sand text-charcoal/70 cursor-not-allowed'
+    : isAuctionScheduled
+      ? 'bg-sand text-charcoal hover:bg-sand'
+      : 'bg-gold text-charcoal hover:bg-gold-hover';
+  const addButtonLabel = isOutOfStock
+    ? t('products.outOfStock')
+    : addState === 'adding'
+      ? t('common.loading')
+      : addState === 'added'
+        ? t('common.addedToCart', 'تمت الإضافة')
+        : t('common.addToCart');
+  const addButtonTone =
+    isOutOfStock
+      ? 'bg-sand text-charcoal/70 cursor-not-allowed'
+      : addState === 'added'
+        ? 'bg-emerald-600 text-white'
+        : addState === 'adding'
+          ? 'bg-gold-hover text-charcoal'
+          : 'bg-gold text-charcoal hover:bg-gold-hover';
+
+  useEffect(() => {
+    return () => {
+      if (addTimerRef.current) {
+        window.clearTimeout(addTimerRef.current);
+      }
+    };
+  }, []);
 
   const toggleWishlist = async () => {
     if (!isAuthenticated) {
@@ -83,6 +159,7 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
           price: displayPrice,
           image: resolvedImage,
           brand: product.brand,
+          sellerId: product.seller_id,
         });
       }
     } catch (error) {
@@ -91,7 +168,11 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
   };
 
   const handleAddToCart = () => {
-    if (isAuctionEnded || isOutOfStock) return;
+    if (isAuctionEnded || isOutOfStock || addState === 'adding') return;
+    if (addTimerRef.current) {
+      window.clearTimeout(addTimerRef.current);
+    }
+    setAddState('adding');
     addToCart(
       {
         id: product.id.toString(),
@@ -99,9 +180,15 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
         price: displayPrice,
         image: resolvedImage,
         brand: product.brand,
+        sellerId: product.seller_id,
       },
       1
     );
+    setAddState('added');
+    addTimerRef.current = window.setTimeout(() => {
+      setAddState('idle');
+      addTimerRef.current = null;
+    }, 1500);
   };
 
   return (
@@ -174,18 +261,25 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
           )}
         </div>
 
-        {/* عنوان بسطرين ثابتين لثبات الارتفاع */}
+        {/* عنوان بسطر واحد ثابت لثبات الارتفاع */}
         <Link
           to={targetLink}
-          className="block text-sm sm:text-base text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-2 min-h-[40px] sm:min-h-[48px] break-words"
+          className="block text-sm sm:text-base text-charcoal font-semibold leading-snug hover:text-gold transition-colors line-clamp-1 truncate whitespace-nowrap min-h-[20px] sm:min-h-[24px]"
+          title={name}
         >
-          {name}
+          {displayName}
         </Link>
 
         {/* ====== السعر + العداد + الزر مثبتان أسفل البطاقة ====== */}
         <div className="mt-auto space-y-2">
           {type === 'auction' && !isAuctionEnded && (
-            <CountdownTimer endDate={defaultAuctionEnd} />
+            <CountdownTimer endDate={defaultAuctionEnd} startDate={auctionStartDate} />
+          )}
+
+          {type === 'auction' && isAuctionScheduled && (
+            <div className="text-[11px] text-taupe">
+              {t('auction.startsAt')}: {formatAuctionDateTime(auctionStartDate)}
+            </div>
           )}
           
           <div className="text-gold font-extrabold text-base sm:text-lg inline-flex items-center gap-1">
@@ -195,36 +289,30 @@ export default function ProductCard({ product, type = 'new', currentBid, auction
           {type === 'auction' ? (
             <Link
               to={targetLink}
-              aria-label={isAuctionEnded ? t('auction.ended') : t('auction.bidNow')}
-              className={`h-10 sm:h-11 w-full rounded-luxury font-semibold transition flex items-center justify-center gap-2 min-h-[40px] sm:min-h-[44px] text-sm sm:text-base ${
-                isAuctionEnded
-                  ? 'bg-sand text-charcoal/70 cursor-not-allowed'
-                  : 'bg-gold text-charcoal hover:bg-gold-hover'
-              }`}
+              aria-label={auctionButtonLabel}
+              className={`h-10 sm:h-11 w-full rounded-luxury font-semibold transition flex items-center justify-center gap-2 min-h-[40px] sm:min-h-[44px] text-sm sm:text-base ${auctionButtonTone}`}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M9 6h6M9 18h6" />
               </svg>
-              <span>{isAuctionEnded ? t('auction.ended') : t('auction.bidNow')}</span>
+              <span>{auctionButtonLabel}</span>
             </Link>
           ) : (
             <button
               onClick={handleAddToCart}
-              disabled={isAuctionEnded || isOutOfStock}
-              className={`h-10 sm:h-11 w-full rounded-luxury font-semibold transition flex items-center justify-center gap-2 min-h-[40px] sm:min-h-[44px] text-sm sm:text-base ${
-                isAuctionEnded || isOutOfStock
-                  ? 'bg-sand text-charcoal/70 cursor-not-allowed'
-                  : 'bg-gold text-charcoal hover:bg-gold-hover'
-              }`}
+              disabled={isAuctionEnded || isOutOfStock || addState === 'adding'}
+              className={`h-10 sm:h-11 w-full rounded-luxury font-semibold transition flex items-center justify-center gap-2 min-h-[40px] sm:min-h-[44px] text-sm sm:text-base disabled:opacity-80 disabled:cursor-not-allowed ${addButtonTone}`}
               aria-label={t('common.addToCart')}
             >
-              <span>
-                {isOutOfStock ? t('products.outOfStock') : t('common.addToCart')}
-              </span>
+              <span>{addButtonLabel}</span>
               {isOutOfStock ? (
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6M15 9l-6 6" />
                   <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                </svg>
+              ) : addState === 'added' ? (
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">

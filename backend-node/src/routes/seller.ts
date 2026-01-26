@@ -188,6 +188,7 @@ router.get("/auctions", sellerOnly, async (req, res, next) => {
     const auctions = await listAuctions({
       seller_id: req.user.id,
       status,
+      scope: "seller",
       include_pending: true,
     });
 

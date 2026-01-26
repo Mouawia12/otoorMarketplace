@@ -31,9 +31,6 @@ const mapSellerProfile = (profile: UserWithRoles['sellerProfile']) => {
     phone: profile.phone,
     city: profile.city,
     address: profile.address,
-    national_id: profile.nationalId,
-    iban: profile.iban,
-    bank_name: profile.bankName,
     torod_warehouse_id: profile.torodWarehouseId ?? null,
     status: profile.status?.toLowerCase?.() ?? profile.status,
     created_at: profile.createdAt,
@@ -57,6 +54,7 @@ const serializeUser = (user: UserWithRoles) => {
     seller_profile: sellerProfile,
     seller_profile_submitted: Boolean(sellerProfile),
     verified_seller: user.verifiedSeller,
+    email_verified: user.emailVerified,
     requires_password_reset: user.requiresPasswordReset,
   };
 };
@@ -103,6 +101,101 @@ export const resetPasswordSchema = z
   });
 
 const PASSWORD_RESET_EXPIRY_MINUTES = 15;
+const EMAIL_VERIFICATION_TOKEN_BYTES = 48;
+
+const hashToken = (token: string) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+const normalizeRedirectPath = (redirect?: string | null) => {
+  if (!redirect) return null;
+  const trimmed = redirect.trim();
+  if (!trimmed.startsWith("/")) return null;
+  if (trimmed.startsWith("//")) return null;
+  if (trimmed.length > 2048) return null;
+  return trimmed;
+};
+
+const buildEmailVerificationUrl = (token: string, redirect?: string | null) => {
+  const safeRedirect = normalizeRedirectPath(redirect);
+  const redirectSuffix = safeRedirect
+    ? `&redirect=${encodeURIComponent(safeRedirect)}`
+    : "";
+  return `${config.auth.emailVerificationUrl}?token=${encodeURIComponent(token)}${redirectSuffix}`;
+};
+
+const sendVerificationEmail = async ({
+  email,
+  fullName,
+  token,
+  redirect,
+}: {
+  email: string;
+  fullName: string;
+  token: string;
+  redirect?: string | null;
+}) => {
+  const verificationUrl = buildEmailVerificationUrl(token, redirect);
+  const expiresInHours = config.auth.emailVerificationTokenExpiresHours;
+  const brandSignature = "FragraWorld | عالم العطور";
+  const contactEmail = config.support.email;
+
+  const plainText = [
+    `مرحباً ${fullName}`.trim(),
+    "",
+    `شكراً لانضمامك إلى ${brandSignature}. لتفعيل حسابك، اضغط الرابط التالي:`,
+    verificationUrl,
+    "",
+    `صلاحية الرابط: ${expiresInHours} ساعة.`,
+    `إذا لم تُنشئ هذا الحساب، يمكنك تجاهل هذه الرسالة أو مراسلتنا على ${contactEmail}.`,
+    "",
+    brandSignature,
+  ].join("\n");
+
+  const html = `
+    <div style="background:#f7f4ef;padding:32px 16px;font-family:'Cairo','Inter','Segoe UI',sans-serif;direction:rtl;text-align:center;color:#2c2a29;">
+      <table role="presentation" style="margin:0 auto;max-width:560px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 18px 45px rgba(0,0,0,0.08);border:1px solid rgba(0,0,0,0.04);">
+        <tr>
+          <td style="padding:28px 28px 12px;background:linear-gradient(135deg,#111 0%,#2b2b2b 100%);color:#f8f5ef;">
+            <div style="font-size:13px;letter-spacing:.6px;opacity:.85;margin-bottom:6px;">${brandSignature}</div>
+            <div style="font-size:26px;font-weight:800;margin:0;">تفعيل الحساب</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:26px 28px 10px;">
+            <p style="margin:0 0 12px;font-size:16px;line-height:1.9;color:#3a342f;">مرحباً ${fullName}،</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.9;color:#4d463f;">
+              يسعدنا انضمامك. لتأمين حسابك وتفعيل كل المزايا، نحتاج منك تأكيد بريدك الإلكتروني.
+            </p>
+            <div style="margin:26px 0 22px;">
+              <a href="${verificationUrl}" style="display:inline-block;padding:15px 26px;background:#caa56a;color:#2c2a29;font-weight:800;text-decoration:none;border-radius:999px;box-shadow:0 10px 24px rgba(202,165,106,0.35);">
+                تفعيل الحساب الآن
+              </a>
+            </div>
+            <p style="margin:0 0 10px;font-size:13px;line-height:1.8;color:#6a635b;">
+              صلاحية رابط التفعيل: ${expiresInHours} ساعة.
+            </p>
+            <p style="margin:0 0 4px;font-size:13px;line-height:1.8;color:#6a635b;">
+              إذا لم تقم بإنشاء هذا الحساب، تجاهل الرسالة أو تواصل معنا عبر
+              <a href="mailto:${contactEmail}" style="color:#a67c52;font-weight:700;text-decoration:none;">${contactEmail}</a>.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f2e9dc;padding:14px 20px;text-align:center;font-size:12.5px;color:#655b50;">
+            فريق ${brandSignature}
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  await sendMail({
+    to: email,
+    subject: "تفعيل حسابك في عالم العطور",
+    html,
+    text: plainText,
+  });
+};
 
 export const registerUser = async (input: z.infer<typeof registerSchema>) => {
   const data = registerSchema.parse(input);
@@ -118,6 +211,13 @@ export const registerUser = async (input: z.infer<typeof registerSchema>) => {
   }
 
   const passwordHash = await hashPassword(data.password);
+  const rawVerificationToken = crypto
+    .randomBytes(EMAIL_VERIFICATION_TOKEN_BYTES)
+    .toString("hex");
+  const verificationTokenHash = hashToken(rawVerificationToken);
+  const verificationExpiresAt = new Date(
+    Date.now() + config.auth.emailVerificationTokenExpiresHours * 60 * 60 * 1000,
+  );
 
   const user = await prisma.user.create({
     data: {
@@ -125,6 +225,10 @@ export const registerUser = async (input: z.infer<typeof registerSchema>) => {
       passwordHash,
       fullName: data.fullName,
       phone: data.phone ?? null,
+      emailVerified: false,
+      emailVerificationTokenHash: verificationTokenHash,
+      emailVerificationTokenExpiresAt: verificationExpiresAt,
+      emailVerificationSentAt: new Date(),
       roles: {
         create: roles.map((roleName) => ({
           role: {
@@ -136,11 +240,6 @@ export const registerUser = async (input: z.infer<typeof registerSchema>) => {
     include: userWithRolesInclude,
   });
 
-  const token = signAccessToken({
-    sub: user.id,
-    roles: user.roles.map((role) => role.role.name),
-  });
-
   await notifyAdmins({
     type: NotificationType.USER_REGISTERED,
     title: "تسجيل مستخدم جديد",
@@ -149,9 +248,19 @@ export const registerUser = async (input: z.infer<typeof registerSchema>) => {
     fallbackToSupport: true,
   });
 
+  try {
+    await sendVerificationEmail({
+      email: user.email,
+      fullName: user.fullName,
+      token: rawVerificationToken,
+    });
+  } catch (error) {
+    console.error("Failed to send verification email", error);
+  }
+
   return {
-    token,
-    user: serializeUser(user),
+    requires_verification: true,
+    email: user.email,
   };
 };
 
@@ -224,6 +333,10 @@ export const authenticateWithGoogle = async (
         passwordHash,
         fullName: createFullName,
         avatarUrl: picture ?? null,
+        emailVerified: true,
+        emailVerificationTokenHash: null,
+        emailVerificationTokenExpiresAt: null,
+        emailVerificationSentAt: null,
         roles: {
           create: [{ role: { connect: { name: requestedRole } } }],
         },
@@ -387,6 +500,10 @@ export const authenticateUser = async (input: z.infer<typeof loginSchema>) => {
     );
   }
 
+  if (!user.emailVerified) {
+    throw AppError.forbidden("يرجى تفعيل الحساب عبر البريد الإلكتروني أولاً");
+  }
+
   const valid = await verifyPassword(data.password, user.passwordHash);
   if (!valid) {
     throw AppError.unauthorized("Invalid credentials");
@@ -401,6 +518,128 @@ export const authenticateUser = async (input: z.infer<typeof loginSchema>) => {
     token,
     user: serializeUser(user),
   };
+};
+
+export const resendVerificationEmailSchema = z.object({
+  email: z.string().email(),
+  redirect: z.string().max(2048).optional(),
+});
+
+const assertResendCooldown = (lastSentAt: Date | null) => {
+  if (!lastSentAt) return;
+  const cooldownMs = config.auth.emailVerificationResendCooldownSeconds * 1000;
+  const elapsed = Date.now() - lastSentAt.getTime();
+  if (elapsed < cooldownMs) {
+    const remainingSeconds = Math.max(1, Math.ceil((cooldownMs - elapsed) / 1000));
+    throw AppError.badRequest(
+      `يرجى الانتظار ${remainingSeconds} ثانية قبل إعادة الإرسال`,
+    );
+  }
+};
+
+export const resendVerificationEmail = async (
+  input: z.infer<typeof resendVerificationEmailSchema>,
+) => {
+  const data = resendVerificationEmailSchema.parse(input);
+  const user = await prisma.user.findUnique({
+    where: { email: data.email },
+    include: userWithRolesInclude,
+  });
+
+  if (!user) {
+    return { success: true };
+  }
+
+  if (user.emailVerified) {
+    return { success: true };
+  }
+
+  assertResendCooldown(user.emailVerificationSentAt ?? null);
+
+  const rawVerificationToken = crypto
+    .randomBytes(EMAIL_VERIFICATION_TOKEN_BYTES)
+    .toString("hex");
+  const verificationTokenHash = hashToken(rawVerificationToken);
+  const verificationExpiresAt = new Date(
+    Date.now() + config.auth.emailVerificationTokenExpiresHours * 60 * 60 * 1000,
+  );
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerificationTokenHash: verificationTokenHash,
+      emailVerificationTokenExpiresAt: verificationExpiresAt,
+      emailVerificationSentAt: new Date(),
+    },
+  });
+
+  try {
+    await sendVerificationEmail({
+      email: user.email,
+      fullName: user.fullName,
+      token: rawVerificationToken,
+      redirect: data.redirect ?? null,
+    });
+  } catch (error) {
+    console.error("Failed to resend verification email", error);
+  }
+
+  return { success: true };
+};
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(20),
+});
+
+export const verifyEmailToken = async (
+  input: z.infer<typeof verifyEmailSchema>,
+) => {
+  const data = verifyEmailSchema.parse(input);
+  const tokenHash = hashToken(data.token);
+
+  const user = (await prisma.user.findFirst({
+    where: {
+      emailVerificationTokenHash: tokenHash,
+    },
+    include: userWithRolesInclude,
+  })) as UserWithRoles | null;
+
+  if (!user) {
+    throw AppError.badRequest("رابط التفعيل غير صالح");
+  }
+
+  if (user.emailVerified) {
+    const token = signAccessToken({
+      sub: user.id,
+      roles: user.roles.map((role) => role.role.name),
+    });
+    return { token, user: serializeUser(user), already_verified: true };
+  }
+
+  if (!user.emailVerificationTokenExpiresAt) {
+    throw AppError.badRequest("رابط التفعيل غير صالح");
+  }
+
+  if (user.emailVerificationTokenExpiresAt.getTime() < Date.now()) {
+    throw AppError.badRequest("انتهت صلاحية رابط التفعيل، اطلب رابطاً جديداً");
+  }
+
+  const updated = (await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerified: true,
+      emailVerificationTokenHash: null,
+      emailVerificationTokenExpiresAt: null,
+    },
+    include: userWithRolesInclude,
+  })) as UserWithRoles;
+
+  const token = signAccessToken({
+    sub: updated.id,
+    roles: updated.roles.map((role) => role.role.name),
+  });
+
+  return { token, user: serializeUser(updated), already_verified: false };
 };
 
 export const changePassword = async (

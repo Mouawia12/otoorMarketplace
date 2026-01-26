@@ -20,6 +20,13 @@ export const hasSubmittedSellerProfile = (user?: User | null): boolean => {
 };
 
 export const resolvePostAuthRoute = (user: User, redirectParam?: string | null): string => {
+  if (user.email_verified === false) {
+    const redirectSuffix = redirectParam
+      ? `&redirect=${encodeURIComponent(redirectParam)}`
+      : '';
+    return `/verify-email/sent?email=${encodeURIComponent(user.email)}${redirectSuffix}`;
+  }
+
   if (redirectParam) {
     return redirectParam;
   }

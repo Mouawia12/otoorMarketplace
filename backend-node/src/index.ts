@@ -17,6 +17,11 @@ import { resumePendingPerfumeImports } from "./services/perfumeImportService";
 const app = express();
 const httpServer = http.createServer(app);
 
+if (config.nodeEnv === "production") {
+  // Ensure secure cookies work correctly behind reverse proxies.
+  app.set("trust proxy", 1);
+}
+
 const corsOptions: CorsOptions =
   config.allowedOrigins.length === 1 && config.allowedOrigins[0] === "*"
     ? { origin: true, credentials: true }

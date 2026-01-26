@@ -10,20 +10,23 @@ import {
   changePasswordSchema,
   requestPasswordReset,
   resetPassword,
+  resendVerificationEmail,
+  verifyEmailToken,
 } from "../services/authService";
 import { authenticate } from "../middleware/auth";
 import { getUserProfile, updateUserProfile } from "../services/userService";
 import { toPlainObject } from "../utils/serializer";
 import { AppError } from "../utils/errors";
 import { config } from "../config/env";
+import { signAccessToken } from "../utils/jwt";
 
 const router = Router();
 
 const setAuthCookie = (res: Response, token: string) => {
   res.cookie(config.auth.cookieName, token, {
     httpOnly: true,
-    secure: config.nodeEnv === "production",
-    sameSite: "lax",
+    secure: config.auth.cookieSecure,
+    sameSite: config.auth.cookieSameSite,
     maxAge: config.auth.cookieMaxAgeSeconds * 1000,
     path: "/",
   });
@@ -32,11 +35,7 @@ const setAuthCookie = (res: Response, token: string) => {
 router.post("/register", async (req, res, next) => {
   try {
     const payload = await registerUser(req.body);
-    setAuthCookie(res, payload.token);
-    res.status(201).json({
-      access_token: payload.token,
-      user: payload.user,
-    });
+    res.status(201).json(payload);
   } catch (error) {
     next(error);
   }
@@ -48,7 +47,6 @@ router.post("/login", async (req, res, next) => {
     const payload = await authenticateUser(data);
     setAuthCookie(res, payload.token);
     res.json({
-      access_token: payload.token,
       user: payload.user,
     });
   } catch (error) {
@@ -61,7 +59,6 @@ router.post("/google", async (req, res, next) => {
     const payload = await authenticateWithGoogle(req.body);
     setAuthCookie(res, payload.token);
     res.json({
-      access_token: payload.token,
       user: payload.user,
     });
   } catch (error) {
@@ -72,8 +69,8 @@ router.post("/google", async (req, res, next) => {
 router.post("/logout", (_req, res) => {
   res.clearCookie(config.auth.cookieName, {
     httpOnly: true,
-    secure: config.nodeEnv === "production",
-    sameSite: "lax",
+    secure: config.auth.cookieSecure,
+    sameSite: config.auth.cookieSameSite,
     path: "/",
   });
   res.json({ success: true });
@@ -92,6 +89,28 @@ router.post("/reset-password", async (req, res, next) => {
   try {
     await resetPassword(req.body);
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/resend-verification", async (req, res, next) => {
+  try {
+    const result = await resendVerificationEmail(req.body);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify-email", async (req, res, next) => {
+  try {
+    const result = await verifyEmailToken(req.body);
+    setAuthCookie(res, result.token);
+    res.json({
+      user: result.user,
+      already_verified: result.already_verified,
+    });
   } catch (error) {
     next(error);
   }
@@ -117,6 +136,11 @@ router.get("/me", authenticate(), async (req, res, next) => {
     }
 
     const profile = await getUserProfile(req.user.id);
+    const refreshedToken = signAccessToken({
+      sub: req.user.id,
+      roles: req.user.roles,
+    });
+    setAuthCookie(res, refreshedToken);
     res.json(toPlainObject(profile));
   } catch (error) {
     next(error);

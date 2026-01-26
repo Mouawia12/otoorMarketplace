@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../store/uiStore';
@@ -39,6 +39,37 @@ export default function ProductDetailPage() {
     count: 0,
   });
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const productId = product?.id ?? 0;
+  const name = product ? (language === 'ar' ? product.name_ar : product.name_en) : '';
+  const description = product ? (language === 'ar' ? product.description_ar : product.description_en) : '';
+  const resolvedImage = resolveProductImageUrl(product?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
+  const resolvedImages = (product?.image_urls || [])
+    .map((img) => resolveProductImageUrl(img) || '')
+    .filter(Boolean);
+  const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
+  const hasInWishlist = product ? wishlistHas(String(product.id)) : false;
+  const isInStock = product ? product.stock_quantity > 0 : false;
+  const ratingLabel = reviewStats.count > 0 ? reviewStats.average.toFixed(1) : t('reviews.noRatings');
+  const sellerName = product?.seller?.full_name;
+  const sellerVerified = product?.seller?.verified_seller;
+  const locale = language === 'ar' ? 'ar-EG' : 'en-US';
+  const crossSellProducts = useMemo(() => {
+    if (!product) return [];
+    const pool = [...relatedProducts, ...brandProducts];
+    const seen = new Set<number>();
+    const result: Product[] = [];
+
+    for (const candidate of pool) {
+      if (!candidate || candidate.id === product.id) continue;
+      if (seen.has(candidate.id)) continue;
+      if (candidate.stock_quantity <= 0) continue;
+      seen.add(candidate.id);
+      result.push(candidate);
+      if (result.length >= 2) break;
+    }
+
+    return result;
+  }, [relatedProducts, brandProducts, product, productId]);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -98,29 +129,6 @@ export default function ProductDetailPage() {
     loadProduct();
   }, [id, isAuthenticated]);
 
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-taupe">{t('common.loading')}</p>
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-taupe">{t('productDetail.notFound')}</p>
-        <button
-          onClick={() => navigate('/new')}
-          className="mt-4 bg-gold text-charcoal px-6 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
-        >
-          {t('productDetail.backToShop')}
-        </button>
-      </div>
-    );
-  }
-  const resolvedImage = resolveProductImageUrl(product.image_urls?.[0]) || PLACEHOLDER_PERFUME;
-  const hasInWishlist = product ? wishlistHas(String(product.id)) : false;
   const toggleWishlist = async () => {
     if (!product) return;
     if (!isAuthenticated) {
@@ -142,6 +150,7 @@ export default function ProductDetailPage() {
           price: product.base_price,
           image: resolvedImage,
           brand: product.brand,
+          sellerId: product.seller_id,
         });
         await fetch(`${import.meta.env.VITE_API_URL || '/api'}/wishlist`, {
           method: 'POST',
@@ -159,17 +168,27 @@ export default function ProductDetailPage() {
     }
   };
 
-  const name = language === 'ar' ? product.name_ar : product.name_en;
-  const description = language === 'ar' ? product.description_ar : product.description_en;
-  const resolvedImages = (product.image_urls || [])
-    .map((img) => resolveProductImageUrl(img) || '')
-    .filter(Boolean);
-  const images = resolvedImages.length ? resolvedImages : [PLACEHOLDER_PERFUME];
-  const isInStock = product.stock_quantity > 0;
-  const ratingLabel = reviewStats.count > 0 ? reviewStats.average.toFixed(1) : t('reviews.noRatings');
-  const sellerName = product.seller?.full_name;
-  const sellerVerified = product.seller?.verified_seller;
-  const locale = language === 'ar' ? 'ar-EG' : 'en-US';
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t('common.loading')}</p>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-taupe">{t('productDetail.notFound')}</p>
+        <button
+          onClick={() => navigate('/new')}
+          className="mt-4 bg-gold text-charcoal px-6 py-2 rounded-luxury font-semibold hover:bg-gold-hover transition"
+        >
+          {t('productDetail.backToShop')}
+        </button>
+      </div>
+    );
+  }
   const renderStars = (value: number) => (
     <div className="flex gap-1" aria-hidden>
       {Array.from({ length: 5 }).map((_, index) => {
@@ -194,7 +213,7 @@ export default function ProductDetailPage() {
     </div>
   );
 
-  const handleBuyNow = () => {
+  const handleAddToCart = () => {
     if (!isInStock || !product) return;
     const primaryImage = images[0] || PLACEHOLDER_PERFUME;
     addToCart(
@@ -204,50 +223,45 @@ export default function ProductDetailPage() {
         price: product.base_price,
         image: primaryImage,
         brand: product.brand,
+        sellerId: product.seller_id,
       },
       1
     );
-    const target = '/checkout';
-    if (!isAuthenticated) {
-      navigate(`/login?redirect=${encodeURIComponent(target)}`);
-      return;
-    }
-    navigate(target);
   };
 
   return (
-    <div className="space-y-12 pb-24 lg:pb-0">
+    <div className="space-y-8 sm:space-y-12 pb-28 sm:pb-24 lg:pb-0">
       {/* Active Auction Banner */}
       {activeAuction && (
-        <div className="bg-gradient-to-r from-gold to-gold-light rounded-luxury p-6 shadow-luxury">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-gold to-gold-light rounded-luxury p-4 sm:p-6 shadow-luxury">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-2xl font-bold text-charcoal mb-2">{t('auction.activeAuction')}</h3>
-              <div className="flex items-center gap-6 text-charcoal">
-                <div>
+              <h3 className="text-xl sm:text-2xl font-bold text-charcoal mb-3">{t('auction.activeAuction')}</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-6 text-charcoal">
+                <div className="min-w-0">
                   <p className="text-sm opacity-80">{t('auction.currentBid')}</p>
-                  <p className="text-2xl font-bold inline-flex items-center gap-1">
+                  <p className="text-xl sm:text-2xl font-bold inline-flex items-center gap-1">
                     {formatPrice(activeAuction.current_price, language).replace(/\s?(SAR|﷼)$/i, '')}
                     <SARIcon size={18} />
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm opacity-80">{t('auction.totalBids')}</p>
                   <p className="text-xl font-bold">{activeAuction.total_bids || 0}</p>
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1 min-w-0">
                   <p className="text-sm opacity-80">{t('auction.timeRemaining')}</p>
                   <Countdown 
                     endAt={activeAuction.end_time} 
                     compact 
-                    className="text-xl font-bold text-charcoal"
+                    className="text-lg sm:text-xl font-bold text-charcoal"
                   />
                 </div>
               </div>
             </div>
             <Link
               to={`/auction/${activeAuction.id}`}
-              className="bg-charcoal text-ivory px-8 py-3 rounded-luxury font-semibold hover:bg-charcoal-light transition whitespace-nowrap"
+              className="w-full sm:w-auto text-center bg-charcoal text-ivory px-6 sm:px-8 py-3 rounded-luxury font-semibold hover:bg-charcoal-light transition whitespace-nowrap"
             >
               {t('auction.goToAuction')}
             </Link>
@@ -255,7 +269,7 @@ export default function ProductDetailPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         <ProductImageCarousel
           images={images}
           name={name}
@@ -278,7 +292,7 @@ export default function ProductDetailPage() {
         />
 
         {/* Product Info */}
-        <div className="space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           <div>
             <Link
               to={`/products?brand=${encodeURIComponent(product.brand)}&status=published`}
@@ -286,26 +300,28 @@ export default function ProductDetailPage() {
             >
               {product.brand}
             </Link>
-            <h1 className="text-h1 text-charcoal mb-4">{name}</h1>
-            <p className="text-charcoal-light leading-relaxed break-words whitespace-pre-line">
+            <h1 className="text-2xl sm:text-3xl lg:text-h1 text-charcoal mb-3 sm:mb-4 break-words">
+              {name}
+            </h1>
+            <p className="text-sm sm:text-base text-charcoal-light leading-relaxed break-words whitespace-pre-line">
               {description}
             </p>
           </div>
 
-          <div className="border-t border-b border-gray-200 py-6 space-y-3">
-            <div className="flex justify-between">
+          <div className="border-t border-b border-gray-200 py-5 sm:py-6 space-y-3 text-sm sm:text-base">
+            <div className="flex justify-between gap-3">
               <span className="text-taupe">{t('productDetail.size')}</span>
               <span className="text-charcoal font-semibold">{product.size_ml}ml</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <span className="text-taupe">{t('productDetail.concentration')}</span>
               <span className="text-charcoal font-semibold">{product.concentration}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <span className="text-taupe">{t('productDetail.category')}</span>
               <span className="text-charcoal font-semibold">{product.category}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3 items-start">
               <span className="text-taupe">{t('productDetail.stock')}</span>
               <span className={`font-semibold ${isInStock ? 'text-success' : 'text-alert'}`}>
                 {isInStock ? `${product.stock_quantity} ${t('productDetail.available')}` : t('products.outOfStock')}
@@ -313,7 +329,7 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-luxury border border-gray-200 p-4">
+          <div className="rounded-luxury border border-gray-200 p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <p className="text-sm text-charcoal-light">{t('products.seller')}</p>
@@ -329,7 +345,7 @@ export default function ProductDetailPage() {
               <div className="mt-3">
                 <Link
                   to={`/store/${product.seller.id}`}
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-charcoal border border-sand/70 px-3 py-2 rounded-luxury hover:bg-sand/60 transition"
+                  className="w-full sm:w-auto justify-center inline-flex items-center gap-2 text-sm font-semibold text-charcoal border border-sand/70 px-3 py-2 rounded-luxury hover:bg-sand/60 transition"
                 >
                   زيارة متجر البائع
                   <span aria-hidden>↗</span>
@@ -338,9 +354,9 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          <div className="bg-sand rounded-luxury p-6">
+          <div className="bg-sand rounded-luxury p-5 sm:p-6">
             <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-4xl font-bold text-gold inline-flex items-center gap-2">
+              <span className="text-3xl sm:text-4xl font-bold text-gold inline-flex items-center gap-2">
                 {formatPrice(product.base_price, language).replace(/\s?(SAR|﷼)$/i, '')}
                 <SARIcon size={22} className="text-gold" />
               </span>
@@ -349,10 +365,10 @@ export default function ProductDetailPage() {
             <div className="space-y-3">
               <button
                 disabled={!isInStock}
-                onClick={handleBuyNow}
+                onClick={handleAddToCart}
                 className="w-full bg-gold text-charcoal px-6 py-3 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <span>{isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}</span>
+                <span>{isInStock ? t('products.addToCart') : t('products.outOfStock')}</span>
                 {!isInStock && (
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6M15 9l-6 6" />
@@ -362,6 +378,24 @@ export default function ProductDetailPage() {
               </button>
             </div>
           </div>
+
+          {crossSellProducts.length > 0 && (
+            <div className="rounded-luxury border border-sand/70 p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-charcoal">
+                  {t('productDetail.crossSellTitle', 'قد يعجبك أيضًا')}
+                </h3>
+                <span className="text-[11px] text-taupe">
+                  {t('productDetail.crossSellHint', 'اقتراحات سريعة قبل الدفع')}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {crossSellProducts.map((item) => (
+                  <ProductCard key={`cross-${item.id}`} product={item} type="new" />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -373,17 +407,17 @@ export default function ProductDetailPage() {
           </div>
           <button
             disabled={!isInStock}
-            onClick={handleBuyNow}
+            onClick={handleAddToCart}
             className="bg-gold text-charcoal px-5 py-2.5 rounded-luxury font-semibold hover:bg-gold-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isInStock ? t('productDetail.buyNow') : t('products.outOfStock')}
+            {isInStock ? t('products.addToCart') : t('products.outOfStock')}
           </button>
         </div>
       </div>
 
       {/* Reviews */}
-      <section className="bg-white rounded-luxury shadow-luxury p-6">
-        <div className="flex flex-col md:flex-row gap-8">
+      <section className="bg-white rounded-luxury shadow-luxury p-5 sm:p-6">
+        <div className="flex flex-col md:flex-row gap-6 sm:gap-8">
           <div className="md:w-1/3 bg-sand/50 rounded-luxury p-5 space-y-3">
             <p className="text-sm text-charcoal-light">{t('reviews.overall')}</p>
             <div className="text-4xl font-bold text-charcoal">{reviewStats.count ? reviewStats.average.toFixed(1) : '—'}</div>
@@ -440,8 +474,8 @@ export default function ProductDetailPage() {
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (
-        <div className="border-t border-gray-200 pt-12">
-          <h2 className="text-h2 text-charcoal mb-6">{t('productDetail.relatedProducts')}</h2>
+        <div className="border-t border-gray-200 pt-10 sm:pt-12">
+          <h2 className="text-h2 text-charcoal mb-5 sm:mb-6">{t('productDetail.relatedProducts')}</h2>
           <div className="responsive-card-grid responsive-card-grid--roomy">
             {relatedProducts.map((relatedProduct) => (
               <ProductCard key={relatedProduct.id} product={relatedProduct} type="new" />
@@ -451,8 +485,8 @@ export default function ProductDetailPage() {
       )}
 
       {brandProducts.length > 0 && (
-        <div className="border-t border-gray-200 pt-12">
-          <div className="flex items-center justify-between mb-6">
+        <div className="border-t border-gray-200 pt-10 sm:pt-12">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5 sm:mb-6">
             <h2 className="text-h2 text-charcoal">
               {t('productDetail.moreFromBrand', 'مزيد من منتجات نفس العلامة')}
             </h2>

@@ -46,6 +46,14 @@ type PaymentMethod = {
   imageUrl?: string;
 };
 
+type InventoryIssue = {
+  productId: number;
+  name: string;
+  requestedQuantity: number;
+  availableQuantity: number;
+  reason: string;
+};
+
 const extractList = (payload: any): any[] => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
@@ -151,6 +159,37 @@ const pickNumber = (raw: Record<string, unknown>, keys: string[]) => {
   return undefined;
 };
 
+const formatInventoryIssues = (details: any, fallback: string) => {
+  if (!details || details.code !== "INSUFFICIENT_STOCK") {
+    return fallback;
+  }
+  const issues: InventoryIssue[] = Array.isArray(details.issues) ? details.issues : [];
+  if (issues.length === 0) {
+    return fallback;
+  }
+  const formatted = issues
+    .map((issue) => {
+      const available = Math.max(0, Number(issue.availableQuantity ?? 0));
+      const requested = Math.max(1, Number(issue.requestedQuantity ?? 1));
+      return `${issue.name} (المتاح ${available}، المطلوب ${requested})`;
+    })
+    .join("، ");
+  return `الكمية غير كافية لبعض المنتجات: ${formatted}`;
+};
+
+const normalizeSellerDiscounts = (value: any): Record<string, number> => {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.entries(value).reduce<Record<string, number>>((acc, [sellerId, amount]) => {
+    const numericAmount = typeof amount === "number" ? amount : Number(amount);
+    if (Number.isFinite(numericAmount) && numericAmount > 0) {
+      acc[sellerId] = numericAmount;
+    }
+    return acc;
+  }, {});
+};
+
 const normalizePaymentTokens = (value: unknown) => {
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry).toLowerCase());
@@ -219,6 +258,7 @@ export default function CheckoutPage() {
     : i18n.language?.startsWith("fr")
     ? "fr"
     : "en";
+  const orderLanguage: "ar" | "en" = lang === "ar" ? "ar" : "en";
 
   const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState("");
@@ -250,7 +290,7 @@ export default function CheckoutPage() {
   const [locationsError, setLocationsError] = useState<string | null>(null);
 
   useEffect(() => {
-    setCoupons([]);
+    setCoupons({ coupons: [], sellerDiscounts: {}, totalDiscount: 0 });
     setCouponCode("");
     setCouponError("");
     setCouponSuccess("");
@@ -584,8 +624,15 @@ export default function CheckoutPage() {
           discount_value: Number(entry.coupon.discount_value),
           seller_id: entry.coupon.seller_id ?? null,
         },
+        perSellerDiscounts: normalizeSellerDiscounts(entry.per_seller_discounts),
       }));
-      setCoupons(nextCoupons);
+      const sellerDiscounts = normalizeSellerDiscounts(payload.per_seller_discounts);
+      const totalDiscount = Number(payload.total_discount ?? 0);
+      setCoupons({
+        coupons: nextCoupons,
+        sellerDiscounts,
+        totalDiscount: Number.isFinite(totalDiscount) ? totalDiscount : undefined,
+      });
       setCouponSuccess(t('checkout.couponApplied'));
       setCouponCode("");
     } catch (error: any) {
@@ -736,6 +783,7 @@ export default function CheckoutPage() {
       payment_method: "MYFATOORAH",
       payment_method_id: !isCodPayment ? selectedPaymentMethod?.id : undefined,
       payment_method_code: !isCodPayment ? selectedPaymentMethod?.code : undefined,
+      language: orderLanguage,
       total_amount: totalAmount,
       shipping: {
         name: String(formData.name ?? "").trim(),
@@ -802,6 +850,7 @@ export default function CheckoutPage() {
     } catch (error: any) {
       console.error("Failed to place order", error);
       const apiMessage = error?.response?.data?.message || error?.response?.data?.detail;
+      const apiDetails = error?.response?.data?.details;
       const fallback =
         error?.message || JSON.stringify(error);
       const message =
@@ -810,7 +859,11 @@ export default function CheckoutPage() {
           : apiMessage !== undefined
           ? JSON.stringify(apiMessage)
           : fallback;
-      setSubmitError(message ?? t('checkout.orderFailed', 'Failed to place order'));
+      const resolvedMessage = formatInventoryIssues(
+        apiDetails,
+        message ?? t('checkout.orderFailed', 'Failed to place order')
+      );
+      setSubmitError(resolvedMessage);
     } finally {
       setPlacingOrder(false);
     }
@@ -1255,7 +1308,7 @@ export default function CheckoutPage() {
                             onClick={() => {
                               const remaining = coupons.filter((c) => c.code !== coupon.code);
                               if (remaining.length === 0) {
-                                setCoupons([]);
+                                setCoupons({ coupons: [], sellerDiscounts: {}, totalDiscount: 0 });
                                 setCouponError("");
                                 setCouponSuccess("");
                                 return;
@@ -1278,8 +1331,15 @@ export default function CheckoutPage() {
                                       discount_value: Number(entry.coupon.discount_value),
                                       seller_id: entry.coupon.seller_id ?? null,
                                     },
+                                    perSellerDiscounts: normalizeSellerDiscounts(entry.per_seller_discounts),
                                   }));
-                                  setCoupons(nextCoupons);
+                                  const sellerDiscounts = normalizeSellerDiscounts(payload.per_seller_discounts);
+                                  const totalDiscount = Number(payload.total_discount ?? 0);
+                                  setCoupons({
+                                    coupons: nextCoupons,
+                                    sellerDiscounts,
+                                    totalDiscount: Number.isFinite(totalDiscount) ? totalDiscount : undefined,
+                                  });
                                   setCouponError("");
                                 })
                                 .catch((error: any) => {

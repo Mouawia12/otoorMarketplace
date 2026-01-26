@@ -10,6 +10,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import VerifyEmailSentPage from './pages/VerifyEmailSentPage';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
 import ProductDetailPage from './pages/ProductDetailPage';
@@ -95,12 +97,18 @@ const withSuspense = (node: ReactNode) => (
 );
 
 function App() {
-  const { isAuthenticated, fetchUser, user } = useAuthStore();
+  const { isAuthenticated, fetchUser, user, initializeAuth, authChecked } = useAuthStore();
   const { language } = useUIStore();
 
   useEffect(() => {
-    if (isAuthenticated && !user) fetchUser();
-  }, [isAuthenticated, user, fetchUser]);
+    void initializeAuth();
+  }, [initializeAuth]);
+
+  useEffect(() => {
+    if (authChecked && isAuthenticated && !user) {
+      void fetchUser();
+    }
+  }, [authChecked, isAuthenticated, user, fetchUser]);
 
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
@@ -122,6 +130,8 @@ function App() {
           <Route path="register" element={<Register />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="reset-password" element={<ResetPassword />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
+          <Route path="verify-email/sent" element={<VerifyEmailSentPage />} />
 
           <Route path="new" element={<NewPerfumes />} />
           <Route path="used" element={<UsedPerfumes />} />

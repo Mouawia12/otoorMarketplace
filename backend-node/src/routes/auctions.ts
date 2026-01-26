@@ -18,6 +18,7 @@ router.get("/", async (req, res, next) => {
   try {
     const auctions = await listAuctions({
       ...req.query,
+      scope: "public",
       include_pending: false,
     });
     res.json({ auctions });

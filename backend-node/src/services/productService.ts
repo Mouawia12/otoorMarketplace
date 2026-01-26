@@ -23,6 +23,7 @@ const normalizeStatus = (status: string | null | undefined) => {
 export const normalizeProduct = (product: any) => {
   const plain = toPlainObject(product);
   const auctions = Array.isArray(plain.auctions) ? plain.auctions : [];
+  const now = new Date();
   const rawImages = Array.isArray(plain.images)
     ? plain.images.map((image: any) => image.url)
     : plain.image_urls ?? [];
@@ -33,7 +34,22 @@ export const normalizeProduct = (product: any) => {
 
   const hasActiveAuction = auctions.some((auction: any) => {
     const status = typeof auction?.status === "string" ? auction.status.toUpperCase() : "";
-    return status === AuctionStatus.ACTIVE || status === AuctionStatus.SCHEDULED;
+    if (status !== AuctionStatus.ACTIVE && status !== AuctionStatus.SCHEDULED) {
+      return false;
+    }
+
+    const startTime = auction?.startTime ? new Date(auction.startTime) : null;
+    const endTime = auction?.endTime ? new Date(auction.endTime) : null;
+
+    if (!startTime || !endTime || endTime <= now) {
+      return false;
+    }
+
+    if (status === AuctionStatus.SCHEDULED) {
+      return startTime > now;
+    }
+
+    return startTime <= now && endTime > now;
   });
 
   const weightKg =
@@ -126,7 +142,6 @@ export const listProducts = async (query: unknown) => {
     brand,
     category,
     condition,
-    status,
     min_price,
   max_price,
   sort,
@@ -145,19 +160,8 @@ export const listProducts = async (query: unknown) => {
     },
   };
 
-  if (status) {
-    if (typeof status === "string") {
-      if (status === "pending") {
-        filters.status = ProductStatus.PENDING_REVIEW;
-      } else {
-        filters.status = status.toUpperCase() as ProductStatus;
-      }
-    } else {
-      filters.status = status;
-    }
-  } else {
-    filters.status = ProductStatus.PUBLISHED;
-  }
+  // Public catalog must never expose unpublished items, even if status is passed via query params.
+  filters.status = ProductStatus.PUBLISHED;
 
   if (seller && seller !== "me") {
     filters.sellerId = seller;
@@ -298,8 +302,8 @@ export const listProductSuggestions = async (query: unknown) => {
 
 export const getProductById = async (id: number) => {
   const [product, ratingStats] = await prisma.$transaction([
-    prisma.product.findUnique({
-      where: { id },
+    prisma.product.findFirst({
+      where: { id, status: ProductStatus.PUBLISHED },
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         seller: {

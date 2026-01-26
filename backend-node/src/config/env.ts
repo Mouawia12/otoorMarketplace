@@ -11,7 +11,7 @@ const envSchema = z.object({
     .min(1, "DATABASE_URL is required")
     .describe("MySQL connection string"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET should be at least 32 chars"),
-  JWT_EXPIRES_IN: z.string().default("86400"),
+  JWT_EXPIRES_IN: z.string().default("604800"),
   ALLOWED_ORIGINS: z.string().default("*"),
   PLATFORM_COMMISSION_RATE: z
     .string()
@@ -36,7 +36,15 @@ const envSchema = z.object({
     .string()
     .url()
     .default("http://localhost:5173/reset-password"),
+  EMAIL_VERIFICATION_URL: z
+    .string()
+    .url()
+    .default("http://localhost:5173/verify-email"),
+  EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS: z.coerce.number().default(24),
+  EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: z.coerce.number().default(60),
   AUTH_COOKIE_NAME: z.string().default("otoor_session"),
+  AUTH_COOKIE_SECURE: z.string().optional(),
+  AUTH_COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
   ADMIN_PROTECTED_EMAIL: z
     .string()
     .email()
@@ -88,7 +96,12 @@ const {
   MAIL_FROM_ADDRESS,
   MAIL_FROM_NAME,
   PASSWORD_RESET_URL,
+  EMAIL_VERIFICATION_URL,
+  EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS,
+  EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS,
   AUTH_COOKIE_NAME,
+  AUTH_COOKIE_SECURE,
+  AUTH_COOKIE_SAME_SITE,
   ADMIN_PROTECTED_EMAIL,
   TOROD_API_URL,
   TOROD_CLIENT_ID,
@@ -106,6 +119,11 @@ const allowedOrigins =
     : ALLOWED_ORIGINS.split(",")
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0);
+
+const cookieSecure =
+  typeof AUTH_COOKIE_SECURE === "string"
+    ? ["1", "true", "yes", "on"].includes(AUTH_COOKIE_SECURE.trim().toLowerCase())
+    : NODE_ENV === "production";
 
 export const config = {
   nodeEnv: NODE_ENV,
@@ -144,7 +162,12 @@ export const config = {
   },
   auth: {
     passwordResetUrl: PASSWORD_RESET_URL.replace(/\/+$/, ""),
+    emailVerificationUrl: EMAIL_VERIFICATION_URL.replace(/\/+$/, ""),
+    emailVerificationTokenExpiresHours: EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS,
+    emailVerificationResendCooldownSeconds: EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS,
     cookieName: AUTH_COOKIE_NAME,
+    cookieSecure,
+    cookieSameSite: AUTH_COOKIE_SAME_SITE,
     cookieMaxAgeSeconds: (() => {
       const numericExpires = Number(JWT_EXPIRES_IN);
       return Number.isNaN(numericExpires) ? 86400 : numericExpires;

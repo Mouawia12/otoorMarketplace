@@ -58,6 +58,8 @@ export default function AdminAuctionsPage() {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [bidLog, setBidLog] = useState<Bid[]>([]);
   const [bidsLoading, setBidsLoading] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [actionAuctionId, setActionAuctionId] = useState<number | null>(null);
 
   const loadAuctions = async () => {
     try {
@@ -77,6 +79,12 @@ export default function AdminAuctionsPage() {
     loadAuctions();
   }, [t]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   const filteredAuctions = useMemo(() => {
     if (filter === "all") {
       return auctions;
@@ -86,6 +94,8 @@ export default function AdminAuctionsPage() {
 
   const handleViewBids = async (auction: Auction) => {
     try {
+      setActionAuctionId(auction.id);
+      setNotice(null);
       setSelectedAuction(auction);
       setShowBidLog(true);
       setBidsLoading(true);
@@ -93,10 +103,14 @@ export default function AdminAuctionsPage() {
       setBidLog(response.data.bids);
     } catch (err: any) {
       console.error("Failed to load bids", err);
-      alert(err?.response?.data?.detail ?? t("admin.loadBidsFailed", "Failed to load bids"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("admin.loadBidsFailed", "Failed to load bids"),
+      });
       setShowBidLog(false);
     } finally {
       setBidsLoading(false);
+      setActionAuctionId(null);
     }
   };
 
@@ -104,11 +118,22 @@ export default function AdminAuctionsPage() {
     const newEnd = new Date(auction.end_time);
     newEnd.setHours(newEnd.getHours() + 24);
     try {
+      setActionAuctionId(auction.id);
+      setNotice(null);
       await api.patch(`/admin/auctions/${auction.id}`, { endTime: newEnd.toISOString() });
       await loadAuctions();
+      setNotice({
+        tone: "success",
+        message: t("admin.extendSuccess", "تم تمديد المزاد بنجاح"),
+      });
     } catch (err: any) {
       console.error("Failed to extend auction", err);
-      alert(err?.response?.data?.detail ?? t("admin.extendFailed", "Failed to extend auction"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("admin.extendFailed", "Failed to extend auction"),
+      });
+    } finally {
+      setActionAuctionId(null);
     }
   };
 
@@ -117,11 +142,22 @@ export default function AdminAuctionsPage() {
       return;
     }
     try {
+      setActionAuctionId(auction.id);
+      setNotice(null);
       await api.patch(`/admin/auctions/${auction.id}`, { status: "completed" });
       await loadAuctions();
+      setNotice({
+        tone: "success",
+        message: t("admin.endSuccess", "تم إنهاء المزاد"),
+      });
     } catch (err: any) {
       console.error("Failed to end auction", err);
-      alert(err?.response?.data?.detail ?? t("admin.endFailed", "Failed to end auction"));
+      setNotice({
+        tone: "error",
+        message: err?.response?.data?.detail ?? t("admin.endFailed", "Failed to end auction"),
+      });
+    } finally {
+      setActionAuctionId(null);
     }
   };
 
@@ -138,11 +174,23 @@ export default function AdminAuctionsPage() {
     const nextStatus = start > now ? "scheduled" : "active";
 
     try {
+      setActionAuctionId(auction.id);
+      setNotice(null);
       await api.patch(`/admin/auctions/${auction.id}`, { status: nextStatus });
       await loadAuctions();
+      setNotice({
+        tone: "success",
+        message: t("admin.approveSuccess", "تم اعتماد المزاد"),
+      });
     } catch (err: any) {
       console.error("Failed to approve auction", err);
-      alert(err?.response?.data?.detail ?? t("admin.approveAuctionFailed", "Failed to approve auction"));
+      setNotice({
+        tone: "error",
+        message:
+          err?.response?.data?.detail ?? t("admin.approveAuctionFailed", "Failed to approve auction"),
+      });
+    } finally {
+      setActionAuctionId(null);
     }
   };
 
@@ -170,6 +218,17 @@ export default function AdminAuctionsPage() {
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <div
+          className={`rounded-luxury border px-4 py-3 text-sm ${
+            notice.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
       <div className="bg-white rounded-luxury p-6 shadow-luxury">
         <h1 className="text-h2 text-charcoal mb-6">{t("admin.auctions")}</h1>
 
@@ -206,6 +265,7 @@ export default function AdminAuctionsPage() {
                   i18n.language === "ar"
                     ? auction.product?.name_ar ?? t("products.unknownProduct")
                     : auction.product?.name_en ?? t("products.unknownProduct");
+                const isRowBusy = actionAuctionId === auction.id;
                 return (
                   <tr key={auction.id} className="border-b border-gray-100 hover:bg-sand">
                     <td className="px-4 py-4 text-charcoal-light">{auction.id}</td>
@@ -227,32 +287,36 @@ export default function AdminAuctionsPage() {
                         {auction.status !== "pending_review" && (
                           <button
                             onClick={() => handleViewBids(auction)}
-                            className="text-blue-600 hover:text-blue-700 text-sm font-semibold"
+                            disabled={isRowBusy}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            {t("admin.viewBids")}
+                            {isRowBusy ? t("common.loading") : t("admin.viewBids")}
                           </button>
                         )}
                         {auction.status === "pending_review" && (
                           <button
                             onClick={() => handleApprove(auction)}
-                            className="text-green-700 hover:text-green-800 text-sm font-semibold"
+                            disabled={isRowBusy}
+                            className="text-green-700 hover:text-green-800 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            {t("admin.approveAuction", "Approve")}
+                            {isRowBusy ? t("common.loading") : t("admin.approveAuction", "Approve")}
                           </button>
                         )}
                         {auction.status === "active" && (
                           <>
                             <button
                               onClick={() => handleExtend(auction)}
-                              className="text-gold hover:text-gold-hover text-sm font-semibold"
+                              disabled={isRowBusy}
+                              className="text-gold hover:text-gold-hover text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              {t("admin.extend")}
+                              {isRowBusy ? t("common.loading") : t("admin.extend")}
                             </button>
                             <button
                               onClick={() => handleEnd(auction)}
-                              className="text-red-600 hover:text-red-700 text-sm font-semibold"
+                              disabled={isRowBusy}
+                              className="text-red-600 hover:text-red-700 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              {t("admin.end")}
+                              {isRowBusy ? t("common.loading") : t("admin.end")}
                             </button>
                           </>
                         )}

@@ -5,6 +5,7 @@ import ProductCard from '../components/products/ProductCard';
 import ProductFilters from '../components/products/ProductFilters';
 import Pagination from '../components/common/Pagination';
 import { fetchProducts, fetchProductFiltersMeta, ProductFiltersMeta } from '../services/productService';
+import { matchesSearch } from '../utils/search';
 import { fetchAuctions } from '../services/auctionService';
 import { Product, Auction } from '../types';
 
@@ -12,15 +13,25 @@ interface CatalogPageProps {
   catalogType: 'new' | 'used' | 'auctions';
 }
 
+type AuctionDisplayStatus = 'active' | 'scheduled';
+
+interface AuctionCatalogItem {
+  auction: Auction;
+  product: Product;
+  displayStatus: AuctionDisplayStatus;
+}
+
 export default function CatalogPage({ catalogType }: CatalogPageProps) {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
-  const [auctionItems, setAuctionItems] = useState<Array<{ auction: Auction; product: Product }>>([]);
+  const [auctionItems, setAuctionItems] = useState<AuctionCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterMeta, setFilterMeta] = useState<ProductFiltersMeta | null>(null);
+  const [fallbackProducts, setFallbackProducts] = useState<Product[]>([]);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
 
   const lockedCondition = catalogType === 'new' ? 'new' : catalogType === 'used' ? 'used' : undefined;
 
@@ -64,24 +75,39 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
     loadProducts();
   }, [filters, currentPage, catalogType]);
 
+  const fetchFallbackRecommendations = async (condition?: string) => {
+    try {
+      setFallbackLoading(true);
+      const fallback = await fetchProducts({
+        ...(condition ? { condition } : {}),
+        sort: 'newest',
+        page: 1,
+        page_size: 8,
+      });
+      setFallbackProducts(fallback.products ?? []);
+    } catch (error) {
+      console.error('Failed to load fallback products', error);
+      setFallbackProducts([]);
+    } finally {
+      setFallbackLoading(false);
+    }
+  };
+
   const loadProducts = async () => {
     setLoading(true);
+    setFallbackProducts([]);
     try {
       if (catalogType === 'auctions') {
         const auctions = await fetchAuctions();
         const filtered = applyAuctionFilters(auctions);
         const { paginated, total } = paginate(filtered, currentPage);
-
-        const mapped = paginated
-          .filter((auction) => auction.product)
-          .map((auction) => ({
-            auction,
-            product: auction.product as Product,
-          }));
-
-        setAuctionItems(mapped);
-        setProducts(mapped.map((item) => item.product));
+        setAuctionItems(paginated);
+        setProducts(paginated.map((item) => item.product));
         setTotalPages(Math.max(1, Math.ceil(total / 12)));
+
+        if (total === 0) {
+          await fetchFallbackRecommendations();
+        }
       } else {
         const { condition, ...restFilters } = filters;
         const effectiveCondition = lockedCondition
@@ -99,6 +125,10 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
         setProducts(result.products);
         setAuctionItems([]);
         setTotalPages(result.total_pages);
+
+        if ((result.products ?? []).length === 0) {
+          await fetchFallbackRecommendations(effectiveCondition);
+        }
       }
     } catch (error) {
       console.error('Error loading products:', error);
@@ -107,16 +137,37 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
     }
   };
 
-  const applyAuctionFilters = (auctions: Auction[]) => {
-    return auctions.filter((auction) => {
-      if (!auction.product) return false;
-      if (auction.status !== 'active') return false;
-      const product = auction.product;
+  const resolveAuctionDisplayStatus = (
+    auction: Auction,
+    nowMs: number
+  ): AuctionDisplayStatus | null => {
+    const rawStatus = typeof auction.status === 'string' ? auction.status.toLowerCase() : '';
+    if (rawStatus === 'pending_review' || rawStatus === 'cancelled' || rawStatus === 'completed') {
+      return null;
+    }
+
+    const startMs = new Date(auction.start_time).getTime();
+    const endMs = new Date(auction.end_time).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= nowMs) {
+      return null;
+    }
+
+    return startMs > nowMs ? 'scheduled' : 'active';
+  };
+
+  const applyAuctionFilters = (auctions: Auction[]): AuctionCatalogItem[] => {
+    const nowMs = Date.now();
+      const filtered = auctions.flatMap((auction) => {
+        if (!auction.product) return [];
+      const displayStatus = resolveAuctionDisplayStatus(auction, nowMs);
+      if (!displayStatus) return [];
+
+      const product = auction.product as Product;
       const searchMatch =
         !filters.search ||
-        product.name_en.toLowerCase().includes(filters.search.toLowerCase()) ||
-        product.name_ar.includes(filters.search) ||
-        product.brand.toLowerCase().includes(filters.search.toLowerCase());
+        matchesSearch(product.name_en ?? "", filters.search) ||
+        matchesSearch(product.name_ar ?? "", filters.search) ||
+        matchesSearch(product.brand ?? "", filters.search);
       const brandMatch = !filters.brand || product.brand === filters.brand;
       const categoryMatch = !filters.category || product.category === filters.category;
       const minPriceMatch =
@@ -124,16 +175,28 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
       const maxPriceMatch =
         filters.max_price === undefined || Number(auction.current_price) <= filters.max_price;
 
-      return searchMatch && brandMatch && categoryMatch && minPriceMatch && maxPriceMatch;
-    }).sort(sortAuctions);
+      if (!searchMatch || !brandMatch || !categoryMatch || !minPriceMatch || !maxPriceMatch) {
+        return [];
+      }
+
+      return [
+        {
+          auction,
+          product,
+          displayStatus,
+        },
+      ];
+    });
+
+    return filtered.sort(sortAuctions);
   };
 
-  const sortAuctions = (a: Auction, b: Auction) => {
+  const sortAuctions = (a: AuctionCatalogItem, b: AuctionCatalogItem) => {
     const sort = filters.sort;
-    const priceA = Number(a.current_price);
-    const priceB = Number(b.current_price);
-    const dateA = new Date(a.created_at).getTime();
-    const dateB = new Date(b.created_at).getTime();
+    const priceA = Number(a.auction.current_price);
+    const priceB = Number(b.auction.current_price);
+    const dateA = new Date(a.auction.created_at).getTime();
+    const dateB = new Date(b.auction.created_at).getTime();
 
     switch (sort) {
       case 'price_asc':
@@ -147,7 +210,7 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
     }
   };
 
-  const paginate = (items: Auction[], page: number) => {
+  const paginate = (items: AuctionCatalogItem[], page: number) => {
     const start = (page - 1) * 12;
     const end = start + 12;
     return {
@@ -224,21 +287,48 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
           <p className="text-taupe">{t('common.loading')}</p>
         </div>
       ) : (catalogType === 'auctions' ? auctionItems.length === 0 : products.length === 0) ? (
-        <div className="text-center py-12">
-          <p className="text-taupe">{t('catalog.noProducts')}</p>
+        <div className="space-y-6">
+          <div className="text-center py-10">
+            <p className="text-charcoal font-semibold text-lg">{t('catalog.noProducts')}</p>
+            <p className="text-taupe text-sm mt-2">
+              {t('catalog.emptyHint', 'جرّب تعديل البحث أو استكشف اقتراحاتنا بالأسفل.')}
+            </p>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-charcoal">
+                {t('catalog.fallbackTitle', 'اقتراحات قد تعجبك')}
+              </h2>
+            </div>
+            {fallbackLoading ? (
+              <div className="text-center py-8 text-taupe">{t('common.loading')}</div>
+            ) : fallbackProducts.length > 0 ? (
+              <div className="responsive-card-grid responsive-card-grid--roomy">
+                {fallbackProducts.map((product) => (
+                  <ProductCard key={`fallback-${product.id}`} product={product} type={catalogType === 'used' ? 'used' : 'new'} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-taupe text-sm">
+                {t('catalog.noFallback', 'لا توجد اقتراحات متاحة حالياً.')}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <>
               <div className="responsive-card-grid responsive-card-grid--roomy">
                 {catalogType === 'auctions'
-                  ? auctionItems.map(({ auction, product }) => (
+                  ? auctionItems.map(({ auction, product, displayStatus }) => (
                       <ProductCard
                         key={auction.id}
                         product={product}
                         type="auction"
                         auctionId={auction.id}
                         currentBid={Number(auction.current_price)}
+                        auctionStartDate={auction.start_time}
                         auctionEndDate={auction.end_time}
+                        auctionStatus={displayStatus}
                       />
                     ))
                   : products.map((product) => (

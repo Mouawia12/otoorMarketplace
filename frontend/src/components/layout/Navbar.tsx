@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
@@ -8,11 +8,24 @@ import CartIconButton from '../cart/CartIconButton';
 import WishlistIconButton from '../wishlist/WishlistIconButton';
 import PromoStripBar from '../promotions/PromoStripBar';
 import { fetchProductSuggestions, type ProductSuggestion } from '../../services/productService';
+import { useNotificationStore } from '../../store/notificationStore';
 
 export default function Navbar() {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
   const { isAuthenticated, user, logout } = useAuthStore();
   const { language, setLanguage } = useUIStore();
+  const {
+    unreadCount,
+    fetchInitial: fetchNotifications,
+    bindSocket: bindNotificationSocket,
+    reset: resetNotifications,
+  } = useNotificationStore((state) => ({
+    unreadCount: state.unreadCount,
+    fetchInitial: state.fetchInitial,
+    bindSocket: state.bindSocket,
+    reset: state.reset,
+  }));
   const normalizedRoles = (user?.roles ?? []).map((role) => role.toUpperCase());
   const isSeller = normalizedRoles.includes('SELLER');
   const isAdmin = normalizedRoles.includes('ADMIN') || normalizedRoles.includes('SUPER_ADMIN');
@@ -76,6 +89,15 @@ export default function Navbar() {
     return () => window.clearTimeout(timer);
   }, [normalizedQuery]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      resetNotifications();
+      return;
+    }
+    bindNotificationSocket();
+    fetchNotifications().catch(() => undefined);
+  }, [isAuthenticated, bindNotificationSocket, fetchNotifications, resetNotifications]);
+
   const resolveSuggestionLabel = (suggestion: ProductSuggestion) =>
     language === 'ar' ? suggestion.name_ar : suggestion.name_en;
 
@@ -84,6 +106,31 @@ export default function Navbar() {
     setSuggestions([]);
     window.location.href = `/p/${suggestion.id}`;
   };
+
+  const pathname = location.pathname;
+  const isActivePath = (path: string) => {
+    if (path === '/') {
+      return pathname === '/';
+    }
+    return pathname === path || pathname.startsWith(`${path}/`);
+  };
+  const desktopNavClass = (path: string) =>
+    `transition whitespace-nowrap border-b-2 pb-1 ${
+      isActivePath(path) ? 'text-gold border-gold font-semibold' : 'border-transparent hover:text-gold'
+    }`;
+  const mobileNavClass = (path: string) =>
+    `block py-3 px-4 rounded-lg transition min-h-[44px] flex items-center ${
+      isActivePath(path) ? 'bg-charcoal-light text-gold font-semibold' : 'hover:bg-charcoal-light'
+    }`;
+
+  const renderUnreadBadge = (className = '') =>
+    unreadCount > 0 ? (
+      <span
+        className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-alert text-xs font-bold text-white ${className}`}
+      >
+        {unreadCount > 9 ? '9+' : unreadCount}
+      </span>
+    ) : null;
 
   const accountMenuItems = [
     { path: '/account', label: t('account.overview'), icon: '👤' },
@@ -223,11 +270,11 @@ export default function Navbar() {
                 )}
               </form>
 
-              <Link to="/" className="hover:text-gold transition whitespace-nowrap">{t('nav.home')}</Link>
-              <Link to="/new" className="hover:text-gold transition whitespace-nowrap">{t('nav.new')}</Link>
-              <Link to="/used" className="hover:text-gold transition whitespace-nowrap">{t('nav.used')}</Link>
-              <Link to="/auctions" className="hover:text-gold transition whitespace-nowrap">{t('nav.auctions')}</Link>
-              <Link to="/blog" className="hover:text-gold transition whitespace-nowrap">{t('nav.blog')}</Link>
+              <Link to="/" className={desktopNavClass('/')}>{t('nav.home')}</Link>
+              <Link to="/new" className={desktopNavClass('/new')}>{t('nav.new')}</Link>
+              <Link to="/used" className={desktopNavClass('/used')}>{t('nav.used')}</Link>
+              <Link to="/auctions" className={desktopNavClass('/auctions')}>{t('nav.auctions')}</Link>
+              <Link to="/blog" className={desktopNavClass('/blog')}>{t('nav.blog')}</Link>
 
               <WishlistIconButton />
               <CartIconButton />
@@ -235,8 +282,12 @@ export default function Navbar() {
               {isAuthenticated ? (
                 <>
               {isSeller && (
-                <Link to="/seller/dashboard" className="hover:text-gold transition whitespace-nowrap">
-                  {t('nav.sellerDashboard')}
+                <Link
+                  to="/seller/dashboard"
+                  className="hover:text-gold transition whitespace-nowrap inline-flex items-center gap-2 relative"
+                >
+                  <span>{t('nav.sellerDashboard')}</span>
+                  {renderUnreadBadge('absolute -top-2 -end-3')}
                 </Link>
               )}
               {!isSeller && !isAdmin && (
@@ -245,8 +296,12 @@ export default function Navbar() {
                 </Link>
               )}
               {isAdmin && (
-                <Link to="/admin/dashboard" className="hover:text-gold transition whitespace-nowrap">
-                  {t('nav.adminDashboard')}
+                <Link
+                  to="/admin/dashboard"
+                  className="hover:text-gold transition whitespace-nowrap inline-flex items-center gap-2 relative"
+                >
+                  <span>{t('nav.adminDashboard')}</span>
+                  {renderUnreadBadge('absolute -top-2 -end-3')}
                 </Link>
               )}
                   <button onClick={logout} className="hover:text-gold transition whitespace-nowrap min-h-[44px]">
@@ -400,19 +455,19 @@ export default function Navbar() {
 
             {/* روابط القائمة */}
             <nav className="p-4 space-y-1">
-              <Link to="/" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
+              <Link to="/" onClick={closeMobileMenu} className={mobileNavClass('/')}>
                 {t('nav.home')}
               </Link>
-              <Link to="/new" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
+              <Link to="/new" onClick={closeMobileMenu} className={mobileNavClass('/new')}>
                 {t('nav.new')}
               </Link>
-              <Link to="/used" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
+              <Link to="/used" onClick={closeMobileMenu} className={mobileNavClass('/used')}>
                 {t('nav.used')}
               </Link>
-              <Link to="/auctions" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
+              <Link to="/auctions" onClick={closeMobileMenu} className={mobileNavClass('/auctions')}>
                 {t('nav.auctions')}
               </Link>
-              <Link to="/blog" onClick={closeMobileMenu} className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center">
+              <Link to="/blog" onClick={closeMobileMenu} className={mobileNavClass('/blog')}>
                 {t('nav.blog')}
               </Link>
 
@@ -430,7 +485,10 @@ export default function Navbar() {
                             className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center gap-2"
                           >
                             <span>{item.icon}</span>
-                            <span>{item.label}</span>
+                            <span className="flex-1 relative">
+                              {item.label}
+                              {item.path === '/seller/dashboard' && renderUnreadBadge('absolute -top-2 -end-3')}
+                            </span>
                           </Link>
                         ))}
                       </>
@@ -464,7 +522,10 @@ export default function Navbar() {
                             className="block py-3 px-4 hover:bg-charcoal-light rounded-lg transition min-h-[44px] flex items-center gap-2"
                           >
                             <span>{item.icon}</span>
-                            <span>{item.label}</span>
+                            <span className="flex-1 relative">
+                              {item.label}
+                              {item.path === '/admin/dashboard' && renderUnreadBadge('absolute -top-2 -end-3')}
+                            </span>
                           </Link>
                         ))}
                       </>

@@ -37,11 +37,25 @@ export default function AdminUsersPage() {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [sellerDecisionUserId, setSellerDecisionUserId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [selectedUser, setSelectedUser] = useState<(User & { created_at?: string }) | null>(null);
   const [editStatus, setEditStatus] = useState<User["status"]>("ACTIVE");
   const [editRoles, setEditRoles] = useState<string[]>([]);
   const [savingUser, setSavingUser] = useState(false);
   const roleOptions = ["buyer", "seller", "admin", "moderator", "support"];
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   const loadUsers = async () => {
     try {
@@ -51,7 +65,7 @@ export default function AdminUsersPage() {
         page,
         page_size: 20,
       };
-      if (searchTerm.trim()) params.search = searchTerm.trim();
+      if (debouncedSearchTerm) params.search = debouncedSearchTerm;
       if (statusFilter !== "all") params.status = statusFilter;
       if (roleFilter !== "all") params.role = roleFilter;
 
@@ -83,13 +97,16 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadUsers();
-  }, [page, statusFilter, roleFilter, searchTerm]);
+  }, [page, statusFilter, roleFilter, debouncedSearchTerm]);
 
   useEffect(() => {
     loadSellerRequests();
   }, []);
 
   const handleSellerDecision = async (userId: number, status: "approved" | "rejected") => {
+    if (sellerDecisionUserId === userId) return;
+    setSellerDecisionUserId(userId);
+    setNotice(null);
     try {
       await api.patch(`/seller/profile/${userId}/status`, { status });
       await Promise.all([loadSellerRequests(), loadUsers()]);
@@ -103,6 +120,8 @@ export default function AdminUsersPage() {
         tone: "error",
         message: err?.response?.data?.detail ?? t("common.error"),
       });
+    } finally {
+      setSellerDecisionUserId(null);
     }
   };
 
@@ -166,13 +185,18 @@ export default function AdminUsersPage() {
 
   const handleDeleteUser = async (user: User) => {
     if (isProtectedEmail(user.email)) {
-      alert(t("admin.protectedAdminWarning", "لا يمكنك حذف هذا الحساب المحمي."));
+      setNotice({
+        tone: "error",
+        message: t("admin.protectedAdminWarning", "لا يمكنك حذف هذا الحساب المحمي."),
+      });
       return;
     }
     if (!window.confirm(t("admin.confirmDeleteUser", "هل أنت متأكد من حذف هذا المستخدم؟"))) {
       return;
     }
     try {
+      setDeletingUserId(user.id);
+      setNotice(null);
       await api.delete(`/admin/users/${user.id}`);
       await loadUsers();
       setNotice({
@@ -185,6 +209,8 @@ export default function AdminUsersPage() {
         tone: "error",
         message: err?.response?.data?.detail ?? t("admin.deleteUserFailed", "فشل حذف المستخدم"),
       });
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -283,15 +309,17 @@ export default function AdminUsersPage() {
                       <div className="flex gap-2 justify-end">
                         <button
                           onClick={() => handleSellerDecision(req.user_id, "approved")}
-                          className="px-3 py-1 rounded-luxury bg-success text-white text-xs font-semibold"
+                          disabled={sellerDecisionUserId === req.user_id}
+                          className="px-3 py-1 rounded-luxury bg-success text-white text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          {t("common.approve", "قبول")}
+                          {sellerDecisionUserId === req.user_id ? t("common.loading") : t("common.approve", "قبول")}
                         </button>
                         <button
                           onClick={() => handleSellerDecision(req.user_id, "rejected")}
-                          className="px-3 py-1 rounded-luxury bg-alert text-white text-xs font-semibold"
+                          disabled={sellerDecisionUserId === req.user_id}
+                          className="px-3 py-1 rounded-luxury bg-alert text-white text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          {t("common.reject", "رفض")}
+                          {sellerDecisionUserId === req.user_id ? t("common.loading") : t("common.reject", "رفض")}
                         </button>
                       </div>
                     </td>
@@ -402,9 +430,9 @@ export default function AdminUsersPage() {
                       </button>
                       <button
                         onClick={() => handleDeleteUser(user)}
-                        disabled={user.isProtected}
+                        disabled={user.isProtected || deletingUserId === user.id}
                         className={`${
-                          user.isProtected
+                          user.isProtected || deletingUserId === user.id
                             ? "text-charcoal/40 cursor-not-allowed"
                             : "text-red-500 hover:text-red-600"
                         }`}
@@ -415,7 +443,7 @@ export default function AdminUsersPage() {
                             : undefined
                         }
                       >
-                        🗑️
+                        {deletingUserId === user.id ? t("common.loading") : "🗑️"}
                       </button>
                     </div>
                   </td>

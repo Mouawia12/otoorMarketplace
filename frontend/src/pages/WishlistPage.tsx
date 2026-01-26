@@ -33,6 +33,7 @@ export default function WishlistPage() {
         price: item.price,
         image: item.image,
         brand: item.brand,
+        sellerId: item.sellerId,
       },
       qty
     );

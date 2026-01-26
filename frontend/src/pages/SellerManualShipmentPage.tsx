@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
+import { matchesSearch } from "../utils/search";
 import { useTranslation } from "react-i18next";
 
 type Partner = {
@@ -774,7 +775,7 @@ export default function SellerManualShipmentPage() {
                     const name =
                       getLocalizedName(product, lang) ||
                       String(product.id);
-                    return name.toLowerCase().includes(productSearch.toLowerCase());
+                    return matchesSearch(name, productSearch);
                   })
                   .map((product) => (
                     <button

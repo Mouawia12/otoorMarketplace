@@ -1,4 +1,4 @@
-import { NavLink, Outlet, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
@@ -7,11 +7,24 @@ import NotificationBell from '../notifications/NotificationBell';
 
 export default function AccountLayout() {
   const { t } = useTranslation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, authChecked } = useAuthStore();
   const { language } = useUIStore();
+  const location = useLocation();
+
+  if (!authChecked) {
+    return <div className="py-10 text-center text-taupe font-semibold">Loading...</div>;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.email_verified === false) {
+    const redirectTarget = `${location.pathname}${location.search}`;
+    const target = `/verify-email/sent?email=${encodeURIComponent(
+      user.email,
+    )}&redirect=${encodeURIComponent(redirectTarget)}`;
+    return <Navigate to={target} replace />;
   }
 
   const isSeller = user?.roles?.some((r) => r.toLowerCase() === 'seller');

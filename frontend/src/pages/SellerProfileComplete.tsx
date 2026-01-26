@@ -17,42 +17,10 @@ export default function SellerProfileComplete() {
     national_id: "",
     iban: "",
     bank_name: "",
-    torod_warehouse_id: "",
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [warehousesLoading, setWarehousesLoading] = useState(false);
-  const [warehousesError, setWarehousesError] = useState<string | null>(null);
-  const [warehousesLoaded, setWarehousesLoaded] = useState(false);
-
-  const extractList = (payload: any): any[] => {
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload?.data)) return payload.data;
-    if (Array.isArray(payload?.result)) return payload.result;
-    if (Array.isArray(payload?.data?.data)) return payload.data.data;
-    if (Array.isArray(payload?.data?.items)) return payload.data.items;
-    if (Array.isArray(payload?.items)) return payload.items;
-    return [];
-  };
-
-  const resolveWarehouse = (item: any) => {
-    const code =
-      item?.warehouse_code ??
-      item?.warehouseCode ??
-      item?.code ??
-      item?.id ??
-      item?.warehouse_id;
-    const name =
-      item?.name ??
-      item?.title ??
-      item?.address ??
-      item?.label ??
-      code;
-    if (!code) return null;
-    return { code: String(code), name: String(name) };
-  };
 
   useEffect(() => {
     // load existing profile if any
@@ -68,7 +36,6 @@ export default function SellerProfileComplete() {
             national_id: res.data.profile.national_id || "",
             iban: res.data.profile.iban || "",
             bank_name: res.data.profile.bank_name || "",
-            torod_warehouse_id: res.data.profile.torod_warehouse_id || "",
           });
         }
       } catch (_error) {
@@ -77,29 +44,6 @@ export default function SellerProfileComplete() {
     };
     loadProfile();
   }, []);
-
-  const loadWarehouses = async () => {
-    try {
-      setWarehousesLoading(true);
-      setWarehousesError(null);
-      setWarehousesLoaded(false);
-      const res = await api.get("/torod/warehouses", { params: { page: 1 } });
-      const list = extractList(res.data)
-        .map((item) => resolveWarehouse(item))
-        .filter(Boolean) as Array<{ code: string; name: string }>;
-      setWarehouses(list);
-      if (!form.torod_warehouse_id && list[0]?.code) {
-        setForm((prev) => ({ ...prev, torod_warehouse_id: list[0].code }));
-      }
-      setWarehousesLoaded(true);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message;
-      setWarehousesError(msg ?? t("common.error"));
-      setWarehousesLoaded(true);
-    } finally {
-      setWarehousesLoading(false);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -119,7 +63,6 @@ export default function SellerProfileComplete() {
       "national_id",
       "iban",
       "bank_name",
-      "torod_warehouse_id",
     ] as const;
     const missing = requiredFields.filter((k) => !form[k as keyof typeof form]?.toString().trim());
     if (missing.length > 0) {
@@ -237,59 +180,12 @@ export default function SellerProfileComplete() {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-semibold text-charcoal mb-1">
-              {t("seller.torodWarehouseId", "رمز مستودع طرود (مطلوب)")}
-            </label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                name="torod_warehouse_id"
-                value={form.torod_warehouse_id}
-                onChange={handleChange}
-                className="w-full border border-sand/60 rounded-luxury px-3 py-3 focus:ring-2 focus:ring-gold focus:border-gold outline-none"
-                placeholder="EX01"
-              />
-              <button
-                type="button"
-                onClick={loadWarehouses}
-                disabled={warehousesLoading}
-                className="px-4 py-3 bg-charcoal text-ivory rounded-luxury font-semibold hover:bg-charcoal-light transition disabled:opacity-60"
-              >
-                {warehousesLoading
-                  ? t("common.loading")
-                  : t("seller.loadWarehouses", "جلب المستودعات")}
-              </button>
+            <div className="rounded-2xl border border-sand/60 bg-sand/30 px-4 py-3 text-sm text-charcoal-light">
+              {t(
+                "seller.warehouseAfterProfileHint",
+                "بعد حفظ ملف التاجر، أضف عناوينك من صفحة العناوين ليتم ربطها بالشحن."
+              )}
             </div>
-            {warehousesError && (
-              <p className="text-sm font-semibold text-alert mt-2">{warehousesError}</p>
-            )}
-            {warehousesLoaded && !warehousesError && warehouses.length === 0 && (
-              <p className="text-sm font-semibold text-alert mt-2">
-                {t(
-                  "seller.noWarehouses",
-                  "لا توجد مستودعات متاحة في حساب طرود. تأكد من تفعيل العنوان في لوحة طرود."
-                )}
-              </p>
-            )}
-            {warehouses.length > 0 && (
-              <div className="mt-3">
-                <label className="block text-sm font-semibold text-charcoal mb-1">
-                  {t("seller.chooseWarehouse", "اختر مستودعًا")}
-                </label>
-                <select
-                  value={form.torod_warehouse_id}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, torod_warehouse_id: e.target.value }))
-                  }
-                  className="w-full border border-sand/60 rounded-luxury px-3 py-3 focus:ring-2 focus:ring-gold focus:border-gold outline-none"
-                >
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.code} value={warehouse.code}>
-                      {warehouse.name} ({warehouse.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
         </div>
 

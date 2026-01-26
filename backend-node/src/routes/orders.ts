@@ -116,12 +116,6 @@ router.post("/", authenticate(), async (req, res, next) => {
       throw AppError.unauthorized();
     }
 
-    // Debug logging to diagnose 403/auth issues in production
-    console.log("ORDER AUTH USER:", req.user);
-    console.log("ORDER AUTH HEADER:", req.headers.authorization);
-    console.log("ORDER BODY RAW:", req.body);
-    console.log("ORDER PAYLOAD:", req.body);
-
     const body = req.body ?? {};
     const shippingMethodRaw =
       body.shipping?.shipping_method ??
@@ -210,6 +204,7 @@ router.post("/", authenticate(), async (req, res, next) => {
       paymentMethod: body.payment_method ?? "COD",
       paymentMethodId: body.payment_method_id ?? body.paymentMethodId,
       paymentMethodCode: body.payment_method_code ?? body.paymentMethodCode,
+      language: typeof body.language === "string" ? body.language : undefined,
       shipping: shippingInput,
       items,
       couponCode: typeof body.coupon_code === "string" ? body.coupon_code : undefined,

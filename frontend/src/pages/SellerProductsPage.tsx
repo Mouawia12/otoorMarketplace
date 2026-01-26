@@ -6,6 +6,7 @@ import { Product, ProductTemplate } from '../types';
 import { useUIStore } from '../store/uiStore';
 import { formatPrice } from '../utils/currency';
 import { normalizeImagePathForStorage, resolveProductImageUrl } from '../utils/image';
+import { matchesSearch } from '../utils/search';
 import { compressImageFile } from '../utils/imageCompression';
 import { sellerSearchTemplates } from '../services/productTemplateService';
 import { PLACEHOLDER_PERFUME } from '../utils/staticAssets';
@@ -31,6 +32,36 @@ const productStatusLabel = (
       return t('seller.rejected', 'Rejected');
     default:
       return status;
+  }
+};
+
+const productStatusExplanation = (
+  status: string,
+  t: ReturnType<typeof useTranslation>['t']
+) => {
+  switch (status) {
+    case 'published':
+      return t(
+        'seller.statusExplainPublished',
+        'منشور ويظهر للعملاء لأنه استوفى المتطلبات والمخزون متاح.'
+      );
+    case 'draft':
+      return t(
+        'seller.statusExplainDraft',
+        'مسودة وغير ظاهر للعملاء. السبب: تم حفظه كمسودة من قبلك.'
+      );
+    case 'pending':
+      return t(
+        'seller.statusExplainPending',
+        'قيد المراجعة وغير ظاهر للعملاء. السبب: ينتظر موافقة الإدارة.'
+      );
+    case 'rejected':
+      return t(
+        'seller.statusExplainRejected',
+        'مرفوض وغير ظاهر للعملاء. السبب: يحتاج تعديلات قبل النشر.'
+      );
+    default:
+      return '';
   }
 };
 
@@ -107,12 +138,11 @@ export default function SellerProductsPage() {
 
   const filteredProducts = useMemo(() => {
     if (searchTerm.trim() === '') return products;
-    const normalized = searchTerm.toLowerCase();
     return products.filter((product) => {
       return (
-        product.name_en.toLowerCase().includes(normalized) ||
-        product.name_ar.includes(searchTerm) ||
-        product.brand.toLowerCase().includes(normalized)
+        matchesSearch(product.name_en ?? "", searchTerm) ||
+        matchesSearch(product.name_ar ?? "", searchTerm) ||
+        matchesSearch(product.brand ?? "", searchTerm)
       );
     });
   }, [products, searchTerm]);
@@ -120,6 +150,24 @@ export default function SellerProductsPage() {
   const handleStatusChange = async (productId: number, newStatus: string) => {
     try {
       await api.patch(`/seller/products/${productId}`, { status: newStatus });
+      alert(
+        newStatus === 'draft'
+          ? t(
+              'seller.statusChangeDraftSuccess',
+              'تم تحويل المنتج إلى مسودة. لن يظهر للعملاء حتى تنشره.'
+            )
+          : newStatus === 'pending'
+          ? t(
+              'seller.statusChangePendingSuccess',
+              'تم إرسال المنتج للمراجعة. سيظهر بعد موافقة الإدارة.'
+            )
+          : newStatus === 'rejected'
+          ? t(
+              'seller.statusChangeRejectedSuccess',
+              'تم تحديث الحالة إلى مرفوض. راجع المتطلبات وعدّل المنتج.'
+            )
+          : t('seller.statusChangeSuccess', 'تم تحديث حالة المنتج.')
+      );
       fetchProducts();
     } catch (error: any) {
       console.error('Failed to update status', error);
@@ -221,28 +269,41 @@ export default function SellerProductsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm md:text-base">
+          <table className="w-full text-sm md:text-base table-fixed">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.id')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.title')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.brand')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.type')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.price')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.status')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.createdAt')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm">{t('seller.actions')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[60px]">{t('seller.id')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[220px] sm:w-[280px]">{t('seller.title')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[160px]">{t('seller.brand')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.type')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.price')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[200px]">{t('seller.status')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.createdAt')}</th>
+                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[160px]">{t('seller.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.map((product, index) => (
-                <tr key={product.id} className="border-b border-gray-100 hover:bg-sand transition">
+                <tr key={product.id} className="border-b border-gray-100 hover:bg-sand/60 transition">
                   <td className="px-3 md:px-4 py-4 text-charcoal-light">{index + 1}</td>
                   <td className="px-3 md:px-4 py-4 text-charcoal font-medium">
-                    {i18n.language === 'ar' ? product.name_ar : product.name_en}
+                    <span
+                      className="block truncate"
+                      title={i18n.language === 'ar' ? product.name_ar : product.name_en}
+                    >
+                      {i18n.language === 'ar' ? product.name_ar : product.name_en}
+                    </span>
                   </td>
-                  <td className="px-3 md:px-4 py-4 text-charcoal-light">{product.brand}</td>
-                  <td className="px-3 md:px-4 py-4 text-charcoal-light">{product.product_type}</td>
+                  <td className="px-3 md:px-4 py-4 text-charcoal-light">
+                    <span className="block truncate" title={product.brand}>
+                      {product.brand}
+                    </span>
+                  </td>
+                  <td className="px-3 md:px-4 py-4 text-charcoal-light">
+                    <span className="block truncate" title={product.product_type}>
+                      {product.product_type}
+                    </span>
+                  </td>
                   <td className="px-3 md:px-4 py-4">
                     {editingId === product.id ? (
                       <div className="flex gap-2 items-center">
@@ -280,21 +341,31 @@ export default function SellerProductsPage() {
                   </td>
                   <td className="px-3 md:px-4 py-4">
                     {product.status === 'published' ? (
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-semibold inline-flex items-center ${statusBadgeClass(product.status)}`}
-                      >
-                        {productStatusLabel(product.status, t)}
-                      </span>
+                      <div className="space-y-1">
+                        <span
+                          className={`px-3 py-1 rounded-full text-sm font-semibold inline-flex items-center ${statusBadgeClass(product.status)}`}
+                        >
+                          {productStatusLabel(product.status, t)}
+                        </span>
+                        <p className="text-xs text-charcoal-light">
+                          {productStatusExplanation(product.status, t)}
+                        </p>
+                      </div>
                     ) : (
-                      <select
-                        value={product.status}
-                        onChange={(e) => handleStatusChange(product.id, e.target.value)}
-                        className={`px-3 py-1 rounded-full text-sm font-semibold ${statusBadgeClass(product.status)} border-none`}
-                      >
-                        <option value="pending">{t('seller.pending', 'Pending review')}</option>
-                        <option value="draft">{t('seller.draft', 'Draft')}</option>
-                        <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
-                      </select>
+                      <div className="space-y-1">
+                        <select
+                          value={product.status}
+                          onChange={(e) => handleStatusChange(product.id, e.target.value)}
+                          className={`px-3 py-1 rounded-full text-sm font-semibold ${statusBadgeClass(product.status)} border-none`}
+                        >
+                          <option value="pending">{t('seller.pending', 'Pending review')}</option>
+                          <option value="draft">{t('seller.draft', 'Draft')}</option>
+                          <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
+                        </select>
+                        <p className="text-xs text-charcoal-light">
+                          {productStatusExplanation(product.status, t)}
+                        </p>
+                      </div>
                     )}
                   </td>
                   <td className="px-3 md:px-4 py-4 text-charcoal-light">
@@ -574,6 +645,14 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         alert(t('seller.invalidPrice', 'Please enter a valid price'));
         return;
       }
+      if (!Number.isFinite(parsedSize) || parsedSize <= 0) {
+        alert(t('seller.invalidSize', 'يرجى إدخال حجم صالح (أكبر من 0)'));
+        return;
+      }
+      if (!Number.isFinite(parsedStock) || parsedStock < 0) {
+        alert(t('seller.invalidStock', 'يرجى إدخال كمية صالحة (0 أو أكثر)'));
+        return;
+      }
 
       const nextStatus =
         intent === 'draft'
@@ -605,6 +684,17 @@ function ProductFormModal({ mode, isOpen, onClose, onSuccess, product }: Product
         await api.patch(`/seller/products/${product.id}`, payload);
       }
 
+      alert(
+        intent === 'draft'
+          ? t(
+              'seller.saveDraftSuccessExplain',
+              'تم حفظ المنتج كمسودة. السبب: اخترت "حفظ كمسودة"، لذلك لن يظهر للعملاء.'
+            )
+          : t(
+              'seller.publishSuccessExplain',
+              'تم إرسال المنتج للنشر. إذا لم يظهر فورًا فغالبًا ينتظر مراجعة الإدارة.'
+            )
+      );
       onSuccess();
       if (mode === 'add') {
         setFormData(createInitialFormState());

@@ -47,6 +47,7 @@ export default function ProductDetail() {
       if (!product) return;
       await api.post('/orders', {
         payment_method: 'COD',
+        language: language === 'ar' ? 'ar' : 'en',
         items: [
           {
             productId: product.id,

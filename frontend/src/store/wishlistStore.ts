@@ -7,6 +7,7 @@ export type WishItem = {
   price: number;
   image?: string | null;
   brand?: string | null;
+  sellerId?: number;
 };
 
 type WishlistState = {

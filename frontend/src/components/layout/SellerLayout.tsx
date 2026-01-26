@@ -8,7 +8,7 @@ import NotificationBell from '../notifications/NotificationBell';
 export default function SellerLayout() {
   const { t } = useTranslation();
   const location = useLocation();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, authChecked } = useAuthStore();
 
   const hasSellerAccess = useMemo(() => {
     const roles = user?.roles ?? [];
@@ -18,8 +18,20 @@ export default function SellerLayout() {
     });
   }, [user]);
 
+  if (!authChecked) {
+    return <div className="py-10 text-center text-taupe font-semibold">Loading...</div>;
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.email_verified === false) {
+    const redirectTarget = `${location.pathname}${location.search}`;
+    const target = `/verify-email/sent?email=${encodeURIComponent(
+      user.email,
+    )}&redirect=${encodeURIComponent(redirectTarget)}`;
+    return <Navigate to={target} replace />;
   }
 
   if (!hasSellerAccess) {

@@ -33,6 +33,7 @@ export default function Orders({ view }: OrdersProps = {}) {
   const [printingLabel, setPrintingLabel] = useState(false);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [torodShipSubmitting, setTorodShipSubmitting] = useState(false);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
 
   const userIsSeller = useMemo(() => user?.roles?.includes('seller'), [user]);
   const userIsAdmin = useMemo(() => user?.roles?.some((r) => ['admin', 'super_admin'].includes(r)), [user]);
@@ -47,6 +48,12 @@ export default function Orders({ view }: OrdersProps = {}) {
       !activeOrder.torod_tracking_number,
     [activeOrder?.shipping_method, activeOrder?.torod_tracking_number, sellerMode, userIsAdmin]
   );
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -156,11 +163,19 @@ export default function Orders({ view }: OrdersProps = {}) {
     if (!activeOrder || !selectedStatus) return;
     try {
       setUpdatingStatus(true);
+      setNotice(null);
       await api.patch(`/orders/${activeOrder.id}/status`, { status: selectedStatus });
       await fetchOrders();
       setActiveOrder((prev) => (prev ? { ...prev, status: selectedStatus } : prev));
+      setNotice({
+        tone: 'success',
+        message: t('orders.noticeStatusUpdated', 'تم تحديث حالة الطلب'),
+      });
     } catch (err: any) {
-      alert(err?.response?.data?.detail || t('orders.updateFailed', 'تعذر تحديث الحالة'));
+      setNotice({
+        tone: 'error',
+        message: err?.response?.data?.detail || t('orders.updateFailed', 'تعذر تحديث الحالة'),
+      });
     } finally {
       setUpdatingStatus(false);
     }
@@ -177,10 +192,14 @@ export default function Orders({ view }: OrdersProps = {}) {
   const handlePrintLabel = async (orderId: number) => {
     try {
       setPrintingLabel(true);
+      setNotice(null);
       const response = await api.get(`/orders/${orderId}/label`);
       const labelUrl = response.data?.label_url;
       if (!labelUrl) {
-        alert(t('orders.labelUnavailable', 'تعذر الحصول على بوليصة الشحن'));
+        setNotice({
+          tone: 'error',
+          message: t('orders.labelUnavailable', 'تعذر الحصول على بوليصة الشحن'),
+        });
         return;
       }
       openLabelWindow(`/orders/${orderId}/label/print-view`);
@@ -191,12 +210,19 @@ export default function Orders({ view }: OrdersProps = {}) {
         );
         setActiveOrder(updatedOrder);
       }
+      setNotice({
+        tone: 'success',
+        message: t('orders.noticeLabelReady', 'تم تجهيز بوليصة الشحن'),
+      });
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.detail ||
         t('orders.labelUnavailable', 'تعذر الحصول على بوليصة الشحن');
-      alert(message);
+      setNotice({
+        tone: 'error',
+        message,
+      });
     } finally {
       setPrintingLabel(false);
     }
@@ -206,6 +232,7 @@ export default function Orders({ view }: OrdersProps = {}) {
     if (!activeOrder) return;
     try {
       setTorodShipSubmitting(true);
+      setNotice(null);
       const response = await api.post(`/orders/${activeOrder.id}/torod/ship`, {
         type: "normal",
       });
@@ -214,12 +241,24 @@ export default function Orders({ view }: OrdersProps = {}) {
         setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
         setActiveOrder(updated);
       }
+      const trackingNumber = updated?.torod_tracking_number;
+      setNotice({
+        tone: 'success',
+        message: trackingNumber
+          ? t('orders.noticeTorodShipSuccessWithTracking', {
+              tracking: trackingNumber,
+              defaultValue: `تم إصدار البوليصة. رقم التتبع: ${trackingNumber}`,
+            })
+          : t('orders.noticeTorodShipSuccess', 'تم إصدار بوليصة الشحن'),
+      });
     } catch (error: any) {
-      alert(
-        error?.response?.data?.message ||
+      setNotice({
+        tone: 'error',
+        message:
+          error?.response?.data?.message ||
           error?.response?.data?.detail ||
-          t("orders.shipFailed", "تعذر إصدار بوليصة الشحن")
-      );
+          t("orders.shipFailed", "تعذر إصدار بوليصة الشحن"),
+      });
     } finally {
       setTorodShipSubmitting(false);
     }
@@ -244,22 +283,61 @@ export default function Orders({ view }: OrdersProps = {}) {
   const handleSubmitReview = async (orderId: number, productId: number, key: string) => {
     const draft = reviewDrafts[key];
     if (!draft?.rating) {
-      alert(t('reviews.validation'));
+      setNotice({
+        tone: 'error',
+        message: t('reviews.validation'),
+      });
       return;
     }
     try {
       setSubmittingReviewKey(key);
+      setNotice(null);
       await submitProductReview(productId, {
         order_id: orderId,
         rating: draft.rating,
         comment: draft.comment,
       });
       updateReviewDraft(key, { submitted: true });
-      alert(t('reviews.thankYou'));
+      setNotice({
+        tone: 'success',
+        message: t('orders.noticeReviewSubmitted', t('reviews.thankYou')),
+      });
     } catch (error: any) {
-      alert(error?.response?.data?.detail || t('reviews.submitFailed'));
+      setNotice({
+        tone: 'error',
+        message: error?.response?.data?.detail || t('reviews.submitFailed'),
+      });
     } finally {
       setSubmittingReviewKey(null);
+    }
+  };
+
+  const ORDER_FLOW = ['pending', 'seller_confirmed', 'shipped', 'completed'] as const;
+
+  const resolveTimelineKey = (status: string) => {
+    if (status === 'processing') return 'seller_confirmed';
+    return status;
+  };
+
+  const getTimelineIndex = (status: string) => {
+    const key = resolveTimelineKey(status) as typeof ORDER_FLOW[number];
+    const idx = ORDER_FLOW.indexOf(key);
+    return idx >= 0 ? idx : 0;
+  };
+
+  const handleCopyTracking = async (trackingNumber?: string | null) => {
+    if (!trackingNumber) return;
+    try {
+      await navigator.clipboard.writeText(trackingNumber);
+      setNotice({
+        tone: 'success',
+        message: t('orders.noticeTrackingCopied', 'تم نسخ رقم التتبع'),
+      });
+    } catch (_error) {
+      setNotice({
+        tone: 'error',
+        message: t('common.error'),
+      });
     }
   };
 
@@ -274,6 +352,18 @@ export default function Orders({ view }: OrdersProps = {}) {
       <div className="flex justify-between items-center mb-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-charcoal">{pageTitle}</h1>
       </div>
+
+      {notice && (
+        <div
+          className={`rounded-luxury border px-4 py-3 text-sm ${
+            notice.tone === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
 
       <div className="bg-white rounded-luxury shadow-sm border border-sand/60 p-3 sm:p-4">
         <div className="flex gap-2 overflow-x-auto">
@@ -447,6 +537,54 @@ export default function Orders({ view }: OrdersProps = {}) {
                 )}
               </div>
 
+              {activeOrder.status !== 'canceled' && (
+                <div className="border border-sand/70 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="font-semibold text-charcoal">
+                      {t('orders.timelineTitle', 'تتبع حالة الطلب')}
+                    </h4>
+                    <span className="text-[11px] text-taupe">
+                      {t('orders.timelineHint', 'تحديثات الحالة تظهر هنا بالترتيب')}
+                    </span>
+                  </div>
+                  <ol className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    {ORDER_FLOW.map((statusKey, index) => {
+                      const currentIndex = getTimelineIndex(activeOrder.status);
+                      const isComplete = index < currentIndex;
+                      const isActive = index === currentIndex;
+                      const tone = isComplete
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : isActive
+                          ? 'bg-gold text-charcoal border-gold'
+                          : 'bg-sand/60 text-charcoal-light border-sand/80';
+                      return (
+                        <li key={statusKey} className="rounded-luxury border border-sand/70 p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${tone}`}
+                            >
+                              {index + 1}
+                            </span>
+                            <span className="text-sm font-semibold text-charcoal">
+                              {t(`orders.statuses.${statusKey}`)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-charcoal-light">
+                            {t(`orders.timelineDesc.${statusKey}`, '')}
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              )}
+
+              {activeOrder.status === 'canceled' && (
+                <div className="border border-red-200 bg-red-50 text-red-700 rounded-xl p-4 text-sm font-semibold">
+                  {t('orders.timelineCanceled', 'تم إلغاء هذا الطلب')}
+                </div>
+              )}
+
               <div className="border rounded-xl border-sand/70">
                 <div className="px-4 py-3 border-b border-sand/70 flex items-center justify-between">
                   <h4 className="font-semibold text-charcoal">{t('orders.items')}</h4>
@@ -585,9 +723,14 @@ export default function Orders({ view }: OrdersProps = {}) {
                     {activeOrder.torod_tracking_number && (
                       <p className="break-all">
                         {t('orders.trackingNumber', 'رقم التتبع')}:{" "}
-                        <span className="font-semibold text-gold">
-                          {activeOrder.torod_tracking_number}
-                        </span>
+                        <span className="font-semibold text-gold">{activeOrder.torod_tracking_number}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyTracking(activeOrder.torod_tracking_number)}
+                          className="ms-2 text-xs underline text-charcoal hover:text-gold transition"
+                        >
+                          {t('orders.copyTracking', 'نسخ')}
+                        </button>
                       </p>
                     )}
                     {activeOrder.torod_status && (
@@ -640,10 +783,23 @@ export default function Orders({ view }: OrdersProps = {}) {
                   <div className="text-sm text-charcoal">{t('orders.confirmDeliveryNote')}</div>
                   <button
                     onClick={async () => {
-                      await api.post(`/orders/${activeOrder.id}/confirm-delivery`);
-                      await fetchOrders();
-                      setActiveOrder(null);
-                      alert(t('orders.deliveryConfirmed'));
+                      try {
+                        setNotice(null);
+                        await api.post(`/orders/${activeOrder.id}/confirm-delivery`);
+                        await fetchOrders();
+                        setActiveOrder(null);
+                        setNotice({
+                          tone: 'success',
+                          message: t('orders.noticeDeliveryConfirmed', t('orders.deliveryConfirmed')),
+                        });
+                      } catch (error: any) {
+                        setNotice({
+                          tone: 'error',
+                          message:
+                            error?.response?.data?.detail ||
+                            t('orders.deliveryConfirmFailed', 'تعذر تأكيد الاستلام حالياً'),
+                        });
+                      }
                     }}
                     className="bg-charcoal text-ivory px-4 py-2 rounded-luxury text-sm font-semibold hover:bg-charcoal-light transition"
                   >

@@ -35,7 +35,7 @@ router.get("/", authenticate(), async (req, res, next) => {
 
     const sellerScope = !isAdmin ? req.user.id : undefined;
     const coupons = await listCoupons(
-      sellerScope ? { sellerId: sellerScope } : undefined,
+      sellerScope ? { sellerId: sellerScope } : { includeSeller: true },
     );
     res.json(coupons);
   } catch (error) {

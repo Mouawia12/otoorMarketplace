@@ -6,6 +6,8 @@ import DOMPurify from 'dompurify';
 import { FooterPageKey, LocaleCode } from '../../types/staticPages';
 import { getDefaultFooterPage } from '../../content/footerPages';
 import { fetchPublishedFooterPage } from '../../services/footerPages';
+import { resolveImageUrl } from '../../utils/image';
+import { PLACEHOLDER_PERFUME } from '../../utils/staticAssets';
 
 export default function InfoPage() {
   const { t, i18n } = useTranslation();
@@ -59,6 +61,7 @@ export default function InfoPage() {
   const sections = page?.sections ?? [];
   const highlights = sections[0]?.highlights ?? [];
   const heroImage = page?.heroImage;
+  const resolvedHeroImage = resolveImageUrl(heroImage) || PLACEHOLDER_PERFUME;
 
   return (
     <div dir={i18n.language === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-sand py-12">
@@ -106,10 +109,13 @@ export default function InfoPage() {
             <div className="relative">
               <div className="rounded-3xl overflow-hidden shadow-xl border border-white/15 bg-white/5 backdrop-blur">
                 <img
-                  src={heroImage}
+                  src={resolvedHeroImage}
                   alt={heroTitle}
                   className="w-full h-64 object-cover"
                   loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.src = PLACEHOLDER_PERFUME;
+                  }}
                 />
               </div>
               <div className="absolute -bottom-4 inset-x-8 bg-white text-charcoal rounded-2xl shadow-soft flex items-center gap-3 px-4 py-3">
@@ -162,10 +168,13 @@ export default function InfoPage() {
                   <div className="lg:w-64">
                     <div className="rounded-2xl overflow-hidden shadow-soft border border-sand/80 h-full">
                       <img
-                        src={section.image}
+                        src={resolveImageUrl(section.image) || PLACEHOLDER_PERFUME}
                         alt={section.title[lang]}
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src = PLACEHOLDER_PERFUME;
+                        }}
                       />
                     </div>
                   </div>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { useUIStore } from '../store/uiStore';
+import { useAuthStore } from '../store/authStore';
 import { formatPrice } from '../utils/currency';
 import SARIcon from '../components/common/SARIcon';
 import { fetchMyBids } from '../services/auctionService';
@@ -21,10 +22,16 @@ interface Bid {
 export default function BidsPage() {
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setBids([]);
+      setLoading(false);
+      return;
+    }
     const loadAuctions = async () => {
       try {
         setLoading(true);
@@ -49,7 +56,7 @@ export default function BidsPage() {
     };
 
     loadAuctions();
-  }, []);
+  }, [isAuthenticated, user?.id]);
 
   const getStatusBadge = (status: Bid['status']) => {
     switch (status) {

@@ -11,13 +11,6 @@ import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import { resolvePostAuthRoute } from '../utils/authNavigation';
 import googleAuthConfig from '../utils/googleAuthConfig';
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6)
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
-
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -25,12 +18,33 @@ export default function Login() {
   const { login } = useAuthStore();
   const [error, setError] = useState('');
   const [processingPending, setProcessingPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const showGoogleSection = googleAuthConfig.hasClientId;
   const resetSuccess = new URLSearchParams(location.search).get('reset') === 'success';
+  const redirectParam = new URLSearchParams(location.search).get('redirect');
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema)
+  const loginSchema = z.object({
+    email: z.string().email(t('auth.errors.emailInvalid', 'يرجى إدخال بريد إلكتروني صحيح')),
+    password: z
+      .string()
+      .min(6, t('auth.errors.passwordMinLogin', 'كلمة المرور يجب ألا تقل عن 6 أحرف')),
   });
+
+  type LoginForm = z.infer<typeof loginSchema>;
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+  });
+  const emailValue = watch('email');
+  const showVerificationHelp = error.includes('تفعيل');
+  const verifyLink = `/verify-email/sent?email=${encodeURIComponent(emailValue ?? '')}${
+    redirectParam ? `&redirect=${encodeURIComponent(redirectParam)}` : ''
+  }`;
 
   const tryCompletePendingOrder = async () => {
     const pending = loadPendingOrder();
@@ -79,11 +93,25 @@ export default function Login() {
         setError(t('auth.invalidCredentials'));
         return;
       }
+      if (status === 403) {
+        const message = err.response?.data?.message || err.response?.data?.detail;
+        if (typeof message === 'string' && message.toLowerCase().includes('suspend')) {
+          setError(t('auth.suspendedAccount', 'تم تعليق حسابك. يرجى التواصل مع الدعم.'));
+        } else if (typeof message === 'string') {
+          setError(message);
+        } else {
+          setError(t('auth.suspendedAccount', 'تم تعليق حسابك. يرجى التواصل مع الدعم.'));
+        }
+        return;
+      }
       const detail = err.response?.data?.detail;
+      const message = err.response?.data?.message;
       if (Array.isArray(detail)) {
         setError(detail.map((e: any) => e.msg).join(', '));
       } else if (typeof detail === 'string') {
         setError(detail);
+      } else if (typeof message === 'string') {
+        setError(message);
       } else {
         setError(t('common.error'));
       }
@@ -91,84 +119,110 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-16">
-      <div className="bg-white p-8 rounded-luxury shadow-luxury-lg">
-        <h2 className="text-3xl font-bold text-charcoal mb-6 text-center">
-          {t('auth.loginTitle')}
-        </h2>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-luxury mb-4">
-            {error}
-          </div>
-        )}
-        {resetSuccess && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-luxury mb-4">
-            {t('auth.resetPasswordLoginMessage')}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label className="block text-charcoal font-medium mb-2">
-              {t('auth.email')}
-            </label>
-            <input
-              {...register('email')}
-              type="email"
-              className="w-full px-4 py-2 border border-gray-300 rounded-luxury focus:ring-2 focus:ring-gold focus:border-transparent"
-            />
-            {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-            )}
+    <div className="min-h-[70vh] flex items-center justify-center px-4 py-12 bg-gradient-to-b from-white via-[#F9F6EF] to-white">
+      <div className="w-full max-w-md">
+        <div className="bg-white/95 backdrop-blur border border-black/5 p-8 md:p-10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.12)] space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-3xl font-bold text-charcoal">{t('auth.loginTitle')}</h2>
+            <p className="text-sm text-taupe">
+              {t('auth.loginSubtitle', 'سجل دخولك وتابع طلباتك بسهولة')}
+            </p>
           </div>
 
-          <div>
-            <label className="block text-charcoal font-medium mb-2">
-              {t('auth.password')}
-            </label>
-            <input
-              {...register('password')}
-              type="password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-luxury focus:ring-2 focus:ring-gold focus:border-transparent"
-            />
-            {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
-            )}
-          </div>
-
-          <div className="text-right">
-            <Link to="/forgot-password" className="text-sm text-gold hover:underline">
-              {t('auth.forgotPassword')}
-            </Link>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting || processingPending}
-            className="w-full bg-gold text-charcoal font-semibold py-3 rounded-luxury hover:bg-gold-light transition disabled:opacity-50"
-          >
-            {isSubmitting || processingPending ? t('common.loading') : t('common.login')}
-          </button>
-        </form>
-
-        {showGoogleSection && (
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center gap-2 text-sm text-charcoal-light">
-              <span className="flex-1 h-px bg-gray-200" />
-              <span>{t('auth.loginWithGoogle', 'أو المتابعة عبر جوجل')}</span>
-              <span className="flex-1 h-px bg-gray-200" />
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+              {error}
+              {showVerificationHelp && (
+                <div className="mt-2">
+                  <Link to={verifyLink} className="font-semibold underline underline-offset-2">
+                    {t('auth.resendVerification', 'إعادة إرسال رابط التفعيل')}
+                  </Link>
+                </div>
+              )}
             </div>
-            <GoogleAuthButton onLoggedIn={postLoginNavigation} />
-          </div>
-        )}
+          )}
+          {resetSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm">
+              {t('auth.resetPasswordLoginMessage')}
+            </div>
+          )}
 
-        <p className="text-center mt-6 text-charcoal-light">
-          {t('auth.noAccount')}{' '}
-          <Link to="/register" className="text-gold hover:underline">
-            {t('common.register')}
-          </Link>
-        </p>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div className="space-y-2">
+              <label className="block text-charcoal font-medium">{t('auth.email')}</label>
+              <input
+                {...register('email')}
+                type="email"
+                autoComplete="email"
+                placeholder={t('auth.placeholders.email', 'example@email.com')}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-gold/60 focus:border-gold/40 focus:outline-none transition"
+              />
+              {errors.email && (
+                <p className="text-red-500 text-sm">{errors.email.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-charcoal font-medium">{t('auth.password')}</label>
+              <div className="relative">
+                <input
+                  {...register('password')}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder={t('auth.placeholders.password', 'أدخل كلمة المرور')}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-gold/60 focus:border-gold/40 focus:outline-none transition pe-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 end-0 px-3 text-sm text-taupe hover:text-charcoal transition"
+                  aria-label={
+                    showPassword
+                      ? t('auth.hidePassword', 'إخفاء كلمة المرور')
+                      : t('auth.showPassword', 'إظهار كلمة المرور')
+                  }
+                >
+                  {showPassword ? t('auth.hide', 'إخفاء') : t('auth.show', 'إظهار')}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-red-500 text-sm">{errors.password.message}</p>
+              )}
+            </div>
+
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-sm text-gold hover:underline">
+                {t('auth.forgotPassword')}
+              </Link>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || processingPending}
+              className="w-full bg-gold text-charcoal font-semibold py-3 rounded-xl hover:bg-gold-light transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {isSubmitting || processingPending ? t('common.loading') : t('common.login')}
+            </button>
+          </form>
+
+          {showGoogleSection && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-charcoal-light">
+                <span className="flex-1 h-px bg-gray-200" />
+                <span>{t('auth.loginWithGoogle', 'أو المتابعة عبر جوجل')}</span>
+                <span className="flex-1 h-px bg-gray-200" />
+              </div>
+              <GoogleAuthButton onLoggedIn={postLoginNavigation} />
+            </div>
+          )}
+
+          <p className="text-center text-charcoal-light text-sm">
+            {t('auth.noAccount')}{' '}
+            <Link to="/register" className="text-gold hover:underline font-semibold">
+              {t('common.register')}
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

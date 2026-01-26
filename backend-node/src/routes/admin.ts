@@ -400,6 +400,7 @@ router.get("/auctions", adminOnly, async (req, res, next) => {
 
     const auctions = await listAuctions({
       status,
+      scope: "admin",
       include_pending: true,
     });
     res.json(auctions);

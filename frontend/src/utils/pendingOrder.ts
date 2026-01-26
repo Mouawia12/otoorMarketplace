@@ -2,6 +2,7 @@ export type PendingOrderPayload = {
   payment_method: string;
   payment_method_id?: number;
   payment_method_code?: string;
+  language?: "ar" | "en";
   total_amount?: number;
   shipping: {
     name: string;
@@ -40,12 +41,16 @@ const STORAGE_KEY = "pending_order_payload";
 
 export const savePendingOrder = (payload: PendingOrderPayload) => {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 };
 
 export const loadPendingOrder = (): PendingOrderPayload | null => {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(STORAGE_KEY);
+  // Clean up legacy persistent storage for sensitive checkout data.
+  if (window.localStorage.getItem(STORAGE_KEY)) {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+  const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -56,5 +61,5 @@ export const loadPendingOrder = (): PendingOrderPayload | null => {
 
 export const clearPendingOrder = () => {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
 };

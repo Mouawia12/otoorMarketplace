@@ -38,6 +38,7 @@ const resolveAuctionStatus = (status: AuctionStatus, startTime: Date, endTime: D
 
 const normalizeAuction = (auction: any) => {
   const plain = toPlainObject(auction);
+  const winner = plain.winner;
   return {
     id: plain.id,
     product_id: plain.productId,
@@ -53,7 +54,20 @@ const normalizeAuction = (auction: any) => {
     total_bids: plain.total_bids ?? plain._count?.bids ?? 0,
     product: plain.product ? normalizeProduct(plain.product) : undefined,
     seller: normalizeSeller(plain.seller),
-    winner: plain.winner,
+    winner: winner
+      ? {
+          bid_id: winner.bid_id ?? winner.bidId ?? winner.id,
+          bidder_id: winner.bidder_id ?? winner.bidderId,
+          amount: Number(winner.amount ?? winner.bidAmount ?? 0),
+          bidder: winner.bidder
+            ? {
+                id: winner.bidder.id,
+                full_name: winner.bidder.fullName ?? winner.bidder.full_name,
+                email: winner.bidder.email,
+              }
+            : undefined,
+        }
+      : null,
   };
 };
 
@@ -93,6 +107,7 @@ const listAuctionsSchema = z.object({
   status: z.nativeEnum(AuctionStatus).optional(),
   seller_id: z.coerce.number().optional(),
   product_id: z.coerce.number().optional(),
+  scope: z.enum(["public", "seller", "admin"]).optional(),
   include_pending: z
     .union([z.boolean(), z.string()])
     .optional()
@@ -105,19 +120,32 @@ const listAuctionsSchema = z.object({
 });
 
 export const listAuctions = async (query: unknown) => {
-  const { status, seller_id, product_id, include_pending } = listAuctionsSchema.parse(query);
+  const { status, seller_id, product_id, scope, include_pending } = listAuctionsSchema.parse(query);
   const includePending = Boolean(include_pending);
+  const viewScope = scope ?? "public";
+  const now = new Date();
 
   const filters: Prisma.AuctionWhereInput = {};
 
-  if (status === AuctionStatus.PENDING_REVIEW && !includePending) {
-    return [];
-  }
+  if (viewScope === "public") {
+    const publicStatuses: AuctionStatus[] = [AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED];
+    if (status && !publicStatuses.includes(status)) {
+      return [];
+    }
 
-  if (status) {
-    filters.status = status;
-  } else if (!includePending) {
-    filters.status = { not: AuctionStatus.PENDING_REVIEW };
+    filters.status = status ?? { in: publicStatuses };
+    filters.endTime = { gt: now };
+    filters.product = { status: ProductStatus.PUBLISHED };
+  } else {
+    if (status === AuctionStatus.PENDING_REVIEW && !includePending) {
+      return [];
+    }
+
+    if (status) {
+      filters.status = status;
+    } else if (!includePending) {
+      filters.status = { not: AuctionStatus.PENDING_REVIEW };
+    }
   }
 
   if (seller_id) {
@@ -128,38 +156,55 @@ export const listAuctions = async (query: unknown) => {
     filters.productId = product_id;
   }
 
-  const auctions = await prisma.auction.findMany({
-    where: filters,
-    include: {
-      product: {
-        include: {
-          images: { orderBy: { sortOrder: "asc" } },
-          seller: {
-            select: {
-              id: true,
-              fullName: true,
-              verifiedSeller: true,
-            },
+  const include: Prisma.AuctionInclude = {
+    product: {
+      include: {
+        images: { orderBy: { sortOrder: "asc" } },
+        seller: {
+          select: {
+            id: true,
+            fullName: true,
+            verifiedSeller: true,
           },
         },
       },
-      seller: {
-        select: {
-          id: true,
-          fullName: true,
-          verifiedSeller: true,
-        },
-      },
-      _count: {
-        select: { bids: true },
+    },
+    seller: {
+      select: {
+        id: true,
+        fullName: true,
+        verifiedSeller: true,
       },
     },
+    _count: {
+      select: { bids: true },
+    },
+  };
+
+  if (viewScope !== "public") {
+    include.bids = {
+      orderBy: [{ amount: "desc" }, { createdAt: "asc" }],
+      take: 1,
+      include: {
+        bidder: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+    };
+  }
+
+  const auctions = await prisma.auction.findMany({
+    where: filters,
+    include,
     orderBy: {
       endTime: "asc",
     },
   });
 
-  const now = new Date();
   const statusUpdates = auctions.reduce<Array<{ id: number; status: AuctionStatus }>>((acc, auction) => {
     const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime, now);
     if (nextStatus !== auction.status) {
@@ -181,13 +226,55 @@ export const listAuctions = async (query: unknown) => {
     );
   }
 
-  return auctions.map((auction) =>
-    normalizeAuction({
+  const normalized = auctions.map((auction) => {
+    const nextStatus = statusById.get(auction.id) ?? auction.status;
+    const topBid = Array.isArray(auction.bids) ? auction.bids[0] : null;
+    const winner =
+      nextStatus === AuctionStatus.COMPLETED && topBid
+        ? {
+            bid_id: topBid.id,
+            bidder_id: topBid.bidderId,
+            amount: Number(topBid.amount),
+            bidder: topBid.bidder
+              ? {
+                  id: topBid.bidder.id,
+                  full_name: topBid.bidder.fullName,
+                  email: topBid.bidder.email,
+                }
+              : undefined,
+          }
+        : null;
+    return normalizeAuction({
       ...auction,
-      status: statusById.get(auction.id) ?? auction.status,
+      status: nextStatus,
       total_bids: auction._count.bids,
-    })
-  );
+      winner,
+    });
+  });
+
+  if (viewScope !== "public") {
+    return normalized;
+  }
+
+  return normalized.filter((auction) => {
+    if (!auction.product || auction.product.status !== "published") {
+      return false;
+    }
+
+    const startMs = new Date(auction.start_time).getTime();
+    const endMs = new Date(auction.end_time).getTime();
+    const nowMs = now.getTime();
+
+    if (endMs <= nowMs) {
+      return false;
+    }
+
+    if (auction.status === "scheduled") {
+      return startMs > nowMs;
+    }
+
+    return auction.status === "active" && startMs <= nowMs && endMs > nowMs;
+  });
 };
 
 export const listUserBids = async (bidderId: number) => {
@@ -297,6 +384,10 @@ export const getAuctionById = async (id: number) => {
     throw AppError.notFound("Auction not found");
   }
 
+  if (!auction.product || auction.product.status !== ProductStatus.PUBLISHED) {
+    throw AppError.notFound("Auction not found");
+  }
+
   const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime);
   if (nextStatus !== auction.status) {
     await prisma.auction.update({
@@ -349,8 +440,14 @@ export const getAuctionById = async (id: number) => {
 };
 
 export const getAuctionByProductId = async (productId: number) => {
+  const now = new Date();
   const auction = await prisma.auction.findFirst({
-    where: { productId, status: { not: AuctionStatus.PENDING_REVIEW } },
+    where: {
+      productId,
+      status: { in: [AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED] },
+      endTime: { gt: now },
+      product: { status: ProductStatus.PUBLISHED },
+    },
     include: {
       product: {
         include: {
@@ -381,7 +478,20 @@ export const getAuctionByProductId = async (productId: number) => {
     return null;
   }
 
-  const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime);
+  const nextStatus: AuctionStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime);
+  if (
+    (nextStatus !== AuctionStatus.ACTIVE && nextStatus !== AuctionStatus.SCHEDULED) ||
+    auction.endTime <= now
+  ) {
+    if (nextStatus !== auction.status) {
+      await prisma.auction.update({
+        where: { id: auction.id },
+        data: { status: nextStatus },
+      });
+    }
+    return null;
+  }
+
   if (nextStatus !== auction.status) {
     await prisma.auction.update({
       where: { id: auction.id },
@@ -389,50 +499,11 @@ export const getAuctionByProductId = async (productId: number) => {
     });
   }
 
-  let winner: {
-    bid_id: number;
-    bidder_id: number;
-    amount: number;
-    bidder?: { id: number; full_name: string; email: string };
-  } | null = null;
-
-  if (nextStatus === AuctionStatus.COMPLETED) {
-    const topBid = await prisma.bid.findFirst({
-      where: { auctionId: auction.id },
-      orderBy: [{ amount: "desc" }, { createdAt: "asc" }],
-      include: {
-        bidder: {
-          select: { id: true, fullName: true, email: true },
-        },
-      },
-    });
-    if (topBid) {
-      const winnerPayload: {
-        bid_id: number;
-        bidder_id: number;
-        amount: number;
-        bidder?: { id: number; full_name: string; email: string };
-      } = {
-        bid_id: topBid.id,
-        bidder_id: topBid.bidderId,
-        amount: Number(topBid.amount),
-      };
-      if (topBid.bidder) {
-        winnerPayload.bidder = {
-          id: topBid.bidder.id,
-          full_name: topBid.bidder.fullName,
-          email: topBid.bidder.email,
-        };
-      }
-      winner = winnerPayload;
-    }
-  }
-
   return normalizeAuction({
     ...auction,
     status: nextStatus,
     total_bids: auction._count.bids,
-    winner,
+    winner: null,
   });
 };
 

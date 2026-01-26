@@ -14,6 +14,8 @@ type Coupon = {
   is_active: boolean;
   created_at?: string;
   seller_id?: number | null;
+  seller_email?: string | null;
+  seller_name?: string | null;
 };
 
 type CouponFormState = {
@@ -261,6 +263,9 @@ export default function AdminCouponsPage() {
                         {t('adminCoupons.tableCode')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-charcoal tracking-wider">
+                        {t('adminCoupons.sellerEmail', 'بريد البائع')}
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-charcoal tracking-wider">
                         {t('adminCoupons.tableType')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-charcoal tracking-wider">
@@ -284,6 +289,9 @@ export default function AdminCouponsPage() {
                     {coupons.map((coupon) => (
                       <tr key={coupon.id}>
                         <td className="px-4 py-3 font-semibold text-charcoal">{coupon.code}</td>
+                        <td className="px-4 py-3 text-sm text-charcoal-light">
+                          {coupon.seller_email ?? '—'}
+                        </td>
                         <td className="px-4 py-3 text-sm text-charcoal-light">
                           {coupon.discount_type === 'percentage'
                             ? t('adminCoupons.typePercentage')

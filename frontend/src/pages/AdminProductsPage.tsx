@@ -78,6 +78,19 @@ export default function AdminProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [updatingProductId, setUpdatingProductId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -91,8 +104,8 @@ export default function AdminProductsPage() {
         if (active !== "all") {
           params.status = adminStatusToApi(active);
         }
-        if (q.trim()) {
-          params.search = q.trim();
+        if (debouncedQ) {
+          params.search = debouncedQ;
         }
         const response = await api.get("/admin/products", { params });
         const payload = response.data;
@@ -108,7 +121,7 @@ export default function AdminProductsPage() {
     };
 
     fetchProducts();
-  }, [t, active, q, page]);
+  }, [t, active, debouncedQ, page]);
 
   const counts = useMemo(() => {
     const base = { all: 0, pending: 0, approved: 0, rejected: 0, hidden: 0 };
@@ -129,13 +142,32 @@ export default function AdminProductsPage() {
   }, [products]);
 
   const handleStatusChange = async (product: Product, status: Exclude<AdminStatus, "all">) => {
+    if (updatingProductId === product.id) return;
+    setUpdatingProductId(product.id);
+    setNotice(null);
     try {
       await api.patch(`/admin/products/${product.id}/status`, { status: adminStatusToApi(status) });
+      const nextStatus = adminStatusToProductStatus(status);
+      const previousStatus = product.status.toLowerCase();
       setProducts((prev) =>
-        prev.map((p) =>
-          p.id === product.id ? { ...p, status: adminStatusToProductStatus(status) } : p
-        )
+        prev
+          .map((p) => (p.id === product.id ? { ...p, status: nextStatus } : p))
+          .filter((p) => (active === "all" ? true : productStatusToAdmin(p.status) === active))
       );
+      if (previousStatus !== nextStatus) {
+        setStatusCounts((prev) => {
+          const next = { ...prev };
+          const decKey = previousStatus;
+          const incKey = nextStatus;
+          if (decKey) {
+            next[decKey] = Math.max(0, (next[decKey] ?? 0) - 1);
+          }
+          if (incKey) {
+            next[incKey] = (next[incKey] ?? 0) + 1;
+          }
+          return next;
+        });
+      }
       setNotice({
         tone: "success",
         message: t("admin.updateSuccess", "تم تحديث الحالة بنجاح"),
@@ -146,6 +178,8 @@ export default function AdminProductsPage() {
         tone: "error",
         message: err?.response?.data?.detail ?? t("seller.updateFailed", "Failed to update product"),
       });
+    } finally {
+      setUpdatingProductId(null);
     }
   };
 
@@ -273,7 +307,8 @@ export default function AdminProductsPage() {
                             e.target.value as Exclude<AdminStatus, "all">
                           )
                         }
-                        className="w-full px-2 py-1 rounded-md border border-sand/60 text-[11px] sm:text-xs"
+                        disabled={updatingProductId === product.id}
+                        className="w-full px-2 py-1 rounded-md border border-sand/60 text-[11px] sm:text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {(["pending", "approved", "rejected", "hidden"] as Exclude<
                           AdminStatus,
@@ -284,6 +319,9 @@ export default function AdminProductsPage() {
                           </option>
                         ))}
                       </select>
+                      {updatingProductId === product.id && (
+                        <p className="mt-1 text-[11px] text-taupe">{t("common.loading")}</p>
+                      )}
                     </div>
                   </td>
                 </tr>
