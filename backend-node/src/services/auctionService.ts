@@ -229,17 +229,19 @@ export const listAuctions = async (query: unknown) => {
   const normalized = auctions.map((auction) => {
     const nextStatus = statusById.get(auction.id) ?? auction.status;
     const topBid = Array.isArray(auction.bids) ? auction.bids[0] : null;
+    const topBidder =
+      topBid && "bidder" in topBid ? (topBid as { bidder?: { id: number; fullName: string; email: string } }).bidder : undefined;
     const winner =
       nextStatus === AuctionStatus.COMPLETED && topBid
         ? {
             bid_id: topBid.id,
             bidder_id: topBid.bidderId,
             amount: Number(topBid.amount),
-            bidder: topBid.bidder
+            bidder: topBidder
               ? {
-                  id: topBid.bidder.id,
-                  full_name: topBid.bidder.fullName,
-                  email: topBid.bidder.email,
+                  id: topBidder.id,
+                  full_name: topBidder.fullName,
+                  email: topBidder.email,
                 }
               : undefined,
           }
