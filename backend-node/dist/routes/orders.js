@@ -97,11 +97,6 @@ router.post("/", (0, auth_1.authenticate)(), async (req, res, next) => {
         if (!req.user) {
             throw errors_1.AppError.unauthorized();
         }
-        // Debug logging to diagnose 403/auth issues in production
-        console.log("ORDER AUTH USER:", req.user);
-        console.log("ORDER AUTH HEADER:", req.headers.authorization);
-        console.log("ORDER BODY RAW:", req.body);
-        console.log("ORDER PAYLOAD:", req.body);
         const body = req.body ?? {};
         const shippingMethodRaw = body.shipping?.shipping_method ??
             body.shipping?.shippingMethod ??
@@ -118,11 +113,13 @@ router.post("/", (0, auth_1.authenticate)(), async (req, res, next) => {
             typeof shippingCompanyIdRaw !== "object" &&
             Number.isFinite(shippingCompanyId) &&
             shippingCompanyId > 0;
+        const hasGroupSelections = Array.isArray(body.shipping?.torod_group_selections) &&
+            body.shipping.torod_group_selections.length > 0;
         const normalizedShippingMethod = typeof shippingMethodRaw === "string" ? shippingMethodRaw.trim().toLowerCase() : "";
         const deferTorodShipment = Boolean(body.shipping?.deferTorodShipment ??
             body.shipping?.defer_torod_shipment ??
             body.deferTorodShipment ??
-            body.defer_torod_shipment) || (normalizedShippingMethod === "torod" && !hasShippingCompany);
+            body.defer_torod_shipment) || (normalizedShippingMethod === "torod" && !hasShippingCompany && !hasGroupSelections);
         if (normalizedShippingMethod === "torod" && !hasShippingCompany && !deferTorodShipment) {
             res.status(422).json({
                 message: "لا توجد شركة شحن متاحة لهذه المدينة",
@@ -171,6 +168,7 @@ router.post("/", (0, auth_1.authenticate)(), async (req, res, next) => {
                     torod_city_id: body.torod_city_id,
                     torod_district_id: body.torod_district_id,
                     torod_metadata: body.torod_metadata,
+                    torod_group_selections: body.shipping?.torod_group_selections ?? body.torod_group_selections,
                 }
                 : undefined);
         const order = await (0, orderService_1.createOrder)({
@@ -178,6 +176,7 @@ router.post("/", (0, auth_1.authenticate)(), async (req, res, next) => {
             paymentMethod: body.payment_method ?? "COD",
             paymentMethodId: body.payment_method_id ?? body.paymentMethodId,
             paymentMethodCode: body.payment_method_code ?? body.paymentMethodCode,
+            language: typeof body.language === "string" ? body.language : undefined,
             shipping: shippingInput,
             items,
             couponCode: typeof body.coupon_code === "string" ? body.coupon_code : undefined,
@@ -204,7 +203,7 @@ router.patch("/:id/status", (0, auth_1.authenticate)({ roles: [client_1.RoleName
         if (typeof status !== "string") {
             throw errors_1.AppError.badRequest("Status is required");
         }
-        const order = await (0, orderService_1.updateOrderStatus)(orderId, status, req.user.roles.map((role) => role.toUpperCase()));
+        const order = await (0, orderService_1.updateOrderStatus)(orderId, status, req.user.roles.map((role) => role.toUpperCase()), req.user.id);
         res.json(order);
     }
     catch (error) {
@@ -243,11 +242,8 @@ router.post("/:id/torod/partners", (0, auth_1.authenticate)({ roles: [client_1.R
         next(error);
     }
 });
-router.post("/torod/partners/checkout", (0, auth_1.authenticate)(), async (req, res, next) => {
+router.post("/torod/partners/checkout", async (req, res, next) => {
     try {
-        if (!req.user) {
-            throw errors_1.AppError.unauthorized();
-        }
         const result = await (0, orderService_1.listTorodPartnersForCheckout)(req.body ?? {});
         res.json(result);
     }
@@ -280,7 +276,7 @@ router.get("/:id/label", (0, auth_1.authenticate)(), async (req, res, next) => {
         if (Number.isNaN(orderId)) {
             throw errors_1.AppError.badRequest("Invalid order id");
         }
-        const result = await (0, orderService_1.getOrderLabel)(orderId, req.user.id, req.user.roles);
+        const result = await (0, orderService_1.getOrderLabel)(orderId, req.user.id, req.user.roles, req.query);
         res.json(result);
     }
     catch (error) {
@@ -296,7 +292,7 @@ router.get("/:id/label/print", (0, auth_1.authenticate)(), async (req, res, next
         if (Number.isNaN(orderId)) {
             throw errors_1.AppError.badRequest("Invalid order id");
         }
-        const result = await (0, orderService_1.getOrderLabel)(orderId, req.user.id, req.user.roles);
+        const result = await (0, orderService_1.getOrderLabel)(orderId, req.user.id, req.user.roles, req.query);
         const labelUrl = result.label_url;
         if (!labelUrl) {
             throw errors_1.AppError.notFound("Label not found");
@@ -329,7 +325,10 @@ router.get("/:id/label/print-view", (0, auth_1.authenticate)(), async (req, res,
         if (Number.isNaN(orderId)) {
             throw errors_1.AppError.badRequest("Invalid order id");
         }
-        const printUrl = `${req.baseUrl}/${orderId}/label/print`;
+        const query = typeof req.originalUrl === "string" && req.originalUrl.includes("?")
+            ? req.originalUrl.split("?")[1]
+            : "";
+        const printUrl = `${req.baseUrl}/${orderId}/label/print${query ? `?${query}` : ""}`;
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.send(`
       <!doctype html>
@@ -389,7 +388,7 @@ router.get("/:id/tracking", (0, auth_1.authenticate)(), async (req, res, next) =
         if (Number.isNaN(orderId)) {
             throw errors_1.AppError.badRequest("Invalid order id");
         }
-        const result = await (0, orderService_1.getOrderTracking)(orderId, req.user.id, req.user.roles);
+        const result = await (0, orderService_1.getOrderTracking)(orderId, req.user.id, req.user.roles, req.query);
         res.json(result);
     }
     catch (error) {

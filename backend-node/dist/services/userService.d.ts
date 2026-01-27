@@ -6,6 +6,7 @@ export declare const getUserProfile: (userId: number) => Promise<{
     phone: string | null;
     avatar_url: string | null;
     verified_seller: boolean;
+    email_verified: boolean;
     status: import(".prisma/client").$Enums.UserStatus;
     roles: any[];
     seller_status: string;
@@ -15,9 +16,6 @@ export declare const getUserProfile: (userId: number) => Promise<{
         phone: string;
         city: string;
         address: string;
-        national_id: string;
-        iban: string;
-        bank_name: string;
         torod_warehouse_id: string | null;
         status: string;
     } | null;
@@ -35,6 +33,7 @@ export declare const updateUserProfile: (userId: number, data: {
     phone: string | null;
     avatar_url: string | null;
     verified_seller: boolean;
+    email_verified: boolean;
     status: import(".prisma/client").$Enums.UserStatus;
     roles: any[];
 }>;

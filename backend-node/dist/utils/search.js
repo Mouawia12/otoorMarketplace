@@ -20,6 +20,69 @@ const normalizeSearchText = (value) => {
     const normalized = normalizeArabic(stripLatinDiacritics(sanitized));
     return normalizeWhitespace(normalized.toLowerCase());
 };
+const ARABIC_PREFIXES = ["ال", "وال", "بال", "لل", "فال", "كال"];
+const ARABIC_SUFFIXES = [
+    "يات",
+    "ات",
+    "ون",
+    "ين",
+    "ان",
+    "ة",
+    "ه",
+    "ي",
+];
+const stripArabicPrefix = (token) => {
+    for (const prefix of ARABIC_PREFIXES) {
+        if (token.startsWith(prefix) && token.length - prefix.length >= 2) {
+            return token.slice(prefix.length);
+        }
+    }
+    return token;
+};
+const stripArabicSuffix = (token) => {
+    for (const suffix of ARABIC_SUFFIXES) {
+        if (token.endsWith(suffix) && token.length - suffix.length >= 2) {
+            return token.slice(0, -suffix.length);
+        }
+    }
+    return token;
+};
+const normalizeArabicTokenVariants = (token) => {
+    const base = normalizeSearchText(token);
+    if (!base)
+        return [];
+    const variants = new Set([base]);
+    const withoutPrefix = stripArabicPrefix(base);
+    variants.add(withoutPrefix);
+    variants.add(stripArabicSuffix(base));
+    variants.add(stripArabicSuffix(withoutPrefix));
+    return Array.from(variants).filter((value) => value.length >= 2);
+};
+const buildArabicTokenCombinations = (normalized) => {
+    const tokens = normalized.split(" ").filter(Boolean);
+    if (tokens.length === 0)
+        return [];
+    const perTokenVariants = tokens.map((token) => normalizeArabicTokenVariants(token));
+    if (perTokenVariants.some((variants) => variants.length === 0)) {
+        return [];
+    }
+    const combinations = [];
+    const backtrack = (index, parts) => {
+        if (index === perTokenVariants.length) {
+            combinations.push(parts.join(" "));
+            return;
+        }
+        const variantsForToken = perTokenVariants[index];
+        if (!variantsForToken) {
+            return;
+        }
+        for (const variant of variantsForToken) {
+            backtrack(index + 1, [...parts, variant]);
+        }
+    };
+    backtrack(0, []);
+    return combinations;
+};
 const buildSearchVariants = (input) => {
     const raw = normalizeWhitespace(input);
     if (!raw) {
@@ -30,6 +93,9 @@ const buildSearchVariants = (input) => {
     const normalized = normalizeSearchText(raw);
     if (normalized) {
         variants.add(normalized);
+        for (const combo of buildArabicTokenCombinations(normalized)) {
+            variants.add(combo);
+        }
     }
     const lower = raw.toLowerCase();
     if (lower) {

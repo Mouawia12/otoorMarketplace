@@ -17,12 +17,16 @@ export declare const validateCoupon: (input: unknown) => Promise<{
             usage_count: number;
             is_active: boolean;
             seller_id: number | null;
+            seller_email: string | null;
+            seller_name: string | null;
             created_at: Date;
             updated_at: Date;
         };
         discount_amount: number;
+        per_seller_discounts: Record<string, number>;
     }[];
     total_discount: number;
+    per_seller_discounts: Record<string, number>;
 }>;
 export declare const redeemCoupon: (input: unknown) => Promise<{
     coupon: {
@@ -35,12 +39,15 @@ export declare const redeemCoupon: (input: unknown) => Promise<{
         usage_count: number;
         is_active: boolean;
         seller_id: number | null;
+        seller_email: string | null;
+        seller_name: string | null;
         created_at: Date;
         updated_at: Date;
     };
 }>;
 export declare const listCoupons: (options?: {
     sellerId?: number;
+    includeSeller?: boolean;
 }) => Promise<{
     id: number;
     code: string;
@@ -51,6 +58,8 @@ export declare const listCoupons: (options?: {
     usage_count: number;
     is_active: boolean;
     seller_id: number | null;
+    seller_email: string | null;
+    seller_name: string | null;
     created_at: Date;
     updated_at: Date;
 }[]>;
@@ -66,6 +75,8 @@ export declare const createCoupon: (input: unknown, options?: {
     usage_count: number;
     is_active: boolean;
     seller_id: number | null;
+    seller_email: string | null;
+    seller_name: string | null;
     created_at: Date;
     updated_at: Date;
 }>;
@@ -81,6 +92,8 @@ export declare const updateCoupon: (id: number, input: unknown, options?: {
     usage_count: number;
     is_active: boolean;
     seller_id: number | null;
+    seller_email: string | null;
+    seller_name: string | null;
     created_at: Date;
     updated_at: Date;
 }>;
@@ -102,6 +115,7 @@ export declare const prepareCouponForOrder: (tx: Prisma.TransactionClient, code:
         isActive: boolean;
     };
     discountAmount: number;
+    perSellerDiscounts: Record<string, number>;
 }>;
 export declare const prepareCouponsForOrder: (tx: Prisma.TransactionClient, codes: string[], items: CouponLine[]) => Promise<{
     coupons: {
@@ -120,8 +134,10 @@ export declare const prepareCouponsForOrder: (tx: Prisma.TransactionClient, code
         };
         eligibleSubtotal: number;
         discountAmount: number;
+        perSellerDiscounts: Record<string, number>;
     }[];
     totalDiscount: number;
+    perSellerDiscounts: Record<string, number>;
 }>;
 export declare const finalizeCouponUsage: (tx: Prisma.TransactionClient, coupon: Coupon) => Promise<void>;
 export declare const finalizeCouponsUsage: (tx: Prisma.TransactionClient, coupons: Coupon[]) => Promise<void>;

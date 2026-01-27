@@ -8,11 +8,8 @@ const env_1 = require("../config/env");
 const cookies_1 = require("../utils/cookies");
 const authenticate = (options = {}) => async (req, _res, next) => {
     try {
-        const authHeader = req.headers.authorization;
-        const bearerToken = typeof authHeader === "string" ? authHeader.split(" ")[1] : undefined;
         const cookies = (0, cookies_1.parseCookies)(req.headers.cookie);
-        const cookieToken = cookies[env_1.config.auth.cookieName];
-        const token = bearerToken ?? cookieToken;
+        const token = cookies[env_1.config.auth.cookieName];
         if (!token) {
             throw errors_1.AppError.unauthorized();
         }

@@ -126,6 +126,32 @@ export declare const createManualShipment: (userId: number, roles: string[], pay
                 has_active_auction: any;
             } | undefined;
         }[];
+        vendor_orders: {
+            id: number;
+            seller_id: number;
+            status: string;
+            shipping_method: string;
+            shipping_company_id: number | null;
+            warehouse_code: string | null;
+            shipper_city_id: number | null;
+            torod_order_id: string | null;
+            tracking_number: string | null;
+            label_url: string | null;
+            torod_status: string | null;
+            subtotal_amount: number;
+            discount_amount: number;
+            shipping_fee: number;
+            total_amount: number;
+            platform_fee: number;
+            items: {
+                id: number;
+                order_item_id: number;
+                product_id: number;
+                quantity: number;
+                unit_price: number;
+                total_price: number;
+            }[];
+        }[];
     };
 }>;
 export declare const listManualShipments: (userId: number, roles: string[]) => Promise<{

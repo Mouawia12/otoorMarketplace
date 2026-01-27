@@ -54,7 +54,16 @@ export declare const listAuctions: (query: unknown) => Promise<{
         full_name: string;
         verified_seller: boolean;
     } | undefined;
-    winner: any;
+    winner: {
+        bid_id: any;
+        bidder_id: any;
+        amount: number;
+        bidder: {
+            id: any;
+            full_name: any;
+            email: any;
+        } | undefined;
+    } | null;
 }[]>;
 export declare const listUserBids: (bidderId: number) => Promise<{
     auctionId: number;
@@ -132,7 +141,16 @@ export declare const getAuctionById: (id: number) => Promise<{
         full_name: string;
         verified_seller: boolean;
     } | undefined;
-    winner: any;
+    winner: {
+        bid_id: any;
+        bidder_id: any;
+        amount: number;
+        bidder: {
+            id: any;
+            full_name: any;
+            email: any;
+        } | undefined;
+    } | null;
 }>;
 export declare const getAuctionByProductId: (productId: number) => Promise<{
     id: any;
@@ -189,7 +207,16 @@ export declare const getAuctionByProductId: (productId: number) => Promise<{
         full_name: string;
         verified_seller: boolean;
     } | undefined;
-    winner: any;
+    winner: {
+        bid_id: any;
+        bidder_id: any;
+        amount: number;
+        bidder: {
+            id: any;
+            full_name: any;
+            email: any;
+        } | undefined;
+    } | null;
 } | null>;
 export declare const closeExpiredAuctions: () => Promise<void>;
 export declare const startAuctionFinalizer: () => void;
@@ -298,7 +325,16 @@ export declare const createAuction: (input: z.infer<typeof createAuctionSchema>)
         full_name: string;
         verified_seller: boolean;
     } | undefined;
-    winner: any;
+    winner: {
+        bid_id: any;
+        bidder_id: any;
+        amount: number;
+        bidder: {
+            id: any;
+            full_name: any;
+            email: any;
+        } | undefined;
+    } | null;
 }>;
 export declare const updateAuction: (auctionId: number, payload: unknown) => Promise<{
     id: any;
@@ -355,7 +391,16 @@ export declare const updateAuction: (auctionId: number, payload: unknown) => Pro
         full_name: string;
         verified_seller: boolean;
     } | undefined;
-    winner: any;
+    winner: {
+        bid_id: any;
+        bidder_id: any;
+        amount: number;
+        bidder: {
+            id: any;
+            full_name: any;
+            email: any;
+        } | undefined;
+    } | null;
 }>;
 export {};
 //# sourceMappingURL=auctionService.d.ts.map

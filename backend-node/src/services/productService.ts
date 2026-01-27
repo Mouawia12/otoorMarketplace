@@ -731,6 +731,40 @@ export const deleteProduct = async (productId: number, sellerId: number) => {
   }
 };
 
+export const deleteProductAsAdmin = async (productId: number) => {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      auctions: { select: { id: true, status: true } },
+    },
+  });
+
+  if (!product) {
+    throw AppError.notFound("Product not found");
+  }
+
+  if (product.auctions.length > 0) {
+    const hasActive = product.auctions.some(
+      (auction) =>
+        auction.status === AuctionStatus.ACTIVE || auction.status === AuctionStatus.SCHEDULED
+    );
+    const message = hasActive
+      ? "Cannot delete a product with an active or scheduled auction"
+      : "Cannot delete a product that has participated in auctions";
+    throw AppError.badRequest(message);
+  }
+
+  try {
+    await prisma.product.delete({ where: { id: productId } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      throw AppError.badRequest("Cannot delete a product that is part of existing orders");
+    }
+    throw error;
+  }
+};
+
 export const moderateProduct = async (
   productId: number,
   action: "approve" | "reject"

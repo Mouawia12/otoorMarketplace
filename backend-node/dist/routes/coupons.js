@@ -21,7 +21,7 @@ router.get("/", (0, auth_1.authenticate)(), async (req, res, next) => {
             throw errors_1.AppError.forbidden();
         }
         const sellerScope = !isAdmin ? req.user.id : undefined;
-        const coupons = await (0, couponService_1.listCoupons)(sellerScope ? { sellerId: sellerScope } : undefined);
+        const coupons = await (0, couponService_1.listCoupons)(sellerScope ? { sellerId: sellerScope } : { includeSeller: true });
         res.json(coupons);
     }
     catch (error) {

@@ -8,12 +8,13 @@ const userService_1 = require("../services/userService");
 const serializer_1 = require("../utils/serializer");
 const errors_1 = require("../utils/errors");
 const env_1 = require("../config/env");
+const jwt_1 = require("../utils/jwt");
 const router = (0, express_1.Router)();
 const setAuthCookie = (res, token) => {
     res.cookie(env_1.config.auth.cookieName, token, {
         httpOnly: true,
-        secure: env_1.config.nodeEnv === "production",
-        sameSite: "lax",
+        secure: env_1.config.auth.cookieSecure,
+        sameSite: env_1.config.auth.cookieSameSite,
         maxAge: env_1.config.auth.cookieMaxAgeSeconds * 1000,
         path: "/",
     });
@@ -21,11 +22,7 @@ const setAuthCookie = (res, token) => {
 router.post("/register", async (req, res, next) => {
     try {
         const payload = await (0, authService_1.registerUser)(req.body);
-        setAuthCookie(res, payload.token);
-        res.status(201).json({
-            access_token: payload.token,
-            user: payload.user,
-        });
+        res.status(201).json(payload);
     }
     catch (error) {
         next(error);
@@ -37,7 +34,6 @@ router.post("/login", async (req, res, next) => {
         const payload = await (0, authService_1.authenticateUser)(data);
         setAuthCookie(res, payload.token);
         res.json({
-            access_token: payload.token,
             user: payload.user,
         });
     }
@@ -50,7 +46,6 @@ router.post("/google", async (req, res, next) => {
         const payload = await (0, authService_1.authenticateWithGoogle)(req.body);
         setAuthCookie(res, payload.token);
         res.json({
-            access_token: payload.token,
             user: payload.user,
         });
     }
@@ -61,8 +56,8 @@ router.post("/google", async (req, res, next) => {
 router.post("/logout", (_req, res) => {
     res.clearCookie(env_1.config.auth.cookieName, {
         httpOnly: true,
-        secure: env_1.config.nodeEnv === "production",
-        sameSite: "lax",
+        secure: env_1.config.auth.cookieSecure,
+        sameSite: env_1.config.auth.cookieSameSite,
         path: "/",
     });
     res.json({ success: true });
@@ -80,6 +75,28 @@ router.post("/reset-password", async (req, res, next) => {
     try {
         await (0, authService_1.resetPassword)(req.body);
         res.json({ success: true });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/resend-verification", async (req, res, next) => {
+    try {
+        const result = await (0, authService_1.resendVerificationEmail)(req.body);
+        res.json(result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post("/verify-email", async (req, res, next) => {
+    try {
+        const result = await (0, authService_1.verifyEmailToken)(req.body);
+        setAuthCookie(res, result.token);
+        res.json({
+            user: result.user,
+            already_verified: result.already_verified,
+        });
     }
     catch (error) {
         next(error);
@@ -104,6 +121,11 @@ router.get("/me", (0, auth_1.authenticate)(), async (req, res, next) => {
             throw new Error("User not found in request");
         }
         const profile = await (0, userService_1.getUserProfile)(req.user.id);
+        const refreshedToken = (0, jwt_1.signAccessToken)({
+            sub: req.user.id,
+            roles: req.user.roles,
+        });
+        setAuthCookie(res, refreshedToken);
         res.json((0, serializer_1.toPlainObject)(profile));
     }
     catch (error) {

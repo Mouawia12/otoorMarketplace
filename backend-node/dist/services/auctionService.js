@@ -31,6 +31,7 @@ const resolveAuctionStatus = (status, startTime, endTime, now = new Date()) => {
 };
 const normalizeAuction = (auction) => {
     const plain = (0, serializer_1.toPlainObject)(auction);
+    const winner = plain.winner;
     return {
         id: plain.id,
         product_id: plain.productId,
@@ -46,7 +47,20 @@ const normalizeAuction = (auction) => {
         total_bids: plain.total_bids ?? plain._count?.bids ?? 0,
         product: plain.product ? (0, productService_1.normalizeProduct)(plain.product) : undefined,
         seller: normalizeSeller(plain.seller),
-        winner: plain.winner,
+        winner: winner
+            ? {
+                bid_id: winner.bid_id ?? winner.bidId ?? winner.id,
+                bidder_id: winner.bidder_id ?? winner.bidderId,
+                amount: Number(winner.amount ?? winner.bidAmount ?? 0),
+                bidder: winner.bidder
+                    ? {
+                        id: winner.bidder.id,
+                        full_name: winner.bidder.fullName ?? winner.bidder.full_name,
+                        email: winner.bidder.email,
+                    }
+                    : undefined,
+            }
+            : null,
     };
 };
 const normalizeBid = (bid) => {
@@ -83,6 +97,7 @@ const listAuctionsSchema = zod_1.z.object({
     status: zod_1.z.nativeEnum(client_1.AuctionStatus).optional(),
     seller_id: zod_1.z.coerce.number().optional(),
     product_id: zod_1.z.coerce.number().optional(),
+    scope: zod_1.z.enum(["public", "seller", "admin"]).optional(),
     include_pending: zod_1.z
         .union([zod_1.z.boolean(), zod_1.z.string()])
         .optional()
@@ -94,17 +109,30 @@ const listAuctionsSchema = zod_1.z.object({
     }),
 });
 const listAuctions = async (query) => {
-    const { status, seller_id, product_id, include_pending } = listAuctionsSchema.parse(query);
+    const { status, seller_id, product_id, scope, include_pending } = listAuctionsSchema.parse(query);
     const includePending = Boolean(include_pending);
+    const viewScope = scope ?? "public";
+    const now = new Date();
     const filters = {};
-    if (status === client_1.AuctionStatus.PENDING_REVIEW && !includePending) {
-        return [];
+    if (viewScope === "public") {
+        const publicStatuses = [client_1.AuctionStatus.ACTIVE, client_1.AuctionStatus.SCHEDULED];
+        if (status && !publicStatuses.includes(status)) {
+            return [];
+        }
+        filters.status = status ?? { in: publicStatuses };
+        filters.endTime = { gt: now };
+        filters.product = { status: client_1.ProductStatus.PUBLISHED };
     }
-    if (status) {
-        filters.status = status;
-    }
-    else if (!includePending) {
-        filters.status = { not: client_1.AuctionStatus.PENDING_REVIEW };
+    else {
+        if (status === client_1.AuctionStatus.PENDING_REVIEW && !includePending) {
+            return [];
+        }
+        if (status) {
+            filters.status = status;
+        }
+        else if (!includePending) {
+            filters.status = { not: client_1.AuctionStatus.PENDING_REVIEW };
+        }
     }
     if (seller_id) {
         filters.sellerId = seller_id;
@@ -112,37 +140,52 @@ const listAuctions = async (query) => {
     if (product_id) {
         filters.productId = product_id;
     }
-    const auctions = await client_2.prisma.auction.findMany({
-        where: filters,
-        include: {
-            product: {
-                include: {
-                    images: { orderBy: { sortOrder: "asc" } },
-                    seller: {
-                        select: {
-                            id: true,
-                            fullName: true,
-                            verifiedSeller: true,
-                        },
+    const include = {
+        product: {
+            include: {
+                images: { orderBy: { sortOrder: "asc" } },
+                seller: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        verifiedSeller: true,
                     },
                 },
             },
-            seller: {
-                select: {
-                    id: true,
-                    fullName: true,
-                    verifiedSeller: true,
-                },
-            },
-            _count: {
-                select: { bids: true },
+        },
+        seller: {
+            select: {
+                id: true,
+                fullName: true,
+                verifiedSeller: true,
             },
         },
+        _count: {
+            select: { bids: true },
+        },
+    };
+    if (viewScope !== "public") {
+        include.bids = {
+            orderBy: [{ amount: "desc" }, { createdAt: "asc" }],
+            take: 1,
+            include: {
+                bidder: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                    },
+                },
+            },
+        };
+    }
+    const auctions = await client_2.prisma.auction.findMany({
+        where: filters,
+        include,
         orderBy: {
             endTime: "asc",
         },
     });
-    const now = new Date();
     const statusUpdates = auctions.reduce((acc, auction) => {
         const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime, now);
         if (nextStatus !== auction.status) {
@@ -157,11 +200,55 @@ const listAuctions = async (query) => {
             data: { status: update.status },
         })));
     }
-    return auctions.map((auction) => normalizeAuction({
-        ...auction,
-        status: statusById.get(auction.id) ?? auction.status,
-        total_bids: auction._count.bids,
-    }));
+    const normalized = auctions.map((auction) => {
+        const nextStatus = statusById.get(auction.id) ?? auction.status;
+        const topBid = Array.isArray(auction.bids) ? auction.bids[0] : null;
+        const topBidder = topBid && "bidder" in topBid ? topBid.bidder : undefined;
+        const winner = nextStatus === client_1.AuctionStatus.COMPLETED && topBid
+            ? {
+                bid_id: topBid.id,
+                bidder_id: topBid.bidderId,
+                amount: Number(topBid.amount),
+                bidder: topBidder
+                    ? {
+                        id: topBidder.id,
+                        full_name: topBidder.fullName,
+                        email: topBidder.email,
+                    }
+                    : undefined,
+            }
+            : null;
+        return normalizeAuction({
+            ...auction,
+            status: nextStatus,
+            total_bids: auction._count.bids,
+            winner,
+        });
+    });
+    if (viewScope !== "public") {
+        return normalized;
+    }
+    return normalized.filter((auction) => {
+        if (!auction.product || auction.product.status !== "published") {
+            return false;
+        }
+        if (auction.status === client_1.AuctionStatus.CANCELLED || auction.status === client_1.AuctionStatus.PENDING_REVIEW) {
+            return false;
+        }
+        if (auction.status === client_1.AuctionStatus.COMPLETED) {
+            return true;
+        }
+        const startMs = new Date(auction.start_time).getTime();
+        const endMs = new Date(auction.end_time).getTime();
+        const nowMs = now.getTime();
+        if (endMs <= nowMs) {
+            return false;
+        }
+        if (auction.status === "scheduled") {
+            return startMs > nowMs;
+        }
+        return auction.status === "active" && startMs <= nowMs && endMs > nowMs;
+    });
 };
 exports.listAuctions = listAuctions;
 const listUserBids = async (bidderId) => {
@@ -250,6 +337,9 @@ const getAuctionById = async (id) => {
     if (!auction || auction.status === client_1.AuctionStatus.PENDING_REVIEW) {
         throw errors_1.AppError.notFound("Auction not found");
     }
+    if (!auction.product || auction.product.status !== client_1.ProductStatus.PUBLISHED) {
+        throw errors_1.AppError.notFound("Auction not found");
+    }
     const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime);
     if (nextStatus !== auction.status) {
         await client_2.prisma.auction.update({
@@ -294,8 +384,14 @@ const getAuctionById = async (id) => {
 };
 exports.getAuctionById = getAuctionById;
 const getAuctionByProductId = async (productId) => {
+    const now = new Date();
     const auction = await client_2.prisma.auction.findFirst({
-        where: { productId, status: { not: client_1.AuctionStatus.PENDING_REVIEW } },
+        where: {
+            productId,
+            status: { in: [client_1.AuctionStatus.ACTIVE, client_1.AuctionStatus.SCHEDULED] },
+            endTime: { gt: now },
+            product: { status: client_1.ProductStatus.PUBLISHED },
+        },
         include: {
             product: {
                 include: {
@@ -325,44 +421,27 @@ const getAuctionByProductId = async (productId) => {
         return null;
     }
     const nextStatus = resolveAuctionStatus(auction.status, auction.startTime, auction.endTime);
+    if ((nextStatus !== client_1.AuctionStatus.ACTIVE && nextStatus !== client_1.AuctionStatus.SCHEDULED) ||
+        auction.endTime <= now) {
+        if (nextStatus !== auction.status) {
+            await client_2.prisma.auction.update({
+                where: { id: auction.id },
+                data: { status: nextStatus },
+            });
+        }
+        return null;
+    }
     if (nextStatus !== auction.status) {
         await client_2.prisma.auction.update({
             where: { id: auction.id },
             data: { status: nextStatus },
         });
     }
-    let winner = null;
-    if (nextStatus === client_1.AuctionStatus.COMPLETED) {
-        const topBid = await client_2.prisma.bid.findFirst({
-            where: { auctionId: auction.id },
-            orderBy: [{ amount: "desc" }, { createdAt: "asc" }],
-            include: {
-                bidder: {
-                    select: { id: true, fullName: true, email: true },
-                },
-            },
-        });
-        if (topBid) {
-            const winnerPayload = {
-                bid_id: topBid.id,
-                bidder_id: topBid.bidderId,
-                amount: Number(topBid.amount),
-            };
-            if (topBid.bidder) {
-                winnerPayload.bidder = {
-                    id: topBid.bidder.id,
-                    full_name: topBid.bidder.fullName,
-                    email: topBid.bidder.email,
-                };
-            }
-            winner = winnerPayload;
-        }
-    }
     return normalizeAuction({
         ...auction,
         status: nextStatus,
         total_bids: auction._count.bids,
-        winner,
+        winner: null,
     });
 };
 exports.getAuctionByProductId = getAuctionByProductId;
@@ -579,6 +658,7 @@ const createAuction = async (input) => {
             id: true,
             sellerId: true,
             status: true,
+            sellerWarehouseId: true,
         },
     });
     if (!product || product.sellerId !== data.sellerId) {
@@ -586,6 +666,9 @@ const createAuction = async (input) => {
     }
     if (product.status !== client_1.ProductStatus.PUBLISHED) {
         throw errors_1.AppError.badRequest("Product must be published before starting an auction");
+    }
+    if (!product.sellerWarehouseId) {
+        throw errors_1.AppError.badRequest("Product must be assigned to a warehouse before starting an auction");
     }
     const existing = await client_2.prisma.auction.findUnique({
         where: { productId: data.productId },

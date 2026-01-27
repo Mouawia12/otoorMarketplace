@@ -319,6 +319,25 @@ router.patch("/products/:id/status", adminOnly, async (req, res, next) => {
         next(error);
     }
 });
+router.delete("/products/:id", adminOnly, async (req, res, next) => {
+    try {
+        const productId = Number(req.params.id);
+        if (Number.isNaN(productId)) {
+            throw errors_1.AppError.badRequest("Invalid product id");
+        }
+        await (0, productService_1.deleteProductAsAdmin)(productId);
+        await logAdminAction(req, {
+            action: "product.delete",
+            targetType: "product",
+            targetId: productId,
+            description: `Deleted product ${productId}`,
+        });
+        res.json({ success: true });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.get("/auctions", adminOnly, async (req, res, next) => {
     try {
         const statusParam = typeof req.query.status === "string" ? req.query.status.toUpperCase() : undefined;
@@ -327,6 +346,7 @@ router.get("/auctions", adminOnly, async (req, res, next) => {
             : undefined;
         const auctions = await (0, auctionService_1.listAuctions)({
             status,
+            scope: "admin",
             include_pending: true,
         });
         res.json(auctions);

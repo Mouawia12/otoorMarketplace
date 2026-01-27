@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePassword = exports.authenticateUser = exports.resetPassword = exports.requestPasswordReset = exports.authenticateWithGoogle = exports.registerUser = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.googleLoginSchema = exports.changePasswordSchema = exports.loginSchema = exports.registerSchema = void 0;
+exports.changePassword = exports.verifyEmailToken = exports.verifyEmailSchema = exports.resendVerificationEmail = exports.resendVerificationEmailSchema = exports.authenticateUser = exports.resetPassword = exports.requestPasswordReset = exports.authenticateWithGoogle = exports.registerUser = exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.googleLoginSchema = exports.changePasswordSchema = exports.loginSchema = exports.registerSchema = void 0;
 const crypto_1 = __importDefault(require("crypto"));
 const google_auth_library_1 = require("google-auth-library");
 const client_1 = require("@prisma/client");
@@ -29,9 +29,6 @@ const mapSellerProfile = (profile) => {
         phone: profile.phone,
         city: profile.city,
         address: profile.address,
-        national_id: profile.nationalId,
-        iban: profile.iban,
-        bank_name: profile.bankName,
         torod_warehouse_id: profile.torodWarehouseId ?? null,
         status: profile.status?.toLowerCase?.() ?? profile.status,
         created_at: profile.createdAt,
@@ -53,6 +50,7 @@ const serializeUser = (user) => {
         seller_profile: sellerProfile,
         seller_profile_submitted: Boolean(sellerProfile),
         verified_seller: user.verifiedSeller,
+        email_verified: user.emailVerified,
         requires_password_reset: user.requiresPasswordReset,
     };
 };
@@ -92,6 +90,87 @@ exports.resetPasswordSchema = zod_1.z
     path: ["confirmPassword"],
 });
 const PASSWORD_RESET_EXPIRY_MINUTES = 15;
+const EMAIL_VERIFICATION_TOKEN_BYTES = 48;
+const hashToken = (token) => crypto_1.default.createHash("sha256").update(token).digest("hex");
+const normalizeRedirectPath = (redirect) => {
+    if (!redirect)
+        return null;
+    const trimmed = redirect.trim();
+    if (!trimmed.startsWith("/"))
+        return null;
+    if (trimmed.startsWith("//"))
+        return null;
+    if (trimmed.length > 2048)
+        return null;
+    return trimmed;
+};
+const buildEmailVerificationUrl = (token, redirect) => {
+    const safeRedirect = normalizeRedirectPath(redirect);
+    const redirectSuffix = safeRedirect
+        ? `&redirect=${encodeURIComponent(safeRedirect)}`
+        : "";
+    return `${env_1.config.auth.emailVerificationUrl}?token=${encodeURIComponent(token)}${redirectSuffix}`;
+};
+const sendVerificationEmail = async ({ email, fullName, token, redirect, }) => {
+    const verificationUrl = buildEmailVerificationUrl(token, redirect);
+    const expiresInHours = env_1.config.auth.emailVerificationTokenExpiresHours;
+    const brandSignature = "FragraWorld | عالم العطور";
+    const contactEmail = env_1.config.support.email;
+    const plainText = [
+        `مرحباً ${fullName}`.trim(),
+        "",
+        `شكراً لانضمامك إلى ${brandSignature}. لتفعيل حسابك، اضغط الرابط التالي:`,
+        verificationUrl,
+        "",
+        `صلاحية الرابط: ${expiresInHours} ساعة.`,
+        `إذا لم تُنشئ هذا الحساب، يمكنك تجاهل هذه الرسالة أو مراسلتنا على ${contactEmail}.`,
+        "",
+        brandSignature,
+    ].join("\n");
+    const html = `
+    <div style="background:#f7f4ef;padding:32px 16px;font-family:'Cairo','Inter','Segoe UI',sans-serif;direction:rtl;text-align:center;color:#2c2a29;">
+      <table role="presentation" style="margin:0 auto;max-width:560px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 18px 45px rgba(0,0,0,0.08);border:1px solid rgba(0,0,0,0.04);">
+        <tr>
+          <td style="padding:28px 28px 12px;background:linear-gradient(135deg,#111 0%,#2b2b2b 100%);color:#f8f5ef;">
+            <div style="font-size:13px;letter-spacing:.6px;opacity:.85;margin-bottom:6px;">${brandSignature}</div>
+            <div style="font-size:26px;font-weight:800;margin:0;">تفعيل الحساب</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:26px 28px 10px;">
+            <p style="margin:0 0 12px;font-size:16px;line-height:1.9;color:#3a342f;">مرحباً ${fullName}،</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.9;color:#4d463f;">
+              يسعدنا انضمامك. لتأمين حسابك وتفعيل كل المزايا، نحتاج منك تأكيد بريدك الإلكتروني.
+            </p>
+            <div style="margin:26px 0 22px;">
+              <a href="${verificationUrl}" style="display:inline-block;padding:15px 26px;background:#caa56a;color:#2c2a29;font-weight:800;text-decoration:none;border-radius:999px;box-shadow:0 10px 24px rgba(202,165,106,0.35);">
+                تفعيل الحساب الآن
+              </a>
+            </div>
+            <p style="margin:0 0 10px;font-size:13px;line-height:1.8;color:#6a635b;">
+              صلاحية رابط التفعيل: ${expiresInHours} ساعة.
+            </p>
+            <p style="margin:0 0 4px;font-size:13px;line-height:1.8;color:#6a635b;">
+              إذا لم تقم بإنشاء هذا الحساب، تجاهل الرسالة أو تواصل معنا عبر
+              <a href="mailto:${contactEmail}" style="color:#a67c52;font-weight:700;text-decoration:none;">${contactEmail}</a>.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f2e9dc;padding:14px 20px;text-align:center;font-size:12.5px;color:#655b50;">
+            فريق ${brandSignature}
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+    await (0, mailer_1.sendMail)({
+        to: email,
+        subject: "تفعيل حسابك في عالم العطور",
+        html,
+        text: plainText,
+    });
+};
 const registerUser = async (input) => {
     const data = exports.registerSchema.parse(input);
     const roles = data.roles && data.roles.length > 0 ? data.roles : [client_1.RoleName.BUYER];
@@ -102,12 +181,21 @@ const registerUser = async (input) => {
         throw errors_1.AppError.badRequest("Email already registered");
     }
     const passwordHash = await (0, password_1.hashPassword)(data.password);
+    const rawVerificationToken = crypto_1.default
+        .randomBytes(EMAIL_VERIFICATION_TOKEN_BYTES)
+        .toString("hex");
+    const verificationTokenHash = hashToken(rawVerificationToken);
+    const verificationExpiresAt = new Date(Date.now() + env_1.config.auth.emailVerificationTokenExpiresHours * 60 * 60 * 1000);
     const user = await client_2.prisma.user.create({
         data: {
             email: data.email,
             passwordHash,
             fullName: data.fullName,
             phone: data.phone ?? null,
+            emailVerified: false,
+            emailVerificationTokenHash: verificationTokenHash,
+            emailVerificationTokenExpiresAt: verificationExpiresAt,
+            emailVerificationSentAt: new Date(),
             roles: {
                 create: roles.map((roleName) => ({
                     role: {
@@ -118,10 +206,6 @@ const registerUser = async (input) => {
         },
         include: userWithRolesInclude,
     });
-    const token = (0, jwt_1.signAccessToken)({
-        sub: user.id,
-        roles: user.roles.map((role) => role.role.name),
-    });
     await (0, notificationService_1.notifyAdmins)({
         type: client_1.NotificationType.USER_REGISTERED,
         title: "تسجيل مستخدم جديد",
@@ -129,9 +213,19 @@ const registerUser = async (input) => {
         data: { userId: user.id, email: user.email },
         fallbackToSupport: true,
     });
+    try {
+        await sendVerificationEmail({
+            email: user.email,
+            fullName: user.fullName,
+            token: rawVerificationToken,
+        });
+    }
+    catch (error) {
+        console.error("Failed to send verification email", error);
+    }
     return {
-        token,
-        user: serializeUser(user),
+        requires_verification: true,
+        email: user.email,
     };
 };
 exports.registerUser = registerUser;
@@ -182,6 +276,10 @@ const authenticateWithGoogle = async (input) => {
                 passwordHash,
                 fullName: createFullName,
                 avatarUrl: picture ?? null,
+                emailVerified: true,
+                emailVerificationTokenHash: null,
+                emailVerificationTokenExpiresAt: null,
+                emailVerificationSentAt: null,
                 roles: {
                     create: [{ role: { connect: { name: requestedRole } } }],
                 },
@@ -320,6 +418,9 @@ const authenticateUser = async (input) => {
     if (user.status === "SUSPENDED") {
         throw errors_1.AppError.forbidden(`Your account is suspended. Please contact support at fragreworld@gmail.com`);
     }
+    if (!user.emailVerified) {
+        throw errors_1.AppError.forbidden("يرجى تفعيل الحساب عبر البريد الإلكتروني أولاً");
+    }
     const valid = await (0, password_1.verifyPassword)(data.password, user.passwordHash);
     if (!valid) {
         throw errors_1.AppError.unauthorized("Invalid credentials");
@@ -334,6 +435,104 @@ const authenticateUser = async (input) => {
     };
 };
 exports.authenticateUser = authenticateUser;
+exports.resendVerificationEmailSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+    redirect: zod_1.z.string().max(2048).optional(),
+});
+const assertResendCooldown = (lastSentAt) => {
+    if (!lastSentAt)
+        return;
+    const cooldownMs = env_1.config.auth.emailVerificationResendCooldownSeconds * 1000;
+    const elapsed = Date.now() - lastSentAt.getTime();
+    if (elapsed < cooldownMs) {
+        const remainingSeconds = Math.max(1, Math.ceil((cooldownMs - elapsed) / 1000));
+        throw errors_1.AppError.badRequest(`يرجى الانتظار ${remainingSeconds} ثانية قبل إعادة الإرسال`);
+    }
+};
+const resendVerificationEmail = async (input) => {
+    const data = exports.resendVerificationEmailSchema.parse(input);
+    const user = await client_2.prisma.user.findUnique({
+        where: { email: data.email },
+        include: userWithRolesInclude,
+    });
+    if (!user) {
+        return { success: true };
+    }
+    if (user.emailVerified) {
+        return { success: true };
+    }
+    assertResendCooldown(user.emailVerificationSentAt ?? null);
+    const rawVerificationToken = crypto_1.default
+        .randomBytes(EMAIL_VERIFICATION_TOKEN_BYTES)
+        .toString("hex");
+    const verificationTokenHash = hashToken(rawVerificationToken);
+    const verificationExpiresAt = new Date(Date.now() + env_1.config.auth.emailVerificationTokenExpiresHours * 60 * 60 * 1000);
+    await client_2.prisma.user.update({
+        where: { id: user.id },
+        data: {
+            emailVerificationTokenHash: verificationTokenHash,
+            emailVerificationTokenExpiresAt: verificationExpiresAt,
+            emailVerificationSentAt: new Date(),
+        },
+    });
+    try {
+        await sendVerificationEmail({
+            email: user.email,
+            fullName: user.fullName,
+            token: rawVerificationToken,
+            redirect: data.redirect ?? null,
+        });
+    }
+    catch (error) {
+        console.error("Failed to resend verification email", error);
+    }
+    return { success: true };
+};
+exports.resendVerificationEmail = resendVerificationEmail;
+exports.verifyEmailSchema = zod_1.z.object({
+    token: zod_1.z.string().min(20),
+});
+const verifyEmailToken = async (input) => {
+    const data = exports.verifyEmailSchema.parse(input);
+    const tokenHash = hashToken(data.token);
+    const user = (await client_2.prisma.user.findFirst({
+        where: {
+            emailVerificationTokenHash: tokenHash,
+        },
+        include: userWithRolesInclude,
+    }));
+    if (!user) {
+        throw errors_1.AppError.badRequest("رابط التفعيل غير صالح");
+    }
+    if (user.emailVerified) {
+        const token = (0, jwt_1.signAccessToken)({
+            sub: user.id,
+            roles: user.roles.map((role) => role.role.name),
+        });
+        return { token, user: serializeUser(user), already_verified: true };
+    }
+    if (!user.emailVerificationTokenExpiresAt) {
+        throw errors_1.AppError.badRequest("رابط التفعيل غير صالح");
+    }
+    if (user.emailVerificationTokenExpiresAt.getTime() < Date.now()) {
+        throw errors_1.AppError.badRequest("انتهت صلاحية رابط التفعيل، اطلب رابطاً جديداً");
+    }
+    const updated = (await client_2.prisma.user.update({
+        where: { id: user.id },
+        data: {
+            emailVerified: true,
+            emailVerificationTokenHash: null,
+            emailVerificationTokenExpiresAt: null,
+        },
+        include: userWithRolesInclude,
+    }));
+    const token = (0, jwt_1.signAccessToken)({
+        sub: updated.id,
+        roles: updated.roles.map((role) => role.role.name),
+    });
+    return { token, user: serializeUser(updated), already_verified: false };
+};
+exports.verifyEmailToken = verifyEmailToken;
 const changePassword = async (userId, payload) => {
     const data = exports.changePasswordSchema.parse(payload);
     const user = await client_2.prisma.user.findUnique({

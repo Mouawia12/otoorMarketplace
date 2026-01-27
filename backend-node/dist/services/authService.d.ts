@@ -37,35 +37,8 @@ export declare const resetPasswordSchema: z.ZodObject<{
     confirmPassword: z.ZodString;
 }, z.core.$strip>;
 export declare const registerUser: (input: z.infer<typeof registerSchema>) => Promise<{
-    token: string;
-    user: {
-        id: number;
-        email: string;
-        full_name: string;
-        avatar_url: string | null;
-        created_at: Date;
-        status: import(".prisma/client").$Enums.UserStatus;
-        roles: string[];
-        seller_status: string;
-        seller_profile_status: string | undefined;
-        seller_profile: {
-            id: number;
-            full_name: string;
-            phone: string;
-            city: string;
-            address: string;
-            national_id: string;
-            iban: string;
-            bank_name: string;
-            torod_warehouse_id: string | null;
-            status: string;
-            created_at: Date;
-            updated_at: Date;
-        } | null;
-        seller_profile_submitted: boolean;
-        verified_seller: boolean;
-        requires_password_reset: boolean;
-    };
+    requires_verification: boolean;
+    email: string;
 }>;
 export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginSchema>) => Promise<{
     token: string;
@@ -85,9 +58,6 @@ export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginS
             phone: string;
             city: string;
             address: string;
-            national_id: string;
-            iban: string;
-            bank_name: string;
             torod_warehouse_id: string | null;
             status: string;
             created_at: Date;
@@ -95,6 +65,7 @@ export declare const authenticateWithGoogle: (input: z.infer<typeof googleLoginS
         } | null;
         seller_profile_submitted: boolean;
         verified_seller: boolean;
+        email_verified: boolean;
         requires_password_reset: boolean;
     };
 }>;
@@ -118,9 +89,6 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
             phone: string;
             city: string;
             address: string;
-            national_id: string;
-            iban: string;
-            bank_name: string;
             torod_warehouse_id: string | null;
             status: string;
             created_at: Date;
@@ -128,8 +96,49 @@ export declare const authenticateUser: (input: z.infer<typeof loginSchema>) => P
         } | null;
         seller_profile_submitted: boolean;
         verified_seller: boolean;
+        email_verified: boolean;
         requires_password_reset: boolean;
     };
+}>;
+export declare const resendVerificationEmailSchema: z.ZodObject<{
+    email: z.ZodString;
+    redirect: z.ZodOptional<z.ZodString>;
+}, z.core.$strip>;
+export declare const resendVerificationEmail: (input: z.infer<typeof resendVerificationEmailSchema>) => Promise<{
+    success: boolean;
+}>;
+export declare const verifyEmailSchema: z.ZodObject<{
+    token: z.ZodString;
+}, z.core.$strip>;
+export declare const verifyEmailToken: (input: z.infer<typeof verifyEmailSchema>) => Promise<{
+    token: string;
+    user: {
+        id: number;
+        email: string;
+        full_name: string;
+        avatar_url: string | null;
+        created_at: Date;
+        status: import(".prisma/client").$Enums.UserStatus;
+        roles: string[];
+        seller_status: string;
+        seller_profile_status: string | undefined;
+        seller_profile: {
+            id: number;
+            full_name: string;
+            phone: string;
+            city: string;
+            address: string;
+            torod_warehouse_id: string | null;
+            status: string;
+            created_at: Date;
+            updated_at: Date;
+        } | null;
+        seller_profile_submitted: boolean;
+        verified_seller: boolean;
+        email_verified: boolean;
+        requires_password_reset: boolean;
+    };
+    already_verified: boolean;
 }>;
 export declare const changePassword: (userId: number, payload: z.infer<typeof changePasswordSchema>) => Promise<{
     success: boolean;

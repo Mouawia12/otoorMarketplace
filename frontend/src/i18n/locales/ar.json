@@ -977,6 +977,7 @@
     "deleteProductConfirm": "هل أنت متأكد من حذف هذا المنتج نهائياً؟",
     "deleteProductDisabled": "هذا المنتج مرتبط بمزاد ولا يمكن حذفه.",
     "deleteProductActive": "يجب إنهاء المزاد قبل حذف المنتج.",
+    "deleteProductSuccess": "تم حذف المنتج بنجاح",
     "deleteProductFailed": "فشل حذف المنتج",
     "deleteProductTooltip": "لا يمكن حذف منتجات المزادات",
     "moreActions": "إجراءات إضافية",

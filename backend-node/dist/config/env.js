@@ -13,7 +13,7 @@ const envSchema = zod_1.z.object({
         .min(1, "DATABASE_URL is required")
         .describe("MySQL connection string"),
     JWT_SECRET: zod_1.z.string().min(32, "JWT_SECRET should be at least 32 chars"),
-    JWT_EXPIRES_IN: zod_1.z.string().default("86400"),
+    JWT_EXPIRES_IN: zod_1.z.string().default("604800"),
     ALLOWED_ORIGINS: zod_1.z.string().default("*"),
     PLATFORM_COMMISSION_RATE: zod_1.z
         .string()
@@ -38,7 +38,15 @@ const envSchema = zod_1.z.object({
         .string()
         .url()
         .default("http://localhost:5173/reset-password"),
+    EMAIL_VERIFICATION_URL: zod_1.z
+        .string()
+        .url()
+        .default("http://localhost:5173/verify-email"),
+    EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS: zod_1.z.coerce.number().default(24),
+    EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: zod_1.z.coerce.number().default(60),
     AUTH_COOKIE_NAME: zod_1.z.string().default("otoor_session"),
+    AUTH_COOKIE_SECURE: zod_1.z.string().optional(),
+    AUTH_COOKIE_SAME_SITE: zod_1.z.enum(["lax", "strict", "none"]).default("lax"),
     ADMIN_PROTECTED_EMAIL: zod_1.z
         .string()
         .email()
@@ -63,12 +71,15 @@ if (!parsed.success) {
     console.error("❌ Invalid environment variables:", parsed.error.flatten());
     throw new Error("Invalid environment configuration");
 }
-const { NODE_ENV, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, ALLOWED_ORIGINS, PLATFORM_COMMISSION_RATE, STANDARD_SHIPPING_FEE, EXPRESS_SHIPPING_FEE, UPLOAD_DIR, MAX_UPLOAD_SIZE_MB, ASSET_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SUPPORT_EMAIL, MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_ENCRYPTION, MAIL_FROM_ADDRESS, MAIL_FROM_NAME, PASSWORD_RESET_URL, AUTH_COOKIE_NAME, ADMIN_PROTECTED_EMAIL, TOROD_API_URL, TOROD_CLIENT_ID, TOROD_CLIENT_SECRET, MYFATOORAH_API_TOKEN, MYFATOORAH_BASE_URL, MYFATOORAH_CALLBACK_URL, MYFATOORAH_ERROR_URL, MYFATOORAH_CURRENCY, } = parsed.data;
+const { NODE_ENV, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, ALLOWED_ORIGINS, PLATFORM_COMMISSION_RATE, STANDARD_SHIPPING_FEE, EXPRESS_SHIPPING_FEE, UPLOAD_DIR, MAX_UPLOAD_SIZE_MB, ASSET_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SUPPORT_EMAIL, MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_ENCRYPTION, MAIL_FROM_ADDRESS, MAIL_FROM_NAME, PASSWORD_RESET_URL, EMAIL_VERIFICATION_URL, EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS, EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS, AUTH_COOKIE_NAME, AUTH_COOKIE_SECURE, AUTH_COOKIE_SAME_SITE, ADMIN_PROTECTED_EMAIL, TOROD_API_URL, TOROD_CLIENT_ID, TOROD_CLIENT_SECRET, MYFATOORAH_API_TOKEN, MYFATOORAH_BASE_URL, MYFATOORAH_CALLBACK_URL, MYFATOORAH_ERROR_URL, MYFATOORAH_CURRENCY, } = parsed.data;
 const allowedOrigins = ALLOWED_ORIGINS === "*"
     ? ["*"]
     : ALLOWED_ORIGINS.split(",")
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0);
+const cookieSecure = typeof AUTH_COOKIE_SECURE === "string"
+    ? ["1", "true", "yes", "on"].includes(AUTH_COOKIE_SECURE.trim().toLowerCase())
+    : NODE_ENV === "production";
 exports.config = {
     nodeEnv: NODE_ENV,
     port: PORT,
@@ -106,7 +117,12 @@ exports.config = {
     },
     auth: {
         passwordResetUrl: PASSWORD_RESET_URL.replace(/\/+$/, ""),
+        emailVerificationUrl: EMAIL_VERIFICATION_URL.replace(/\/+$/, ""),
+        emailVerificationTokenExpiresHours: EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS,
+        emailVerificationResendCooldownSeconds: EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS,
         cookieName: AUTH_COOKIE_NAME,
+        cookieSecure,
+        cookieSameSite: AUTH_COOKIE_SAME_SITE,
         cookieMaxAgeSeconds: (() => {
             const numericExpires = Number(JWT_EXPIRES_IN);
             return Number.isNaN(numericExpires) ? 86400 : numericExpires;

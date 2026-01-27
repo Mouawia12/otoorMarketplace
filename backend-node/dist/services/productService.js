@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.moderateProduct = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductFiltersMeta = exports.getRelatedProducts = exports.getProductById = exports.listProductSuggestions = exports.listProducts = exports.normalizeProduct = void 0;
+exports.moderateProduct = exports.deleteProductAsAdmin = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductFiltersMeta = exports.getRelatedProducts = exports.getProductById = exports.listProductSuggestions = exports.listProducts = exports.normalizeProduct = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const client_2 = require("../prisma/client");
@@ -29,6 +29,7 @@ const normalizeStatus = (status) => {
 const normalizeProduct = (product) => {
     const plain = (0, serializer_1.toPlainObject)(product);
     const auctions = Array.isArray(plain.auctions) ? plain.auctions : [];
+    const now = new Date();
     const rawImages = Array.isArray(plain.images)
         ? plain.images.map((image) => image.url)
         : plain.image_urls ?? [];
@@ -38,7 +39,18 @@ const normalizeProduct = (product) => {
         .map((url) => (0, assets_1.toPublicAssetUrl)(url));
     const hasActiveAuction = auctions.some((auction) => {
         const status = typeof auction?.status === "string" ? auction.status.toUpperCase() : "";
-        return status === client_1.AuctionStatus.ACTIVE || status === client_1.AuctionStatus.SCHEDULED;
+        if (status !== client_1.AuctionStatus.ACTIVE && status !== client_1.AuctionStatus.SCHEDULED) {
+            return false;
+        }
+        const startTime = auction?.startTime ? new Date(auction.startTime) : null;
+        const endTime = auction?.endTime ? new Date(auction.endTime) : null;
+        if (!startTime || !endTime || endTime <= now) {
+            return false;
+        }
+        if (status === client_1.AuctionStatus.SCHEDULED) {
+            return startTime > now;
+        }
+        return startTime <= now && endTime > now;
     });
     const weightKg = typeof plain.weightKg === "number"
         ? plain.weightKg
@@ -120,7 +132,7 @@ const listProducts = async (query) => {
             delete normalizedQuery.condition;
         }
     }
-    const { search, brand, category, condition, status, min_price, max_price, sort, page = 1, page_size = 12, seller, } = listProductsSchema.parse(normalizedQuery);
+    const { search, brand, category, condition, min_price, max_price, sort, page = 1, page_size = 12, seller, } = listProductsSchema.parse(normalizedQuery);
     const filters = {};
     const now = new Date();
     filters.auctions = {
@@ -129,22 +141,8 @@ const listProducts = async (query) => {
             endTime: { gt: now },
         },
     };
-    if (status) {
-        if (typeof status === "string") {
-            if (status === "pending") {
-                filters.status = client_1.ProductStatus.PENDING_REVIEW;
-            }
-            else {
-                filters.status = status.toUpperCase();
-            }
-        }
-        else {
-            filters.status = status;
-        }
-    }
-    else {
-        filters.status = client_1.ProductStatus.PUBLISHED;
-    }
+    // Public catalog must never expose unpublished items, even if status is passed via query params.
+    filters.status = client_1.ProductStatus.PUBLISHED;
     if (seller && seller !== "me") {
         filters.sellerId = seller;
     }
@@ -271,8 +269,8 @@ const listProductSuggestions = async (query) => {
 exports.listProductSuggestions = listProductSuggestions;
 const getProductById = async (id) => {
     const [product, ratingStats] = await client_2.prisma.$transaction([
-        client_2.prisma.product.findUnique({
-            where: { id },
+        client_2.prisma.product.findFirst({
+            where: { id, status: client_1.ProductStatus.PUBLISHED },
             include: {
                 images: { orderBy: { sortOrder: "asc" } },
                 seller: {
@@ -394,9 +392,7 @@ const createProduct = async (input, options) => {
     const data = productInputSchema.parse(input);
     const isAdmin = options?.roles?.some((role) => role === client_1.RoleName.ADMIN || role === client_1.RoleName.SUPER_ADMIN) ?? false;
     const requestedStatus = data.status ?? client_1.ProductStatus.PUBLISHED;
-    const initialStatus = !isAdmin && requestedStatus === client_1.ProductStatus.PUBLISHED
-        ? client_1.ProductStatus.PENDING_REVIEW
-        : requestedStatus;
+    const initialStatus = requestedStatus;
     const slugBase = (0, slugify_1.makeSlug)(data.nameEn);
     const existingSlug = await client_2.prisma.product.findFirst({
         where: { slug: slugBase },
@@ -582,22 +578,14 @@ const updateProduct = async (productId, sellerId, payload, options) => {
                 updateData.status = client_1.ProductStatus.PENDING_REVIEW;
             }
             else if (normalized === "published") {
-                updateData.status =
-                    isAdmin || product.status === client_1.ProductStatus.PUBLISHED
-                        ? client_1.ProductStatus.PUBLISHED
-                        : client_1.ProductStatus.PENDING_REVIEW;
+                updateData.status = client_1.ProductStatus.PUBLISHED;
             }
             else {
                 updateData.status = normalized.toUpperCase();
             }
         }
         else {
-            updateData.status =
-                !isAdmin &&
-                    data.status === client_1.ProductStatus.PUBLISHED &&
-                    product.status !== client_1.ProductStatus.PUBLISHED
-                    ? client_1.ProductStatus.PENDING_REVIEW
-                    : data.status;
+            updateData.status = data.status;
         }
     }
     const imagesUpdate = data.imageUrls !== undefined
@@ -672,6 +660,35 @@ const deleteProduct = async (productId, sellerId) => {
     }
 };
 exports.deleteProduct = deleteProduct;
+const deleteProductAsAdmin = async (productId) => {
+    const product = await client_2.prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+            id: true,
+            auctions: { select: { id: true, status: true } },
+        },
+    });
+    if (!product) {
+        throw errors_1.AppError.notFound("Product not found");
+    }
+    if (product.auctions.length > 0) {
+        const hasActive = product.auctions.some((auction) => auction.status === client_1.AuctionStatus.ACTIVE || auction.status === client_1.AuctionStatus.SCHEDULED);
+        const message = hasActive
+            ? "Cannot delete a product with an active or scheduled auction"
+            : "Cannot delete a product that has participated in auctions";
+        throw errors_1.AppError.badRequest(message);
+    }
+    try {
+        await client_2.prisma.product.delete({ where: { id: productId } });
+    }
+    catch (error) {
+        if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+            throw errors_1.AppError.badRequest("Cannot delete a product that is part of existing orders");
+        }
+        throw error;
+    }
+};
+exports.deleteProductAsAdmin = deleteProductAsAdmin;
 const moderateProduct = async (productId, action) => {
     const status = action === "approve" ? client_1.ProductStatus.PUBLISHED : client_1.ProductStatus.REJECTED;
     const product = await client_2.prisma.product.update({

@@ -36,7 +36,12 @@ export declare const config: {
     };
     auth: {
         passwordResetUrl: string;
+        emailVerificationUrl: string;
+        emailVerificationTokenExpiresHours: number;
+        emailVerificationResendCooldownSeconds: number;
         cookieName: string;
+        cookieSecure: boolean;
+        cookieSameSite: "none" | "lax" | "strict";
         cookieMaxAgeSeconds: number;
     };
     accounts: {

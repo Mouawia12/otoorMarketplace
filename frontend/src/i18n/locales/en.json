@@ -975,6 +975,7 @@
     "deleteProductConfirm": "Delete this product permanently?",
     "deleteProductDisabled": "This product is part of an auction and cannot be deleted.",
     "deleteProductActive": "You must end the auction before deleting this product.",
+    "deleteProductSuccess": "Product deleted successfully",
     "deleteProductFailed": "Failed to delete product",
     "deleteProductTooltip": "Auction products cannot be deleted",
     "moreActions": "More actions",

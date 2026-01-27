@@ -25,6 +25,7 @@ const getUserProfile = async (userId) => {
         phone: user.phone,
         avatar_url: user.avatarUrl,
         verified_seller: user.verifiedSeller,
+        email_verified: user.emailVerified,
         status: user.status,
         roles: user.roles.map((r) => r.role.name.toLowerCase()),
         seller_status: user.sellerStatus?.toLowerCase?.() ?? "pending",
@@ -35,9 +36,6 @@ const getUserProfile = async (userId) => {
                 phone: user.sellerProfile.phone,
                 city: user.sellerProfile.city,
                 address: user.sellerProfile.address,
-                national_id: user.sellerProfile.nationalId,
-                iban: user.sellerProfile.iban,
-                bank_name: user.sellerProfile.bankName,
                 torod_warehouse_id: user.sellerProfile.torodWarehouseId ?? null,
                 status: user.sellerProfile.status?.toLowerCase?.() ?? user.sellerProfile.status,
             }
@@ -71,6 +69,7 @@ const updateUserProfile = async (userId, data) => {
         phone: user.phone,
         avatar_url: user.avatarUrl,
         verified_seller: user.verifiedSeller,
+        email_verified: user.emailVerified,
         status: user.status,
         roles: user.roles.map((r) => r.role.name.toLowerCase()),
     });

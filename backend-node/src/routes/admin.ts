@@ -16,7 +16,7 @@ import {
   deleteUserByAdmin,
   updateProductStatusAsAdmin,
 } from "../services/adminService";
-import { moderateProduct } from "../services/productService";
+import { deleteProductAsAdmin, moderateProduct } from "../services/productService";
 import { listAuctions, updateAuction } from "../services/auctionService";
 import { AppError } from "../utils/errors";
 import {
@@ -386,6 +386,25 @@ router.patch("/products/:id/status", adminOnly, async (req, res, next) => {
     });
 
     res.json(product);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/products/:id", adminOnly, async (req, res, next) => {
+  try {
+    const productId = Number(req.params.id);
+    if (Number.isNaN(productId)) {
+      throw AppError.badRequest("Invalid product id");
+    }
+    await deleteProductAsAdmin(productId);
+    await logAdminAction(req, {
+      action: "product.delete",
+      targetType: "product",
+      targetId: productId,
+      description: `Deleted product ${productId}`,
+    });
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }

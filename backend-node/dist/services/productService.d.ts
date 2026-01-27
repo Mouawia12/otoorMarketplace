@@ -277,6 +277,7 @@ export declare const updateProduct: (productId: number, sellerId: number, payloa
     has_active_auction: any;
 }>;
 export declare const deleteProduct: (productId: number, sellerId: number) => Promise<void>;
+export declare const deleteProductAsAdmin: (productId: number) => Promise<void>;
 export declare const moderateProduct: (productId: number, action: "approve" | "reject") => Promise<{
     id: any;
     seller_id: any;

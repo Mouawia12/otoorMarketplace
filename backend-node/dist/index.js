@@ -18,6 +18,10 @@ const auctionService_1 = require("./services/auctionService");
 const perfumeImportService_1 = require("./services/perfumeImportService");
 const app = (0, express_1.default)();
 const httpServer = http_1.default.createServer(app);
+if (env_1.config.nodeEnv === "production") {
+    // Ensure secure cookies work correctly behind reverse proxies.
+    app.set("trust proxy", 1);
+}
 const corsOptions = env_1.config.allowedOrigins.length === 1 && env_1.config.allowedOrigins[0] === "*"
     ? { origin: true, credentials: true }
     : { origin: env_1.config.allowedOrigins, credentials: true };

@@ -414,7 +414,20 @@ const resolvePartnerId = (partner: Record<string, unknown>) => {
   return undefined;
 };
 
-const normalizeTorodPartners = (payload: unknown) => {
+type NormalizedTorodPartner = {
+  id: string;
+  name: unknown;
+  name_ar: unknown;
+  rate: number | null;
+  currency: unknown;
+  eta: unknown;
+  cod_fee: number | null;
+  supports_cod?: boolean;
+  supports_prepaid?: boolean;
+  raw: Record<string, unknown>;
+};
+
+const normalizeTorodPartners = (payload: unknown): NormalizedTorodPartner[] => {
   const partners = extractList(payload);
   return partners
     .map((partner) => {
@@ -423,7 +436,7 @@ const normalizeTorodPartners = (payload: unknown) => {
       const id = resolvePartnerId(record);
       if (!id) return null;
       const { supportsCod, supportsPrepaid } = resolvePaymentSupport(record);
-      return {
+      const normalized: NormalizedTorodPartner = {
         id,
         name:
           record.title ??
@@ -464,12 +477,17 @@ const normalizeTorodPartners = (payload: unknown) => {
           toNumber(record.cod_fee_amount) ??
           toNumber(record.cod_amount) ??
           null,
-        supports_cod: supportsCod,
-        supports_prepaid: supportsPrepaid,
+        ...(supportsCod !== undefined ? { supports_cod: supportsCod } : {}),
+        ...(supportsPrepaid !== undefined ? { supports_prepaid: supportsPrepaid } : {}),
         raw: record,
       };
+      return normalized;
     })
-    .filter(Boolean);
+    .filter((partner): partner is NormalizedTorodPartner => Boolean(partner));
+};
+
+export const __test__ = {
+  normalizeTorodPartners,
 };
 
 const normalizeTokens = (value: unknown) => {
@@ -1635,6 +1653,10 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
   });
 
   if (requiresTorodShipment) {
+    if (torodCityId === undefined) {
+      throw AppError.badRequest("Torod city is required");
+    }
+
     const baseMetadata = {
       orderId: order.id,
       buyerId: data.buyerId,
@@ -1687,7 +1709,6 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
         }, 0);
 
         const partnersResponse = await listTorodCourierPartners({
-          shipper_city_id: shipperCityId ?? undefined,
           customer_city_id: torodCityId,
           payment: isCodPayment ? "coo" : "Prepaid",
           weight: totalWeight > 0 ? totalWeight : 1,
@@ -1696,13 +1717,16 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
           type: "normal",
           filter_by: "cheapest",
           ...(warehouseCode ? { warehouse: warehouseCode } : {}),
+          ...(typeof shipperCityId === "number" ? { shipper_city_id: shipperCityId } : {}),
         });
 
         const partners = normalizeTorodPartners(partnersResponse);
         const groupKey = groupContext?.groupKey;
+        const selectedGroupPartnerId =
+          groupKey ? torodGroupSelectionMap.get(groupKey) : undefined;
         const preferPartnerId =
-          (groupKey ? torodGroupSelectionMap.get(groupKey) : null)
-            ? String(torodGroupSelectionMap.get(groupKey)!)
+          typeof selectedGroupPartnerId === "number"
+            ? String(selectedGroupPartnerId)
             : vendorOrders.length === 1 && torodShippingCompanyId
             ? String(torodShippingCompanyId)
             : null;
@@ -1710,7 +1734,7 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
           (preferPartnerId
             ? partners.find((partner) => String(partner.id) === preferPartnerId)
             : null) ??
-          partners.find((partner) => partner?.supports_prepaid !== false) ??
+          partners.find((partner) => partner.supports_prepaid !== false) ??
           partners[0];
         if (!selectedPartner) {
           await prisma.vendorOrder.update({
@@ -1923,24 +1947,32 @@ export const createOrder = async (input: z.infer<typeof createOrderSchema>) => {
 
   let updatedOrder;
   if (vendorOrders.length === 1) {
-    const vendor = await prisma.vendorOrder.findUnique({
-      where: { id: vendorOrders[0].id },
-    });
-    updatedOrder = vendor
-      ? await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            redboxShipmentId: vendor.torodOrderId ?? order.redboxShipmentId,
-            redboxTrackingNumber: vendor.trackingNumber ?? order.redboxTrackingNumber,
-            redboxLabelUrl: vendor.labelUrl ?? order.redboxLabelUrl,
-            redboxStatus: vendor.torodStatus ?? order.redboxStatus ?? null,
-          },
-          include: orderInclude,
-        })
-      : await prisma.order.findUniqueOrThrow({
-          where: { id: order.id },
-          include: orderInclude,
-        });
+    const vendorOrder = vendorOrders[0];
+    if (!vendorOrder) {
+      updatedOrder = await prisma.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: orderInclude,
+      });
+    } else {
+      const vendor = await prisma.vendorOrder.findUnique({
+        where: { id: vendorOrder.id },
+      });
+      updatedOrder = vendor
+        ? await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              redboxShipmentId: vendor.torodOrderId ?? order.redboxShipmentId,
+              redboxTrackingNumber: vendor.trackingNumber ?? order.redboxTrackingNumber,
+              redboxLabelUrl: vendor.labelUrl ?? order.redboxLabelUrl,
+              redboxStatus: vendor.torodStatus ?? order.redboxStatus ?? null,
+            },
+            include: orderInclude,
+          })
+        : await prisma.order.findUniqueOrThrow({
+            where: { id: order.id },
+            include: orderInclude,
+          });
+    }
   } else if (vendorOrders.length > 1) {
     updatedOrder = await prisma.order.update({
       where: { id: order.id },
@@ -2753,17 +2785,21 @@ export const listTorodPartnersForCheckout = async (payload: unknown) => {
 
   const partnerCoverage = new Map<
     string,
-    { id: string; groupKeys: string[]; partner: Record<string, unknown> }
+    { id: string; groupKeys: string[]; partner: NormalizedTorodPartner }
   >();
   groupList.forEach((group) => {
     group.partners.forEach((partner) => {
-      const id = String((partner as { id: string }).id);
+      const id = partner.id;
       const entry =
         partnerCoverage.get(id) ??
-        ({ id, groupKeys: [], partner: partner as Record<string, unknown> } as {
+        ({
+          id,
+          groupKeys: [],
+          partner,
+        } as {
           id: string;
           groupKeys: string[];
-          partner: Record<string, unknown>;
+          partner: NormalizedTorodPartner;
         });
       entry.groupKeys.push(group.groupKey);
       partnerCoverage.set(id, entry);
@@ -2772,7 +2808,7 @@ export const listTorodPartnersForCheckout = async (payload: unknown) => {
 
   let commonPartnerIds: Set<string> | null = null;
   groupList.forEach((group) => {
-    const ids = new Set(group.partners.map((partner) => String(partner.id)));
+    const ids = new Set(group.partners.map((partner) => partner.id));
     if (!commonPartnerIds) {
       commonPartnerIds = ids;
     } else {
@@ -2780,7 +2816,7 @@ export const listTorodPartnersForCheckout = async (payload: unknown) => {
     }
   });
   const commonPartners = commonPartnerIds
-    ? Array.from(commonPartnerIds).map(
+    ? Array.from(commonPartnerIds as Set<string>).map(
         (id) => partnerCoverage.get(id)?.partner ?? { id }
       )
     : [];
