@@ -6,11 +6,7 @@ import { useCartStore } from "../store/cartStore";
 import { useAuthStore } from "../store/authStore";
 import { formatPrice } from "../utils/currency";
 import { clearPendingOrder, savePendingOrder, PendingOrderPayload } from "../utils/pendingOrder";
-import {
-  shouldDisablePlaceOrder,
-  shouldDisableTorodShipping,
-  shouldFetchCourierPartners,
-} from "../utils/checkoutGuards";
+import { shouldDisablePlaceOrder, shouldFetchCourierPartners } from "../utils/checkoutGuards";
 
 const dialCodeOptions = [
   { code: "+966", country: "Saudi Arabia", label: "🇸🇦 Saudi Arabia (+966)" },
@@ -139,6 +135,29 @@ const toOptions = (list: any[], lang: "ar" | "en" | "fr") =>
   list
     .map((item) => resolveOption(item, lang))
     .filter(Boolean) as LocationOption[];
+
+const buildPartnerIndex = (groups: any[]) => {
+  const index = new Map<string, any>();
+  groups.forEach((group) => {
+    const partners = Array.isArray(group?.partners) ? group.partners : [];
+    partners.forEach((partner: any) => {
+      const id = String(partner?.id ?? "");
+      if (id && !index.has(id)) {
+        index.set(id, partner);
+      }
+    });
+  });
+  return index;
+};
+
+const buildCoverageMap = (coverage: Array<{ id: string; group_keys: string[] }>) => {
+  const map = new Map<string, Set<string>>();
+  coverage.forEach((entry) => {
+    if (!entry?.id) return;
+    map.set(entry.id, new Set(entry.group_keys ?? []));
+  });
+  return map;
+};
 
 const toNumber = (value: unknown) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -272,7 +291,9 @@ export default function CheckoutPage() {
   const [regions, setRegions] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
-  const [courierPartners, setCourierPartners] = useState<any[]>([]);
+  const [courierGroups, setCourierGroups] = useState<any[]>([]);
+  const [commonCourierPartners, setCommonCourierPartners] = useState<any[]>([]);
+  const [partnerCoverage, setPartnerCoverage] = useState<Array<{ id: string; group_keys: string[] }>>([]);
   const [courierLoading, setCourierLoading] = useState(false);
   const [courierError, setCourierError] = useState<string | null>(null);
   const previousCourierCityId = useRef<number | null>(null);
@@ -281,6 +302,8 @@ export default function CheckoutPage() {
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedCourierPartner, setSelectedCourierPartner] = useState("");
+  const [groupSelections, setGroupSelections] = useState<Record<string, string>>({});
+  const [showAdvancedShipping, setShowAdvancedShipping] = useState(false);
   const [locationsLoading, setLocationsLoading] = useState({
     countries: false,
     regions: false,
@@ -345,10 +368,30 @@ export default function CheckoutPage() {
   const regionOptions = toOptions(regions, lang);
   const cityOptions = toOptions(cities, lang);
   const districtOptions = toOptions(districts, lang);
-  const courierOptions = toOptions(courierPartners, lang);
+  const partnerIndex = buildPartnerIndex(courierGroups);
+  const sharedPartners =
+    commonCourierPartners.length > 0
+      ? commonCourierPartners
+      : partnerCoverage
+          .filter((entry) => Array.isArray(entry.group_keys) && entry.group_keys.length > 1)
+          .map((entry) => partnerIndex.get(String(entry.id)))
+          .filter(Boolean);
+  const courierOptions = toOptions(sharedPartners, lang);
   const numericSelectedCity = toNumber(selectedCity);
   const noCourierForCity =
-    Boolean(selectedCity) && !courierLoading && courierOptions.length === 0;
+    Boolean(selectedCity) &&
+    !courierLoading &&
+    courierGroups.length > 0 &&
+    courierGroups.every((group: any) => !group?.partners?.length);
+  const allGroupsHavePartners =
+    courierGroups.length > 0 &&
+    courierGroups.every((group: any) => Array.isArray(group?.partners) && group.partners.length > 0);
+  const courierReadyCount = allGroupsHavePartners ? 1 : 0;
+  const hasFullIntersection = commonCourierPartners.length > 0;
+  const hasSharedPartners = sharedPartners.length > 0;
+  const showUnifiedSelect = hasSharedPartners;
+  const showAdvancedSelects = showAdvancedShipping || !hasSharedPartners;
+  const isPartialIntersection = !hasFullIntersection && hasSharedPartners;
 
   const setLoading = (
     key: "countries" | "regions" | "cities" | "districts",
@@ -409,8 +452,12 @@ export default function CheckoutPage() {
     setRegions([]);
     setCities([]);
     setDistricts([]);
-    setCourierPartners([]);
+    setCourierGroups([]);
+    setCommonCourierPartners([]);
+    setPartnerCoverage([]);
+    setGroupSelections({});
     setSelectedCourierPartner("");
+    setShowAdvancedShipping(false);
     setCourierError(null);
 
     if (!selectedCountry) return undefined;
@@ -449,8 +496,12 @@ export default function CheckoutPage() {
     setSelectedDistrict("");
     setCities([]);
     setDistricts([]);
-    setCourierPartners([]);
+    setCourierGroups([]);
+    setCommonCourierPartners([]);
+    setPartnerCoverage([]);
+    setGroupSelections({});
     setSelectedCourierPartner("");
+    setShowAdvancedShipping(false);
     setCourierError(null);
 
     if (!selectedRegion) return undefined;
@@ -487,8 +538,12 @@ export default function CheckoutPage() {
     let active = true;
     setSelectedDistrict("");
     setDistricts([]);
-    setCourierPartners([]);
+    setCourierGroups([]);
+    setCommonCourierPartners([]);
+    setPartnerCoverage([]);
+    setGroupSelections({});
     setSelectedCourierPartner("");
+    setShowAdvancedShipping(false);
     setCourierError(null);
 
     if (!selectedCity) return undefined;
@@ -525,8 +580,12 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     let active = true;
-    setCourierPartners([]);
+    setCourierGroups([]);
+    setCommonCourierPartners([]);
+    setPartnerCoverage([]);
     setSelectedCourierPartner("");
+    setGroupSelections({});
+    setShowAdvancedShipping(false);
     setCourierError(null);
 
     if (!numericSelectedCity) {
@@ -550,11 +609,49 @@ export default function CheckoutPage() {
             quantity: item.qty,
           })),
         });
-        const list = response.data?.partners ?? extractList(response.data);
+        const groups = Array.isArray(response.data?.groups) ? response.data.groups : [];
+        const common = Array.isArray(response.data?.common_partners)
+          ? response.data.common_partners
+          : [];
+        const coverage = Array.isArray(response.data?.partner_coverage)
+          ? response.data.partner_coverage
+          : [];
         if (!active) return;
-        setCourierPartners(list);
-        const first = toOptions(list, lang)[0];
-        if (first) setSelectedCourierPartner(first.id);
+        setCourierGroups(groups);
+        setCommonCourierPartners(common);
+        setPartnerCoverage(coverage);
+
+        const partnerIndex = buildPartnerIndex(groups);
+        const coverageMap = buildCoverageMap(coverage);
+        const sharedPartners =
+          common.length > 0
+            ? common
+            : coverage
+                .filter((entry: any) => Array.isArray(entry?.group_keys) && entry.group_keys.length > 1)
+                .map((entry: any) => partnerIndex.get(String(entry.id)))
+                .filter(Boolean);
+
+        const defaultSelections: Record<string, string> = {};
+        groups.forEach((group: any) => {
+          const partners = Array.isArray(group?.partners) ? group.partners : [];
+          const firstPartnerId = partners[0]?.id ? String(partners[0].id) : "";
+          if (firstPartnerId) {
+            defaultSelections[String(group.group_key)] = firstPartnerId;
+          }
+        });
+
+        const defaultCommon = sharedPartners[0];
+        const defaultCommonId = defaultCommon?.id ? String(defaultCommon.id) : "";
+        if (defaultCommonId) {
+          setSelectedCourierPartner(defaultCommonId);
+          const supportedGroups = coverageMap.get(defaultCommonId);
+          if (supportedGroups) {
+            supportedGroups.forEach((groupKey) => {
+              defaultSelections[groupKey] = defaultCommonId;
+            });
+          }
+        }
+        setGroupSelections(defaultSelections);
         previousCourierCityId.current = numericSelectedCity;
       } catch (error: any) {
         if (!active) return;
@@ -577,6 +674,20 @@ export default function CheckoutPage() {
       setFormData((prev) => ({ ...prev, city: cityName }));
     }
   }, [cityOptions, formData.city, selectedCity]);
+
+  useEffect(() => {
+    if (!selectedCourierPartner) return;
+    const coverage = buildCoverageMap(partnerCoverage);
+    const supportedGroups = coverage.get(selectedCourierPartner);
+    if (!supportedGroups) return;
+    setGroupSelections((prev) => {
+      const next = { ...prev };
+      supportedGroups.forEach((groupKey) => {
+        next[groupKey] = selectedCourierPartner;
+      });
+      return next;
+    });
+  }, [selectedCourierPartner, partnerCoverage]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -646,7 +757,6 @@ export default function CheckoutPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     const selectedCourier = courierOptions.find((option) => option.id === selectedCourierPartner);
-    const selectedCourierId = toNumber(selectedCourier?.id ?? selectedCourierPartner);
     if (!formData.name.trim()) newErrors.name = t('checkout.nameRequired');
     if (!formData.phone.trim()) {
       newErrors.phone = t('checkout.phoneRequired');
@@ -659,14 +769,40 @@ export default function CheckoutPage() {
     if (districtOptions.length > 0 && !selectedDistrict) {
       newErrors.district = t('checkout.districtRequired', 'اختر الحي');
     }
-    if (courierOptions.length > 0 && !selectedCourierPartner) {
-      if (shipping !== "torod") {
-        newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
-      }
-    }
     if (!formData.address.trim()) newErrors.address = t('checkout.addressRequired');
     if (formData.paymentMethod === "myfatoorah" && !selectedPaymentMethodId) {
       newErrors.payment = t('checkout.paymentMethodRequired', 'اختر طريقة الدفع');
+    }
+
+    if (shipping === "torod" && courierGroups.length > 0) {
+      courierGroups.forEach((group: any) => {
+        const groupKey = String(group?.group_key ?? "");
+        const partners = Array.isArray(group?.partners) ? group.partners : [];
+        if (!groupKey || partners.length === 0) {
+          newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
+          return;
+        }
+        const selectedPartnerId = groupSelections[groupKey];
+        if (!selectedPartnerId) {
+          newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
+          return;
+        }
+        const partner = partners.find(
+          (entry: any) => String(entry?.id) === String(selectedPartnerId)
+        );
+        if (!partner) {
+          newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
+          return;
+        }
+        const isCodPayment = false;
+        const { supportsPrepaid } = resolvePaymentSupport(partner);
+        if (!isCodPayment && supportsPrepaid === false) {
+          newErrors.courier = t(
+            'checkout.courierPrepaidNotSupported',
+            'شركة الشحن المختارة لا تدعم الدفع الإلكتروني'
+          );
+        }
+      });
     }
 
     if (selectedCourier?.raw) {
@@ -715,12 +851,6 @@ export default function CheckoutPage() {
       }
     }
 
-    if (courierOptions.length > 0 && (!selectedCourierId || selectedCourierId <= 0)) {
-      if (shipping !== "torod") {
-        newErrors.courier = t('checkout.courierRequired', 'اختر شركة الشحن');
-      }
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -735,11 +865,7 @@ export default function CheckoutPage() {
     const cityId = toNumber(selectedCity);
     const districtId = toNumber(selectedDistrict);
     const shippingCompanyId = toNumber(selectedCourierPartner);
-    const torodDisabled = shouldDisableTorodShipping(
-      courierOptions.length,
-      Boolean(selectedCity),
-      courierLoading
-    );
+    const hasAnyPartners = courierGroups.some((group: any) => Array.isArray(group?.partners) && group.partners.length > 0);
 
     if (!countryId || !regionId || !cityId) {
       setSubmitError(
@@ -748,9 +874,14 @@ export default function CheckoutPage() {
       return null;
     }
 
-    const deferTorodShipment =
-      shipping === "torod" &&
-      (torodDisabled || !shippingCompanyId || shippingCompanyId <= 0);
+    if (shipping === "torod" && !hasAnyPartners) {
+      setSubmitError(
+        t('checkout.courierUnavailable', 'لا توجد شركات شحن متاحة')
+      );
+      return null;
+    }
+
+    const deferTorodShipment = false;
 
     const countryName = findOptionName(countryOptions, selectedCountry);
     const regionName = findOptionName(regionOptions, selectedRegion);
@@ -779,6 +910,18 @@ export default function CheckoutPage() {
       return null;
     }
 
+    const torodGroupSelections = courierGroups
+      .map((group: any) => {
+        const groupKey = String(group?.group_key ?? "");
+        const selectedId = toNumber(groupSelections[groupKey]);
+        if (!groupKey || !selectedId) return null;
+        return {
+          group_key: groupKey,
+          shipping_company_id: selectedId,
+        };
+      })
+      .filter(Boolean) as Array<{ group_key: string; shipping_company_id: number }>;
+
     return {
       payment_method: "MYFATOORAH",
       payment_method_id: !isCodPayment ? selectedPaymentMethod?.id : undefined,
@@ -805,6 +948,9 @@ export default function CheckoutPage() {
               torod_shipping_company_id: shippingCompanyId,
               shipping_company_id: shippingCompanyId,
             }
+          : {}),
+        ...(torodGroupSelections.length > 0
+          ? { torod_group_selections: torodGroupSelections }
           : {}),
         torod_metadata: hasMetadata ? metadata : undefined,
         cod_amount: undefined,
@@ -1058,27 +1204,98 @@ export default function CheckoutPage() {
                   <label className="block text-charcoal font-semibold mb-2">
                     {t('checkout.courierPartner', 'شركة الشحن')}
                   </label>
-                  <select
-                    value={selectedCourierPartner}
-                    onChange={(e) => setSelectedCourierPartner(e.target.value)}
-                    disabled={!selectedCity || courierLoading || courierOptions.length === 0}
-                    className={`w-full px-4 py-3 rounded-lg border ${
-                      errors.courier ? 'border-red-500' : 'border-charcoal-light'
-                    } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
-                  >
-                    {!selectedCourierPartner && (
-                      <option value="">
-                        {courierOptions.length > 0
-                          ? t('checkout.courierPlaceholder', 'اختر شركة الشحن')
-                          : t('checkout.courierUnavailable', 'لا توجد شركات شحن متاحة')}
-                      </option>
-                    )}
-                    {courierOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
+                  {courierGroups.length > 1 && (
+                    <p className="text-xs text-taupe mb-2">
+                      {t('checkout.multiParcelNote', 'سيتم شحن الطلب على عدة طرود')}
+                    </p>
+                  )}
+                  {showUnifiedSelect && (
+                    <select
+                      value={selectedCourierPartner}
+                      onChange={(e) => setSelectedCourierPartner(e.target.value)}
+                      disabled={!selectedCity || courierLoading || courierOptions.length === 0}
+                      className={`w-full px-4 py-3 rounded-lg border ${
+                        errors.courier ? 'border-red-500' : 'border-charcoal-light'
+                      } focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100`}
+                    >
+                      {!selectedCourierPartner && (
+                        <option value="">
+                          {courierOptions.length > 0
+                            ? t('checkout.courierPlaceholder', 'اختر شركة الشحن')
+                            : t('checkout.courierUnavailable', 'لا توجد شركات شحن متاحة')}
+                        </option>
+                      )}
+                      {courierOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {isPartialIntersection && (
+                    <p className="text-amber-700 text-sm mt-2">
+                      {t(
+                        'checkout.partialCourierNote',
+                        'بعض المنتجات سيتم شحنها عبر شركة مختلفة.'
+                      )}
+                    </p>
+                  )}
+                  {showUnifiedSelect && courierGroups.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedShipping((prev) => !prev)}
+                      className="mt-2 text-sm text-gold hover:text-gold-hover transition"
+                    >
+                      {showAdvancedSelects
+                        ? t('checkout.hideAdvancedShipping', 'إخفاء اختيار الشحن المتقدم')
+                        : t('checkout.advancedShipping', 'اختيار شحن متقدم')}
+                    </button>
+                  )}
+                  {showAdvancedSelects && (
+                    <div className="mt-3 space-y-3">
+                      {courierGroups.map((group: any, index: number) => {
+                        const groupKey = String(group?.group_key ?? index);
+                        const groupOptions = toOptions(
+                          Array.isArray(group?.partners) ? group.partners : [],
+                          lang
+                        );
+                        const label = group?.warehouse_code
+                          ? `${t('checkout.shipment', 'شحنة')} ${index + 1} — ${group.warehouse_code}`
+                          : `${t('checkout.shipment', 'شحنة')} ${index + 1}`;
+                        return (
+                          <div key={groupKey}>
+                            <label className="block text-sm font-semibold text-charcoal mb-1">
+                              {label}
+                            </label>
+                            <select
+                              value={groupSelections[groupKey] ?? ""}
+                              onChange={(e) =>
+                                setGroupSelections((prev) => ({
+                                  ...prev,
+                                  [groupKey]: e.target.value,
+                                }))
+                              }
+                              disabled={!selectedCity || courierLoading || groupOptions.length === 0}
+                              className="w-full px-4 py-3 rounded-lg border border-charcoal-light focus:outline-none focus:ring-2 focus:ring-gold min-h-[44px] disabled:bg-gray-100"
+                            >
+                              {!groupSelections[groupKey] && (
+                                <option value="">
+                                  {groupOptions.length > 0
+                                    ? t('checkout.courierPlaceholder', 'اختر شركة الشحن')
+                                    : t('checkout.courierUnavailable', 'لا توجد شركات شحن متاحة')}
+                                </option>
+                              )}
+                              {groupOptions.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   {errors.courier && <p className="text-red-500 text-sm mt-1">{errors.courier}</p>}
                   {courierError && <p className="text-red-500 text-sm mt-1">{courierError}</p>}
                 </div>
@@ -1130,7 +1347,7 @@ export default function CheckoutPage() {
                   <p className="text-amber-600 text-sm">
                     {t(
                       'checkout.noCouriersDeferred',
-                      'لا توجد شركات شحن الآن لهذه المدينة، سيتم اختيار شركة الشحن لاحقًا من لوحة البائع.'
+                      'لا توجد شركات شحن متاحة لهذه المدينة حالياً.'
                     )}
                   </p>
                 )}
@@ -1392,7 +1609,7 @@ export default function CheckoutPage() {
                 onClick={handlePlaceOrder}
                 disabled={shouldDisablePlaceOrder(
                   shipping,
-                  courierOptions.length,
+                  courierReadyCount,
                   Boolean(selectedCity),
                   courierLoading,
                   placingOrder

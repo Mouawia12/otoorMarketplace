@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import api from "../lib/api";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min?url";
@@ -8,6 +8,7 @@ GlobalWorkerOptions.workerSrc = workerSrc;
 
 const LabelPrintView = () => {
   const { id } = useParams();
+  const location = useLocation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,8 +53,11 @@ const LabelPrintView = () => {
       try {
         setLoading(true);
         setError("");
+        const search = new URLSearchParams(location.search);
+        const vendorOrderId = search.get("vendor_order_id");
         const response = await api.get(`/orders/${id}/label/print`, {
           responseType: "arraybuffer",
+          params: vendorOrderId ? { vendor_order_id: vendorOrderId } : undefined,
         });
         if (cancelled) return;
 

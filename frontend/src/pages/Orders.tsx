@@ -49,6 +49,11 @@ export default function Orders({ view }: OrdersProps = {}) {
     [activeOrder?.shipping_method, activeOrder?.torod_tracking_number, sellerMode, userIsAdmin]
   );
 
+  const vendorShipments = useMemo(
+    () => (activeOrder?.vendor_orders ?? []).filter((entry) => Boolean(entry)),
+    [activeOrder?.vendor_orders]
+  );
+
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 3000);
@@ -70,13 +75,22 @@ export default function Orders({ view }: OrdersProps = {}) {
     const refreshTracking = async () => {
       try {
         setTrackingLoading(true);
-        const response = await api.get(`/orders/${activeOrder.id}/tracking`);
+        const params =
+          activeOrder.vendor_order_id !== undefined && activeOrder.vendor_order_id !== null
+            ? { vendor_order_id: activeOrder.vendor_order_id }
+            : undefined;
+        const response = await api.get(`/orders/${activeOrder.id}/tracking`, { params });
         const payload = response.data ?? {};
         const updatedOrder = payload.order;
         if (!active || !updatedOrder) return;
         setActiveOrder(updatedOrder);
         setOrders((prev) =>
-          prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
+          prev.map((order) =>
+            order.id === updatedOrder.id &&
+            (order.vendor_order_id ?? null) === (updatedOrder.vendor_order_id ?? null)
+              ? updatedOrder
+              : order
+          )
         );
       } catch (error) {
         if (!active) return;
@@ -86,10 +100,12 @@ export default function Orders({ view }: OrdersProps = {}) {
     };
 
     refreshTracking();
+    const interval = window.setInterval(refreshTracking, 60000);
     return () => {
       active = false;
+      window.clearInterval(interval);
     };
-  }, [activeOrder?.id, activeOrder?.torod_tracking_number]);
+  }, [activeOrder?.id, activeOrder?.torod_tracking_number, activeOrder?.vendor_order_id]);
 
   const fetchOrders = async () => {
     try {
@@ -189,11 +205,13 @@ export default function Orders({ view }: OrdersProps = {}) {
     window.open(resolvedUrl, "_blank", "noopener,noreferrer");
   };
 
-  const handlePrintLabel = async (orderId: number) => {
+  const handlePrintLabel = async (orderId: number, vendorOrderId?: number) => {
     try {
       setPrintingLabel(true);
       setNotice(null);
-      const response = await api.get(`/orders/${orderId}/label`);
+      const response = await api.get(`/orders/${orderId}/label`, {
+        params: vendorOrderId ? { vendor_order_id: vendorOrderId } : undefined,
+      });
       const labelUrl = response.data?.label_url;
       if (!labelUrl) {
         setNotice({
@@ -202,7 +220,8 @@ export default function Orders({ view }: OrdersProps = {}) {
         });
         return;
       }
-      openLabelWindow(`/orders/${orderId}/label/print-view`);
+      const query = vendorOrderId ? `?vendor_order_id=${vendorOrderId}` : '';
+      openLabelWindow(`/orders/${orderId}/label/print-view${query}`);
       const updatedOrder = response.data?.order;
       if (updatedOrder) {
         setOrders((prev) =>
@@ -411,9 +430,13 @@ export default function Orders({ view }: OrdersProps = {}) {
             const name = primary ? (language === 'ar' ? primary.name_ar : primary.name_en) : t('products.unknownProduct');
             const image = resolveProductImageUrl(primary?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
             const qty = order.quantity || items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+            const displayKey = `${order.id}-${order.vendor_order_id ?? 'main'}`;
+            const displayOrderNumber = order.vendor_order_id
+              ? `${order.id} · ${t('orders.shipmentLabel', 'شحنة')} ${order.vendor_order_id}`
+              : String(order.id);
             return (
               <button
-                key={order.id}
+                key={displayKey}
                 onClick={() => {
                   setActiveOrder(order);
                   setSelectedStatus(order.status);
@@ -434,7 +457,7 @@ export default function Orders({ view }: OrdersProps = {}) {
                       <div className="min-w-0">
                         <p className="text-sm sm:text-base font-semibold text-charcoal line-clamp-1">{name}</p>
                         <p className="text-xs text-charcoal-light">
-                          {t('orders.orderNumber')}: {order.id} ·{' '}
+                          {t('orders.orderNumber')}: {displayOrderNumber} ·{' '}
                           {new Date(order.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
                         </p>
                       </div>
@@ -470,7 +493,12 @@ export default function Orders({ view }: OrdersProps = {}) {
           <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-sand/80">
               <div>
-                <p className="text-xs text-taupe">{t('orders.orderNumber')}: {activeOrder.id}</p>
+                <p className="text-xs text-taupe">
+                  {t('orders.orderNumber')}: {activeOrder.id}
+                  {activeOrder.vendor_order_id
+                    ? ` · ${t('orders.shipmentLabel', 'شحنة')} ${activeOrder.vendor_order_id}`
+                    : ''}
+                </p>
                 <h3 className="text-lg font-bold text-charcoal">{t(`orders.statuses.${activeOrder.status}`)}</h3>
               </div>
               {(sellerMode || userIsAdmin) && (
@@ -707,9 +735,77 @@ export default function Orders({ view }: OrdersProps = {}) {
                 </div>
               )}
 
-              {(activeOrder.torod_tracking_number ||
-                activeOrder.torod_label_url ||
-                activeOrder.torod_status) && (
+              {vendorShipments.length > 0 && (
+                <div className="border border-sand/70 rounded-xl p-4">
+                  <h4 className="font-semibold text-charcoal mb-2">
+                    {t('orders.trackingInfo', 'معلومات الشحنة')}
+                  </h4>
+                  <div className="space-y-4 text-sm text-charcoal">
+                    {vendorShipments.map((shipment) => (
+                      <div key={shipment.id} className="rounded-lg border border-sand/60 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-semibold text-charcoal">
+                            {t('orders.vendorShipment', {
+                              defaultValue: `شحنة التاجر #${shipment.seller_id}`,
+                            })}
+                          </p>
+                          {shipment.torod_status && (
+                            <span className="text-xs text-taupe">
+                              {t('orders.shipmentStatus', 'حالة الشحنة')}:{" "}
+                              <span className="font-semibold">{shipment.torod_status}</span>
+                            </span>
+                          )}
+                        </div>
+                        {shipment.tracking_number && (
+                          <p className="break-all mt-2">
+                            {t('orders.trackingNumber', 'رقم التتبع')}:{" "}
+                            <span className="font-semibold text-gold">{shipment.tracking_number}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyTracking(shipment.tracking_number)}
+                              className="ms-2 text-xs underline text-charcoal hover:text-gold transition"
+                            >
+                              {t('orders.copyTracking', 'نسخ')}
+                            </button>
+                          </p>
+                        )}
+                        {(sellerMode || userIsAdmin) &&
+                          (shipment.tracking_number || shipment.label_url) && (
+                          <div className="mt-2 flex flex-wrap items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handlePrintLabel(activeOrder.id, shipment.id)}
+                              className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition disabled:opacity-60"
+                              disabled={printingLabel}
+                            >
+                              {printingLabel
+                                ? t('orders.labelLoading', 'جاري تحميل البوليصة...')
+                                : t('orders.printLabel', 'طباعة بوليصة الشحن')}
+                              <span aria-hidden>↗</span>
+                            </button>
+                            {shipment.label_url && (
+                              <a
+                                href={shipment.label_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 text-charcoal underline hover:text-gold transition"
+                              >
+                                {t('orders.downloadLabel', 'تحميل بوليصة الشحن')}
+                                <span aria-hidden>↗</span>
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {vendorShipments.length === 0 &&
+                (activeOrder.torod_tracking_number ||
+                  activeOrder.torod_label_url ||
+                  activeOrder.torod_status) && (
                 <div className="border border-sand/70 rounded-xl p-4">
                   <h4 className="font-semibold text-charcoal mb-2">
                     {t('orders.trackingInfo', 'معلومات الشحنة')}

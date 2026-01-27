@@ -48,6 +48,13 @@ interface AuthState {
 }
 
 let initializePromise: Promise<void> | null = null;
+let logoutInProgress = false;
+
+const resolveLogoutUrl = () => {
+  const baseUrl = api.defaults.baseURL ?? '';
+  if (!baseUrl) return '/auth/logout';
+  return `${baseUrl.replace(/\/+$/, '')}/auth/logout`;
+};
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
@@ -131,16 +138,39 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: () => {
+    if (logoutInProgress) return;
+    logoutInProgress = true;
+    if (typeof window !== 'undefined') {
+      window.location.replace('/');
+      window.setTimeout(() => {
+        logoutInProgress = false;
+      }, 3000);
+    } else {
+      logoutInProgress = false;
+    }
+
     set({ user: null, isAuthenticated: false, authChecked: true });
     useWishlistStore.getState().clear();
     useWishlistStore.persist.clearStorage();
-    void api.post('/auth/logout', undefined, { timeout: 5000 }).catch(() => null);
-    if (typeof window !== 'undefined') {
-      window.location.assign('/');
+
+    const logoutUrl = resolveLogoutUrl();
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        navigator.sendBeacon(logoutUrl);
+      } else if (typeof fetch !== 'undefined') {
+        void fetch(logoutUrl, { method: 'POST', credentials: 'include', keepalive: true });
+      } else {
+        void api.post('/auth/logout', undefined, { timeout: 5000 }).catch(() => null);
+      }
+    } catch (_error) {
+      void api.post('/auth/logout', undefined, { timeout: 5000 }).catch(() => null);
     }
   },
 
   fetchUser: async () => {
+    if (logoutInProgress) {
+      return;
+    }
     try {
       const response = await api.get('/auth/me');
       set({ user: response.data, isAuthenticated: true, authChecked: true });

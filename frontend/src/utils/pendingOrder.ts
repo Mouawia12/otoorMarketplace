@@ -25,6 +25,10 @@ export type PendingOrderPayload = {
     torod_district_id?: number;
     torod_metadata?: Record<string, unknown>;
     defer_torod_shipment?: boolean;
+    torod_group_selections?: Array<{
+      group_key: string;
+      shipping_company_id: number;
+    }>;
   };
   items: Array<{
     productId: number;

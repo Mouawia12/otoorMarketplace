@@ -52,6 +52,7 @@ model User {
   perfumeImportJobs PerfumeImportJob[]
   sellerWarehouses SellerWarehouse[]
   manualShipments  ManualShipment[]
+  vendorOrders    VendorOrder[] @relation("VendorOrderSeller")
 }
 
 model Role {
@@ -103,6 +104,7 @@ model Product {
   images       ProductImage[]
   auctions     Auction[]
   orderItems   OrderItem[]
+  vendorOrderItems VendorOrderItem[]
   WishlistItem WishlistItem[]
   reviews      ProductReview[]
 
@@ -197,6 +199,7 @@ model Order {
   coupon Coupon?    @relation(fields: [couponId], references: [id])
   items OrderItem[]
   reviews ProductReview[]
+  vendorOrders VendorOrder[]
 
   @@index([buyerId])
   @@index([couponId])
@@ -204,6 +207,56 @@ model Order {
   @@index([redboxTrackingNumber])
   @@index([myfatoorahInvoiceId])
   @@index([myfatoorahPaymentId])
+}
+
+model VendorOrder {
+  id               Int         @id @default(autoincrement())
+  orderId          Int         @map("order_id")
+  sellerId         Int         @map("seller_id")
+  status           OrderStatus @default(PENDING)
+  shippingMethod   String      @map("shipping_method") @default("torod")
+  shippingCompanyId Int?       @map("shipping_company_id")
+  warehouseCode    String?     @map("warehouse_code")
+  shipperCityId    Int?        @map("shipper_city_id")
+  torodOrderId     String?     @map("torod_order_id")
+  trackingNumber   String?     @map("tracking_number")
+  labelUrl         String?     @map("label_url")
+  torodStatus      String?     @map("torod_status")
+  subtotalAmount   Decimal     @map("subtotal_amount") @db.Decimal(10, 2)
+  discountAmount   Decimal     @map("discount_amount") @db.Decimal(10, 2)
+  shippingFee      Decimal     @map("shipping_fee") @db.Decimal(10, 2)
+  totalAmount      Decimal     @map("total_amount") @db.Decimal(10, 2)
+  platformFee      Decimal     @map("platform_fee") @db.Decimal(10, 2) @default(0)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seller User  @relation("VendorOrderSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  items  VendorOrderItem[]
+
+  @@index([orderId])
+  @@index([sellerId])
+  @@map("vendor_orders")
+}
+
+model VendorOrderItem {
+  id            Int      @id @default(autoincrement())
+  vendorOrderId Int      @map("vendor_order_id")
+  orderItemId   Int      @map("order_item_id")
+  productId     Int      @map("product_id")
+  quantity      Int
+  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2)
+  totalPrice    Decimal  @map("total_price") @db.Decimal(10, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  vendorOrder VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([vendorOrderId])
+  @@index([orderItemId])
+  @@index([productId])
+  @@map("vendor_order_items")
 }
 
 model OrderItem {
@@ -217,6 +270,7 @@ model OrderItem {
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  vendorOrderItems VendorOrderItem[]
 
   @@index([orderId])
   @@index([productId])

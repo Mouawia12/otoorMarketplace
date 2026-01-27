@@ -135,6 +135,9 @@ router.post("/", authenticate(), async (req, res, next) => {
       typeof shippingCompanyIdRaw !== "object" &&
       Number.isFinite(shippingCompanyId) &&
       shippingCompanyId > 0;
+    const hasGroupSelections =
+      Array.isArray(body.shipping?.torod_group_selections) &&
+      body.shipping.torod_group_selections.length > 0;
     const normalizedShippingMethod =
       typeof shippingMethodRaw === "string" ? shippingMethodRaw.trim().toLowerCase() : "";
     const deferTorodShipment =
@@ -143,7 +146,7 @@ router.post("/", authenticate(), async (req, res, next) => {
           body.shipping?.defer_torod_shipment ??
           body.deferTorodShipment ??
           body.defer_torod_shipment
-      ) || (normalizedShippingMethod === "torod" && !hasShippingCompany);
+      ) || (normalizedShippingMethod === "torod" && !hasShippingCompany && !hasGroupSelections);
 
     if (normalizedShippingMethod === "torod" && !hasShippingCompany && !deferTorodShipment) {
       res.status(422).json({
@@ -196,6 +199,8 @@ router.post("/", authenticate(), async (req, res, next) => {
             torod_city_id: body.torod_city_id,
             torod_district_id: body.torod_district_id,
             torod_metadata: body.torod_metadata,
+            torod_group_selections:
+              body.shipping?.torod_group_selections ?? body.torod_group_selections,
           }
         : undefined);
 
@@ -241,7 +246,8 @@ router.patch(
       const order = await updateOrderStatus(
         orderId,
         status,
-        req.user.roles.map((role) => role.toUpperCase())
+        req.user.roles.map((role) => role.toUpperCase()),
+        req.user.id
       );
 
       res.json(order);
@@ -296,11 +302,8 @@ router.post(
   }
 );
 
-router.post("/torod/partners/checkout", authenticate(), async (req, res, next) => {
+router.post("/torod/partners/checkout", async (req, res, next) => {
   try {
-    if (!req.user) {
-      throw AppError.unauthorized();
-    }
     const result = await listTorodPartnersForCheckout(req.body ?? {});
     res.json(result);
   } catch (error) {
@@ -346,7 +349,7 @@ router.get("/:id/label", authenticate(), async (req, res, next) => {
       throw AppError.badRequest("Invalid order id");
     }
 
-    const result = await getOrderLabel(orderId, req.user.id, req.user.roles);
+    const result = await getOrderLabel(orderId, req.user.id, req.user.roles, req.query as any);
     res.json(result);
   } catch (error) {
     next(error);
@@ -364,7 +367,7 @@ router.get("/:id/label/print", authenticate(), async (req, res, next) => {
       throw AppError.badRequest("Invalid order id");
     }
 
-    const result = await getOrderLabel(orderId, req.user.id, req.user.roles);
+    const result = await getOrderLabel(orderId, req.user.id, req.user.roles, req.query as any);
     const labelUrl = result.label_url;
     if (!labelUrl) {
       throw AppError.notFound("Label not found");
@@ -403,7 +406,10 @@ router.get("/:id/label/print-view", authenticate(), async (req, res, next) => {
       throw AppError.badRequest("Invalid order id");
     }
 
-    const printUrl = `${req.baseUrl}/${orderId}/label/print`;
+    const query = typeof req.originalUrl === "string" && req.originalUrl.includes("?")
+      ? req.originalUrl.split("?")[1]
+      : "";
+    const printUrl = `${req.baseUrl}/${orderId}/label/print${query ? `?${query}` : ""}`;
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(`
       <!doctype html>
@@ -465,7 +471,7 @@ router.get("/:id/tracking", authenticate(), async (req, res, next) => {
       throw AppError.badRequest("Invalid order id");
     }
 
-    const result = await getOrderTracking(orderId, req.user.id, req.user.roles);
+    const result = await getOrderTracking(orderId, req.user.id, req.user.roles, req.query as any);
     res.json(result);
   } catch (error) {
     next(error);

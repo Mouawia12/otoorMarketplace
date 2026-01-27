@@ -122,6 +122,8 @@ export interface Notification {
 
 export interface Order {
   id: number;
+  vendor_order_id?: number | null;
+  warehouse_code?: string | null;
   buyer_id: number;
   product_id: number;
   quantity: number;
@@ -147,6 +149,7 @@ export interface Order {
   torod_tracking_number?: string | null;
   torod_label_url?: string | null;
   torod_status?: string | null;
+  vendor_orders?: VendorOrder[];
   items?: Array<{
     id: number;
     product_id: number;
@@ -154,6 +157,33 @@ export interface Order {
     unit_price: number;
     total_price: number;
     product?: Product;
+  }>;
+}
+
+export interface VendorOrder {
+  id: number;
+  seller_id: number;
+  status: string;
+  shipping_method?: string | null;
+  shipping_company_id?: number | null;
+  warehouse_code?: string | null;
+  shipper_city_id?: number | null;
+  torod_order_id?: string | null;
+  tracking_number?: string | null;
+  label_url?: string | null;
+  torod_status?: string | null;
+  subtotal_amount: number;
+  discount_amount: number;
+  shipping_fee: number;
+  total_amount: number;
+  platform_fee?: number;
+  items?: Array<{
+    id: number;
+    order_item_id: number;
+    product_id: number;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
   }>;
 }
 
