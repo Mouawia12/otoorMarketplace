@@ -13,7 +13,7 @@ interface CatalogPageProps {
   catalogType: 'new' | 'used' | 'auctions';
 }
 
-type AuctionDisplayStatus = 'active' | 'scheduled';
+type AuctionDisplayStatus = 'active' | 'scheduled' | 'ended';
 
 interface AuctionCatalogItem {
   auction: Auction;
@@ -142,14 +142,18 @@ export default function CatalogPage({ catalogType }: CatalogPageProps) {
     nowMs: number
   ): AuctionDisplayStatus | null => {
     const rawStatus = typeof auction.status === 'string' ? auction.status.toLowerCase() : '';
-    if (rawStatus === 'pending_review' || rawStatus === 'cancelled' || rawStatus === 'completed') {
+    if (rawStatus === 'pending_review' || rawStatus === 'cancelled') {
       return null;
     }
 
     const startMs = new Date(auction.start_time).getTime();
     const endMs = new Date(auction.end_time).getTime();
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= nowMs) {
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
       return null;
+    }
+
+    if (rawStatus === 'completed' || endMs <= nowMs) {
+      return 'ended';
     }
 
     return startMs > nowMs ? 'scheduled' : 'active';

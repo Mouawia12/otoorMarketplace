@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -304,6 +304,7 @@ export default function CheckoutPage() {
   const [selectedCourierPartner, setSelectedCourierPartner] = useState("");
   const [groupSelections, setGroupSelections] = useState<Record<string, string>>({});
   const [showAdvancedShipping, setShowAdvancedShipping] = useState(false);
+  const [activeShipmentGroup, setActiveShipmentGroup] = useState<any | null>(null);
   const [locationsLoading, setLocationsLoading] = useState({
     countries: false,
     regions: false,
@@ -311,6 +312,27 @@ export default function CheckoutPage() {
     districts: false,
   });
   const [locationsError, setLocationsError] = useState<string | null>(null);
+
+  const activeShipmentItems = useMemo(() => {
+    if (!activeShipmentGroup) return [];
+    const groupItems = Array.isArray(activeShipmentGroup?.items) ? activeShipmentGroup.items : [];
+    return groupItems.map((entry: any) => {
+      const cartItem = items.find((item) => String(item.id) === String(entry.productId));
+      return {
+        id: entry.productId,
+        name: cartItem?.name || t("checkout.productFallback", "منتج"),
+        image: cartItem?.image,
+        qty: entry.quantity ?? cartItem?.qty ?? 1,
+      };
+    });
+  }, [activeShipmentGroup, items, t]);
+
+  const activeShipmentIndex = useMemo(() => {
+    if (!activeShipmentGroup) return null;
+    const groupKey = String(activeShipmentGroup?.group_key ?? "");
+    const index = courierGroups.findIndex((group: any) => String(group?.group_key ?? "") === groupKey);
+    return index >= 0 ? index : null;
+  }, [activeShipmentGroup, courierGroups]);
 
   useEffect(() => {
     setCoupons({ coupons: [], sellerDiscounts: {}, totalDiscount: 0 });
@@ -1259,14 +1281,19 @@ export default function CheckoutPage() {
                           Array.isArray(group?.partners) ? group.partners : [],
                           lang
                         );
-                        const label = group?.warehouse_code
-                          ? `${t('checkout.shipment', 'شحنة')} ${index + 1} — ${group.warehouse_code}`
-                          : `${t('checkout.shipment', 'شحنة')} ${index + 1}`;
+                        const label = `${t("checkout.shipment", "شحنة")} ${index + 1} — ${t(
+                          "checkout.shipmentItemsHint",
+                          "اضغط لرؤية منتجات الشحنة"
+                        )}`;
                         return (
                           <div key={groupKey}>
-                            <label className="block text-sm font-semibold text-charcoal mb-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveShipmentGroup(group)}
+                              className="block text-sm font-semibold text-charcoal mb-1 underline decoration-dotted hover:text-gold transition"
+                            >
                               {label}
-                            </label>
+                            </button>
                             <select
                               value={groupSelections[groupKey] ?? ""}
                               onChange={(e) =>
@@ -1622,6 +1649,68 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {activeShipmentGroup && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-luxury shadow-xl w-full max-w-lg max-h-[85vh] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-sand">
+              <div>
+                <h3 className="text-lg font-semibold text-charcoal">
+                  {t("checkout.shipmentItemsTitle", "منتجات الشحنة")}
+                </h3>
+                <p className="text-sm text-taupe mt-1">
+                  {activeShipmentGroup?.warehouse_code
+                    ? `${t("checkout.shipment", "شحنة")} ${
+                        activeShipmentIndex !== null ? activeShipmentIndex + 1 : ""
+                      } — ${activeShipmentGroup.warehouse_code}`
+                    : t("checkout.shipment", "شحنة")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveShipmentGroup(null)}
+                className="text-charcoal-light hover:text-charcoal transition"
+                aria-label={t("common.close", "إغلاق")}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+              {activeShipmentItems.length === 0 ? (
+                <p className="text-sm text-taupe">
+                  {t("checkout.shipmentItemsEmpty", "لا توجد منتجات لهذه الشحنة")}
+                </p>
+              ) : (
+                activeShipmentItems.map((item: any) => (
+                  <div key={item.id} className="flex gap-3">
+                    <div className="w-14 h-14 bg-sand rounded-lg flex-shrink-0 overflow-hidden">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-full h-full object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg className="w-6 h-6 text-taupe" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-charcoal truncate">{item.name}</p>
+                      <p className="text-xs text-taupe">
+                        {t("cart.qty")}: {item.qty}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

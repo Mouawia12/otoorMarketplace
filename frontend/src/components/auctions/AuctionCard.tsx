@@ -18,7 +18,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
   const product = auction.product;
   const name = product ? (language === 'ar' ? product.name_ar : product.name_en) : 'Unknown Product';
   const imageUrl = resolveProductImageUrl(product?.image_urls?.[0]) || PLACEHOLDER_PERFUME;
-  const isActive = auction.status === 'running';
+  const isActive = auction.status === 'active';
   const bidsCount = auction.total_bids || 0;
 
   return (

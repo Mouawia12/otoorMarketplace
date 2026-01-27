@@ -263,6 +263,14 @@ export const listAuctions = async (query: unknown) => {
       return false;
     }
 
+    if (auction.status === AuctionStatus.CANCELLED || auction.status === AuctionStatus.PENDING_REVIEW) {
+      return false;
+    }
+
+    if (auction.status === AuctionStatus.COMPLETED) {
+      return true;
+    }
+
     const startMs = new Date(auction.start_time).getTime();
     const endMs = new Date(auction.end_time).getTime();
     const nowMs = now.getTime();
@@ -749,6 +757,7 @@ export const createAuction = async (input: z.infer<typeof createAuctionSchema>) 
       id: true,
       sellerId: true,
       status: true,
+      sellerWarehouseId: true,
     },
   });
 
@@ -758,6 +767,10 @@ export const createAuction = async (input: z.infer<typeof createAuctionSchema>) 
 
   if (product.status !== ProductStatus.PUBLISHED) {
     throw AppError.badRequest("Product must be published before starting an auction");
+  }
+
+  if (!product.sellerWarehouseId) {
+    throw AppError.badRequest("Product must be assigned to a warehouse before starting an auction");
   }
 
   const existing = await prisma.auction.findUnique({

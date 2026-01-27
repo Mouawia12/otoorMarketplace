@@ -20,7 +20,7 @@ interface ProductCardProps {
   auctionEndDate?: string;
   auctionStartDate?: string;
   auctionId?: number;
-  auctionStatus?: 'active' | 'scheduled';
+  auctionStatus?: 'active' | 'scheduled' | 'ended';
 }
 
 function productLink(p: Product) {
@@ -66,14 +66,16 @@ export default function ProductCard({
   const nowMs = Date.now();
   const auctionStartMs = isAuction && auctionStartDate ? new Date(auctionStartDate).getTime() : null;
   const auctionEndMs = isAuction && auctionEndDate ? new Date(auctionEndDate).getTime() : null;
-  const derivedAuctionStatus: 'active' | 'scheduled' | null = isAuction
+  const derivedAuctionStatus: 'active' | 'scheduled' | 'ended' | null = isAuction
     ? auctionStatus ??
       (auctionStartMs && auctionStartMs > nowMs ? 'scheduled' : 'active')
     : null;
   const isAuctionScheduled = Boolean(
     isAuction && derivedAuctionStatus === 'scheduled' && auctionStartMs && auctionStartMs > nowMs
   );
-  const isAuctionEnded = Boolean(isAuction && auctionEndMs && auctionEndMs <= nowMs);
+  const isAuctionEnded = Boolean(
+    isAuction && (derivedAuctionStatus === 'ended' || (auctionEndMs && auctionEndMs <= nowMs))
+  );
   const isOutOfStock = product.stock_quantity <= 0;
   const conditionLabel =
     product.condition === 'used'

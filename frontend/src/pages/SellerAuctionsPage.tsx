@@ -18,6 +18,13 @@ type AuctionFilter =
   | "completed"
   | "cancelled";
 
+type SellerWarehouse = {
+  id: number;
+  warehouseCode: string;
+  warehouseName: string;
+  isDefault?: boolean;
+};
+
 const statusTone = (status: string) => {
   switch (status) {
     case "active":
@@ -264,6 +271,7 @@ type ProductFormState = {
   condition: "NEW" | "USED";
   image_urls: string[];
   is_tester: boolean;
+  seller_warehouse_id: string;
 };
 
 const createProductFormState = (): ProductFormState => ({
@@ -281,12 +289,14 @@ const createProductFormState = (): ProductFormState => ({
   condition: "NEW",
   image_urls: [],
   is_tester: false,
+  seller_warehouse_id: "",
 });
 
 function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
   const { t, i18n } = useTranslation();
   const { language } = useUIStore();
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<SellerWarehouse[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [form, setForm] = useState({
@@ -304,13 +314,20 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const [warehouseError, setWarehouseError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setInitialLoading(true);
-        const response = await api.get<Product[]>("/seller/products", { params: { status: "published" } });
-        setProducts(response.data);
+        const [productsResponse, warehousesResponse] = await Promise.all([
+          api.get<Product[]>("/seller/products", { params: { status: "published" } }),
+          api.get("/seller/warehouses"),
+        ]);
+        setProducts(productsResponse.data);
+        const list = warehousesResponse.data?.warehouses ?? [];
+        setWarehouses(list);
+        setWarehouseError(list.length === 0 ? t("seller.noWarehouses", "لا توجد مستودعات") : null);
       } catch (err: any) {
         console.error("Failed to load seller products", err);
         setError(err?.response?.data?.detail ?? t("common.errorLoading"));
@@ -383,12 +400,22 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
       }
 
       let productId = Number(form.productId);
+      const selectedProduct = products.find((product) => product.id === productId);
 
       if (productSource === "new") {
+        if (!productForm.seller_warehouse_id) {
+          setError(t("seller.selectWarehouseFirst", "يرجى اختيار مستودع للمنتج"));
+          setLoading(false);
+          return;
+        }
         const newProductId = await createAuctionProduct();
         productId = newProductId;
       } else if (!productId) {
         setError(t("seller.selectProductFirst", "يرجى اختيار منتج للمزاد"));
+        setLoading(false);
+        return;
+      } else if (!selectedProduct?.seller_warehouse_id) {
+        setError(t("seller.productMissingWarehouse", "المنتج المختار لا يملك مستودع، عدّل المنتج أولاً"));
         setLoading(false);
         return;
       }
@@ -433,13 +460,14 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
       basePrice: parseFloat(productForm.base_price || "0"),
       sizeMl: parseInt(productForm.size_ml || "0", 10),
       concentration: productForm.concentration,
-      stockQuantity: parseInt(productForm.stock_quantity || "1", 10),
+      stockQuantity: 1,
       descriptionEn: productForm.description_en,
       descriptionAr: productForm.description_ar,
       condition: productForm.condition,
       isTester: productForm.is_tester,
       status: "PUBLISHED",
       imageUrls: productForm.image_urls,
+      sellerWarehouseId: Number(productForm.seller_warehouse_id),
     };
     const { data } = await api.post("/seller/products", payload);
     return data?.id;
@@ -505,7 +533,7 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
 
   const applyTemplate = (template: ProductTemplate) => {
     setSelectedTemplateId(template.id);
-    setProductForm({
+    setProductForm((prev) => ({
       name_en: template.name_en,
       name_ar: template.name_ar,
       brand: template.brand,
@@ -520,7 +548,8 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
       condition: "NEW",
       image_urls: template.image_urls?.slice?.() || [],
       is_tester: false,
-    });
+      seller_warehouse_id: prev.seller_warehouse_id,
+    }));
   };
 
   return (
@@ -566,6 +595,16 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                   </option>
                 ))}
               </select>
+              {form.productId && (
+                <p className="text-xs text-taupe mt-2">
+                  {t("seller.productWarehouse", "المستودع")}:{" "}
+                  {(() => {
+                    const selected = products.find((product) => product.id === Number(form.productId));
+                    const warehouse = warehouses.find((entry) => entry.id === selected?.seller_warehouse_id);
+                    return warehouse?.warehouseName || warehouse?.warehouseCode || t("seller.noWarehouses", "لا توجد مستودعات");
+                  })()}
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-4 rounded-luxury border border-gray-200 bg-sand/20 p-4">
@@ -669,6 +708,28 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-charcoal font-semibold mb-2">
+                  {t("seller.productWarehouse", "المستودع")}
+                </label>
+                <select
+                  value={productForm.seller_warehouse_id}
+                  onChange={handleProductChange("seller_warehouse_id")}
+                  className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
+                  required
+                >
+                  <option value="">{t("seller.selectWarehouse", "اختر المستودع")}</option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>
+                      {warehouse.warehouseName || warehouse.warehouseCode}
+                    </option>
+                  ))}
+                </select>
+                {warehouseError && (
+                  <p className="text-xs text-red-600 mt-1">{warehouseError}</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-charcoal font-semibold mb-2">{t("seller.type", "Type")}</label>
@@ -697,10 +758,10 @@ function CreateAuctionModal({ onClose, onCreated }: CreateAuctionModalProps) {
                   <label className="block text-charcoal font-semibold mb-2">{t("seller.stock", "Stock quantity")}</label>
                   <input
                     type="number"
-                    value={productForm.stock_quantity}
-                    onChange={handleProductChange("stock_quantity")}
-                    className="w-full px-4 py-2 rounded-luxury border border-gray-300 focus:border-gold focus:outline-none"
-                    required
+                    value="1"
+                    className="w-full px-4 py-2 rounded-luxury border border-gray-300 bg-sand/30 text-charcoal/70 cursor-not-allowed"
+                    disabled
+                    readOnly
                   />
                 </div>
               </div>
