@@ -320,60 +320,6 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
-            <div>
-              <h3 className="text-h3 text-charcoal mb-4">{t('admin.rbacMatrix')}</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full border border-gray-200">
-                  <thead>
-                    <tr className="bg-sand">
-                      <th className="text-right px-4 py-3 text-charcoal font-semibold border-b">{t('admin.permission')}</th>
-                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.admin')}</th>
-                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.moderator')}</th>
-                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.seller')}</th>
-                      <th className="text-center px-4 py-3 text-charcoal font-semibold border-b">{t('admin.buyer')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="px-4 py-3 text-charcoal">{t('admin.manageUsers')}</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">-</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="px-4 py-3 text-charcoal">{t('admin.moderateProducts')}</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">-</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="px-4 py-3 text-charcoal">{t('admin.manageOrders')}</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                      <td className="text-center px-4 py-3">-</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="px-4 py-3 text-charcoal">{t('admin.placeOrders')}</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-3 text-charcoal">{t('admin.viewReports')}</td>
-                      <td className="text-center px-4 py-3">✓</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">-</td>
-                      <td className="text-center px-4 py-3">-</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             <button
               onClick={handleSavePlatform}
               disabled={savingPlatform}

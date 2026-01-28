@@ -30,7 +30,6 @@ export default function AdminUsersPage() {
   const [sellerRequests, setSellerRequests] = useState<SellerRequest[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -42,9 +41,7 @@ export default function AdminUsersPage() {
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [selectedUser, setSelectedUser] = useState<(User & { created_at?: string }) | null>(null);
   const [editStatus, setEditStatus] = useState<User["status"]>("ACTIVE");
-  const [editRoles, setEditRoles] = useState<string[]>([]);
   const [savingUser, setSavingUser] = useState(false);
-  const roleOptions = ["buyer", "seller", "admin", "moderator", "support"];
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
@@ -67,7 +64,6 @@ export default function AdminUsersPage() {
       };
       if (debouncedSearchTerm) params.search = debouncedSearchTerm;
       if (statusFilter !== "all") params.status = statusFilter;
-      if (roleFilter !== "all") params.role = roleFilter;
 
       const response = await api.get("/admin/users", { params });
       const payload = response.data;
@@ -97,7 +93,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadUsers();
-  }, [page, statusFilter, roleFilter, debouncedSearchTerm]);
+  }, [page, statusFilter, debouncedSearchTerm]);
 
   useEffect(() => {
     loadSellerRequests();
@@ -128,14 +124,6 @@ export default function AdminUsersPage() {
   const openEditModal = (user: User & { created_at?: string }) => {
     setSelectedUser(user);
     setEditStatus(user.status);
-    const normalizedRoles =
-      user.roles && user.roles.length > 0
-        ? Array.from(new Set(user.roles.map((role) => role.toLowerCase())))
-        : [];
-    if (!normalizedRoles.includes("buyer")) {
-      normalizedRoles.push("buyer");
-    }
-    setEditRoles(normalizedRoles);
   };
 
   const closeEditModal = () => {
@@ -143,26 +131,12 @@ export default function AdminUsersPage() {
     setSavingUser(false);
   };
 
-  const toggleRole = (role: string) => {
-    setEditRoles((prev) => {
-      const normalized = role.toLowerCase();
-      if (normalized === "buyer") {
-        return prev.includes("buyer") ? prev : [...prev, "buyer"];
-      }
-      return prev.includes(normalized)
-        ? prev.filter((r) => r !== normalized)
-        : [...prev, normalized];
-    });
-  };
-
   const handleSaveUser = async () => {
     if (!selectedUser) return;
     try {
       setSavingUser(true);
-      const normalizedRoles = editRoles.includes("buyer") ? editRoles : [...editRoles, "buyer"];
       await api.patch(`/admin/users/${selectedUser.id}`, {
         status: editStatus,
-        roles: normalizedRoles,
       });
       await loadUsers();
       closeEditModal();
@@ -358,21 +332,6 @@ export default function AdminUsersPage() {
             <option value="active">{t("admin.activate", "تفعيل")}</option>
             <option value="suspended">{t("admin.suspend", "تعليق")}</option>
           </select>
-          <select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setPage(1);
-            }}
-            className="px-4 py-2 rounded-luxury border border-sand min-h-[44px]"
-          >
-            <option value="all">{t("admin.allRoles", "كل الأدوار")}</option>
-            {roleOptions.map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </select>
         </div>
 
         <div className="overflow-x-auto">
@@ -513,29 +472,6 @@ export default function AdminUsersPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-2">{t("admin.role")}</label>
-              <div className="flex flex-wrap gap-2">
-                {roleOptions.map((role) => (
-                  <label
-                    key={role}
-                    className={`px-3 py-1 rounded-full border cursor-pointer text-sm ${
-                      editRoles.includes(role)
-                        ? "bg-gold text-charcoal border-gold"
-                        : "border-sand text-charcoal-light"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="hidden"
-                      checked={editRoles.includes(role)}
-                      onChange={() => toggleRole(role)}
-                    />
-                    {role}
-                  </label>
-                ))}
-              </div>
-            </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button

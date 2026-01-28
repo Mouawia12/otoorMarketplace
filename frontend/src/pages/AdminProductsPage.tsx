@@ -80,7 +80,6 @@ export default function AdminProductsPage() {
   const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [updatingProductId, setUpdatingProductId] = useState<number | null>(null);
-  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQ(q.trim()), 300);
@@ -184,41 +183,6 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleDeleteProduct = async (product: Product) => {
-    if (deletingProductId === product.id) return;
-    const confirmed = window.confirm(
-      t("seller.deleteProductConfirm", "Delete this product permanently?")
-    );
-    if (!confirmed) return;
-    setDeletingProductId(product.id);
-    setNotice(null);
-    try {
-      await api.delete(`/admin/products/${product.id}`);
-      setProducts((prev) => prev.filter((entry) => entry.id !== product.id));
-      const statusKey = product.status?.toLowerCase?.() ?? "";
-      if (statusKey) {
-        setStatusCounts((prev) => {
-          const next = { ...prev };
-          if (statusKey in next) {
-            next[statusKey] = Math.max(0, (next[statusKey] ?? 0) - 1);
-          }
-          return next;
-        });
-      }
-      setNotice({
-        tone: "success",
-        message: t("seller.deleteProductSuccess", "Product deleted successfully"),
-      });
-    } catch (err: any) {
-      console.error("Failed to delete product", err);
-      setNotice({
-        tone: "error",
-        message: err?.response?.data?.detail ?? t("seller.deleteProductFailed", "Failed to delete product"),
-      });
-    } finally {
-      setDeletingProductId(null);
-    }
-  };
 
   if (loading) {
     return (
@@ -307,7 +271,6 @@ export default function AdminProductsPage() {
               <th className="px-2 py-2 text-start align-top">{t("admin.seller")}</th>
               <th className="px-2 py-2 text-start align-top">{t("seller.price")}</th>
               <th className="px-2 py-2 text-start align-top">{t("seller.status")}</th>
-              <th className="px-2 py-2 text-start align-top">{t("common.actions", "Actions")}</th>
             </tr>
           </thead>
 
@@ -362,23 +325,13 @@ export default function AdminProductsPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-2 py-2 align-top">
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProduct(product)}
-                      disabled={deletingProductId === product.id}
-                      className="px-3 py-1.5 rounded-md text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {deletingProductId === product.id ? t("common.loading") : t("common.delete")}
-                    </button>
-                  </td>
                 </tr>
               );
             })}
 
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-taupe">
+                <td colSpan={5} className="px-3 py-6 text-center text-taupe">
                   {t("seller.noProducts")}
                 </td>
               </tr>

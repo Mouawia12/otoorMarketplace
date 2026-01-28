@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Outlet, NavLink, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
@@ -9,6 +9,7 @@ export default function SellerLayout() {
   const { t } = useTranslation();
   const location = useLocation();
   const { isAuthenticated, user, authChecked } = useAuthStore();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const hasSellerAccess = useMemo(() => {
     const roles = user?.roles ?? [];
@@ -75,6 +76,17 @@ export default function SellerLayout() {
     <div className="min-h-screen bg-sand">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6 md:py-8">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+          {/* Mobile Sidebar Toggle */}
+          <div className="flex items-center justify-between lg:hidden">
+            <h2 className="text-lg font-semibold text-charcoal">{t('seller.sellerPanel')}</h2>
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="px-3 py-2 rounded-luxury border border-sand bg-white text-charcoal text-sm font-semibold hover:bg-sand/60 transition"
+            >
+              {t('common.menu', 'القائمة')}
+            </button>
+          </div>
           {/* Sidebar */}
           <aside className="hidden lg:block w-full lg:w-64 flex-shrink-0">
             <div className="bg-white rounded-luxury p-4 sm:p-6 shadow-luxury">
@@ -109,6 +121,48 @@ export default function SellerLayout() {
           </main>
         </div>
       </div>
+      {/* Mobile Sidebar Drawer */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label={t('common.close', 'إغلاق')}
+            onClick={() => setMobileSidebarOpen(false)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <div className="absolute inset-y-0 start-0 w-72 max-w-[85%] bg-white shadow-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-charcoal">{t('seller.sellerPanel')}</h2>
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="text-charcoal-light hover:text-charcoal"
+              >
+                ✕
+              </button>
+            </div>
+            <nav className="space-y-1">
+              {menuItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-3 rounded-luxury transition min-h-[44px] ${
+                      isActive
+                        ? 'bg-gold text-charcoal font-semibold'
+                        : 'text-charcoal-light hover:bg-sand hover:text-charcoal'
+                    }`
+                  }
+                >
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-sm">{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

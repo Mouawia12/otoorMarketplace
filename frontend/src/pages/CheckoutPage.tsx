@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -7,6 +7,8 @@ import { useAuthStore } from "../store/authStore";
 import { formatPrice } from "../utils/currency";
 import { clearPendingOrder, savePendingOrder, PendingOrderPayload } from "../utils/pendingOrder";
 import { shouldDisablePlaceOrder, shouldFetchCourierPartners } from "../utils/checkoutGuards";
+import { computeTorodShippingTotal } from "../utils/torodShipping";
+import SARIcon from "../components/common/SARIcon";
 
 const dialCodeOptions = [
   { code: "+966", country: "Saudi Arabia", label: "🇸🇦 Saudi Arabia (+966)" },
@@ -414,6 +416,64 @@ export default function CheckoutPage() {
   const showUnifiedSelect = hasSharedPartners;
   const showAdvancedSelects = showAdvancedShipping || !hasSharedPartners;
   const isPartialIntersection = !hasFullIntersection && hasSharedPartners;
+  const torodShippingSummary = useMemo(() => {
+    if (shipping !== "torod") return null;
+    return computeTorodShippingTotal({
+      groups: courierGroups,
+      groupSelections,
+      commonPartnerId: selectedCourierPartner,
+    });
+  }, [shipping, courierGroups, groupSelections, selectedCourierPartner]);
+  const renderSarPrice = useCallback(
+    (amount: number, iconSize = 14, className = "") => {
+      const formatted = formatPrice(amount, lang).replace(/\s?(SAR|﷼)$/i, "");
+      return (
+        <span className={`inline-flex items-center gap-1 ${className}`}>
+          {formatted}
+          <SARIcon size={iconSize} className="text-current" />
+        </span>
+      );
+    },
+    [lang]
+  );
+  const renderShippingAmount = useCallback(
+    (amount: number, currency?: string, iconSize = 14) => {
+      const normalizedCurrency = typeof currency === "string" ? currency.trim().toUpperCase() : "";
+      if (!normalizedCurrency || normalizedCurrency === "SAR") {
+        return renderSarPrice(amount, iconSize);
+      }
+      return `${amount.toFixed(2)} ${normalizedCurrency}`;
+    },
+    [renderSarPrice]
+  );
+  const shippingSummaryNode = useMemo(() => {
+    if (shipping === "torod") {
+      const totalValue =
+        typeof torodShippingSummary?.total === "number" && Number.isFinite(torodShippingSummary.total)
+          ? torodShippingSummary.total
+          : 0;
+      const currency =
+        typeof torodShippingSummary?.currency === "string" && torodShippingSummary.currency.trim()
+          ? torodShippingSummary.currency.trim()
+          : "SAR";
+      return (
+        <span className="inline-flex items-center gap-1">
+          {t("checkout.shippingTotalLabel", "سعر الشحن الإجمالي")}:
+          {renderShippingAmount(totalValue, currency)}
+        </span>
+      );
+    }
+    return shippingCost > 0 ? renderSarPrice(shippingCost) : t("checkout.free");
+  }, [shipping, torodShippingSummary, shippingCost, t, renderShippingAmount, renderSarPrice]);
+
+  const displayTotal = useMemo(() => {
+    if (shipping !== "torod") return total;
+    const totalValue =
+      typeof torodShippingSummary?.total === "number" && Number.isFinite(torodShippingSummary.total)
+        ? torodShippingSummary.total
+        : 0;
+    return sub - discount + totalValue;
+  }, [shipping, torodShippingSummary, sub, discount, total]);
 
   const setLoading = (
     key: "countries" | "regions" | "cities" | "districts",
@@ -1412,7 +1472,7 @@ export default function CheckoutPage() {
                       {t('checkout.expressShippingDesc')} ({t("checkout.unavailableNow", "غير متاحة حالياً")})
                     </p>
                   </div>
-                  <p className="font-bold text-gold">{formatPrice(35, lang)}</p>
+                  <p className="font-bold text-gold">{renderSarPrice(35, 14)}</p>
                 </label>
               </div>
             </div>
@@ -1464,7 +1524,7 @@ export default function CheckoutPage() {
                         {typeof method.serviceCharge === "number" && (
                           <p className="text-xs text-taupe">
                             {t('checkout.paymentServiceFee', 'رسوم الخدمة')}:{" "}
-                            {formatPrice(method.serviceCharge, lang)}
+                            {renderSarPrice(method.serviceCharge, 12)}
                           </p>
                         )}
                       </div>
@@ -1507,7 +1567,9 @@ export default function CheckoutPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-charcoal truncate">{item.name}</p>
                       <p className="text-xs text-taupe">{t('cart.qty')}: {item.qty}</p>
-                      <p className="text-sm font-bold text-gold">{formatPrice(item.price * item.qty, lang)}</p>
+                      <p className="text-sm font-bold text-gold">
+                        {renderSarPrice(item.price * item.qty, 12)}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -1544,9 +1606,9 @@ export default function CheckoutPage() {
                       <div key={coupon.code} className="flex items-center justify-between text-sm bg-white rounded-lg px-3 py-2 border border-sand">
                         <span className="font-semibold text-charcoal">{coupon.code}</span>
                         <div className="flex items-center gap-3">
-                          <span className="text-green-600">
-                            -{formatPrice(coupon.amount, lang)}
-                          </span>
+                        <span className="text-green-600">
+                          -{renderSarPrice(coupon.amount, 12)}
+                        </span>
                           <button
                             type="button"
                             onClick={() => {
@@ -1606,24 +1668,26 @@ export default function CheckoutPage() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-charcoal">
                   <span>{t('cart.subtotal')}:</span>
-                  <span className="font-semibold">{formatPrice(sub, lang)}</span>
+                  <span className="font-semibold">{renderSarPrice(sub, 12)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>{t('checkout.discount')}:</span>
-                    <span className="font-semibold">-{formatPrice(discount, lang)}</span>
+                    <span className="font-semibold">-{renderSarPrice(discount, 12)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-charcoal">
                   <span>{t('cart.shipping')}:</span>
                   <span className="font-semibold">
-                    {shippingCost > 0 ? formatPrice(shippingCost, lang) : t('checkout.free')}
+                    {shippingSummaryNode}
                   </span>
                 </div>
                 <div className="border-t border-charcoal-light pt-3">
                   <div className="flex justify-between text-charcoal text-xl font-bold">
                     <span>{t('cart.total')}:</span>
-                    <span className="text-gold">{formatPrice(total, lang)}</span>
+                    <span className="text-gold">
+                      {renderShippingAmount(displayTotal, torodShippingSummary?.currency, 16)}
+                    </span>
                   </div>
                 </div>
               </div>

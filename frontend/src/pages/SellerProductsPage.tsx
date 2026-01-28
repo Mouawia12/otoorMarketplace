@@ -274,11 +274,11 @@ export default function SellerProductsPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[60px]">{t('seller.id')}</th>
                 <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[220px] sm:w-[280px]">{t('seller.title')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[160px]">{t('seller.brand')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.type')}</th>
+                <th className="hidden md:table-cell text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[160px]">{t('seller.brand')}</th>
+                <th className="hidden md:table-cell text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.type')}</th>
                 <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.price')}</th>
                 <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[200px]">{t('seller.status')}</th>
-                <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.createdAt')}</th>
+                <th className="hidden md:table-cell text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[140px]">{t('seller.createdAt')}</th>
                 <th className="text-right px-3 md:px-4 py-3 text-charcoal font-semibold text-xs md:text-sm w-[160px]">{t('seller.actions')}</th>
               </tr>
             </thead>
@@ -294,12 +294,12 @@ export default function SellerProductsPage() {
                       {i18n.language === 'ar' ? product.name_ar : product.name_en}
                     </span>
                   </td>
-                  <td className="px-3 md:px-4 py-4 text-charcoal-light">
+                  <td className="hidden md:table-cell px-3 md:px-4 py-4 text-charcoal-light">
                     <span className="block truncate" title={product.brand}>
                       {product.brand}
                     </span>
                   </td>
-                  <td className="px-3 md:px-4 py-4 text-charcoal-light">
+                  <td className="hidden md:table-cell px-3 md:px-4 py-4 text-charcoal-light">
                     <span className="block truncate" title={product.product_type}>
                       {product.product_type}
                     </span>
@@ -351,6 +351,33 @@ export default function SellerProductsPage() {
                           {productStatusExplanation(product.status, t)}
                         </p>
                       </div>
+                    ) : product.status === 'rejected' ? (
+                      <div className="space-y-2">
+                        <span
+                          className={`px-3 py-1 rounded-full text-sm font-semibold inline-flex items-center ${statusBadgeClass(product.status)}`}
+                        >
+                          {productStatusLabel(product.status, t)}
+                        </span>
+                        <p className="text-xs text-charcoal-light">
+                          {productStatusExplanation(product.status, t)}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(product.id, 'pending')}
+                            className="px-3 py-1 rounded-full text-xs font-semibold border border-gold text-charcoal hover:bg-gold/10 transition"
+                          >
+                            {t('seller.submitForReview', 'إرسال للمراجعة')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(product.id, 'draft')}
+                            className="px-3 py-1 rounded-full text-xs font-semibold border border-gray-200 text-charcoal hover:bg-sand/60 transition"
+                          >
+                            {t('seller.draft', 'مسودة')}
+                          </button>
+                        </div>
+                      </div>
                     ) : (
                       <div className="space-y-1">
                         <select
@@ -360,7 +387,6 @@ export default function SellerProductsPage() {
                         >
                           <option value="pending">{t('seller.pending', 'Pending review')}</option>
                           <option value="draft">{t('seller.draft', 'Draft')}</option>
-                          <option value="rejected">{t('seller.rejected', 'Rejected')}</option>
                         </select>
                         <p className="text-xs text-charcoal-light">
                           {productStatusExplanation(product.status, t)}
@@ -368,7 +394,7 @@ export default function SellerProductsPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 md:px-4 py-4 text-charcoal-light">
+                  <td className="hidden md:table-cell px-3 md:px-4 py-4 text-charcoal-light">
                     {new Date(product.created_at).toLocaleDateString(
                       i18n.language === 'ar' ? 'ar-EG' : 'en-US'
                     )}
